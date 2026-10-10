@@ -1,0 +1,5 @@
+{
+  "backend_url": "http://localhost:8000",
+  "secret_token": "PASTE_TOKEN_FROM_APP",
+  "interval_seconds": 60
+}
