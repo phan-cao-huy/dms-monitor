@@ -23,6 +23,6 @@ Agent: `cp agent/configs/config.example.json agent/configs/config.json && make a
 ## Phân công
 | Dev | Module | Việc đầu tiên |
 |---|---|---|
-| 1 | backend, database | models + `/auth/login` + `/agent/heartbeat` thật |
-| 2 | agent | thu thập metrics + gửi heartbeat có retry |
-| 3 | mobile | tạo project Android, Login + Dashboard (mock → API thật) |
+| 1: Huy | backend, database | models + `/auth/login` + `/agent/heartbeat` thật |
+| 2: Kỳ | agent | thu thập metrics + gửi heartbeat có retry |
+| 3: Vinh| mobile | tạo project Android, Login + Dashboard (mock → API thật) |
