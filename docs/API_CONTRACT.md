@@ -37,6 +37,11 @@ Lỗi trả về dạng `{"detail": "..."}`. Thời gian: ISO-8601 UTC.
 | POST | /auth/refresh | rotate refresh token |
 | POST | /auth/logout | revoke refresh token |
 | POST | /auth/fcm-token | đăng ký FCM token |
+| GET | /auth/me | thông tin tài khoản hiện tại, yêu cầu access token |
+
+`register` nhận JSON `{"username":"linh","email":"linh@example.com","password":"...","full_name":"..."}`; username dài 3–50 ký tự, password tối thiểu 8 và tối đa 72 byte UTF-8. Email/username trùng trả `409`. `login` nhận `{"identifier":"linh@example.com","password":"..."}`; `identifier` có thể là email hoặc username. Refresh và logout nhận `{"refresh_token":"..."}`. Refresh token được rotate mỗi lần dùng và chỉ bản SHA-256 được lưu trong PostgreSQL. Các endpoint ngoài register/login/refresh/logout yêu cầu `Authorization: Bearer <access_token>`; FCM nhận `{"fcm_token":"...","device_label":"...","app_version":"..."}`.
+
+Backend dùng SQLAlchemy async với driver `asyncpg`; `DATABASE_URL` có dạng `postgresql+asyncpg://user:password@host:5432/database`. Chạy trong Docker Compose thì `host` là `db`; chạy backend trực tiếp trên máy host thì dùng `localhost`. `database/schema.sql` được Docker nạp khi khởi tạo volume PostgreSQL lần đầu.
 
 ## Organization
 | Method | Path |
@@ -46,6 +51,8 @@ Lỗi trả về dạng `{"detail": "..."}`. Thời gian: ISO-8601 UTC.
 | GET/POST | /orgs/{org_id}/invitations |
 | GET/PATCH/DELETE | /orgs/{org_id}/members[/{user_id}] |
 | GET/POST | /orgs/{org_id}/groups |
+
+Tất cả endpoint tổ chức yêu cầu `Authorization: Bearer <access_token>`. `POST /orgs` nhận `{"org_name":"Tên tổ chức","description":"...","logo_url":"..."}`; người tạo tự động có role `Owner`. `GET /orgs` chỉ trả về tổ chức mà user hiện tại tham gia. `POST /orgs/join` nhận `{"invite_code":"A3K9MZ"}`; mã phải còn hạn và chưa hết lượt sử dụng. Chỉ `Owner`/`Admin` được tạo hoặc liệt kê invitation và tạo group; invitation chỉ cấp role `Manager` hoặc `Viewer`. Thành viên của org có thể xem danh sách members/groups. PATCH `/orgs/{org_id}/members/{user_id}` nhận `{"role":"Admin|Manager|Viewer"}`; chỉ Owner được cấp role Admin, không thể đổi hoặc xóa Owner.
 
 ## Devices & Metrics (Mobile, JWT)
 | Method | Path | Mô tả |
