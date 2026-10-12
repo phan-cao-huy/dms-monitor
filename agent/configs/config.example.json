@@ -1,5 +1,9 @@
 {
-  "backend_url": "http://localhost:8000",
+  "backend_url": "http://localhost:8000/api/v1",
   "secret_token": "PASTE_TOKEN_FROM_APP",
-  "interval_seconds": 60
+  "device_id": 0,
+  "heartbeat_interval_seconds": 60,
+  "command_poll_interval_seconds": 10,
+  "process_top_n": 15,
+  "log_level": "info"
 }
