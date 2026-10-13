@@ -41,25 +41,27 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 # ── 1. GET /orgs/{org_id}/devices ────────────────────────────────────────────
 
+
 @router.get("/orgs/{org_id}/devices", response_model=list[DeviceListItem])
 async def api_list_devices(
     org_id: int,
     db: DB,
     user: CurrentUser,
-    group_id: int | None = Query(default=None, description="Loc theo nhom"),
-    status_filter: str | None = Query(
-        default=None, alias="status", description="Loc theo trang thai"
-    ),
+    group_id: Annotated[int | None, Query(description="Loc theo nhom")] = None,
+    status_filter: Annotated[
+        str | None, Query(alias="status", description="Loc theo trang thai")
+    ] = None,
 ):
     """Lay danh sach thiet bi trong to chuc — cho Dashboard Mobile/Web."""
     try:
         devices = await list_devices(db, org_id, user.user_id, group_id, status_filter)
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     return devices
 
 
 # ── 2. POST /orgs/{org_id}/devices ───────────────────────────────────────────
+
 
 @router.post(
     "/orgs/{org_id}/devices",
@@ -79,9 +81,9 @@ async def api_create_device(
             body.device_name, body.description, body.group_id,
         )
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
     return DeviceCreateOut(
         device_id=device.device_id,
@@ -96,19 +98,21 @@ async def api_create_device(
 
 # ── 3. GET /devices/{id} ────────────────────────────────────────────────────
 
+
 @router.get("/devices/{device_id}", response_model=DeviceDetailOut)
 async def api_get_device(device_id: int, db: DB, user: CurrentUser):
     """Lay chi tiet thiet bi + thong tin phan cung tinh."""
     try:
         detail = await get_device_detail(db, device_id, user.user_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     return detail
 
 
 # ── 3b. PATCH /devices/{id} ─────────────────────────────────────────────────
+
 
 @router.patch("/devices/{device_id}", response_model=DeviceDetailOut)
 async def api_update_device(
@@ -116,19 +120,20 @@ async def api_update_device(
 ):
     """Cap nhat ten, mo ta, nhom cua thiet bi."""
     try:
-        device = await update_device(
+        await update_device(
             db, device_id, user.user_id,
             body.device_name, body.description, body.group_id,
         )
         detail = await get_device_detail(db, device_id, user.user_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except (PermissionError, ValueError) as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     return detail
 
 
 # ── 3c. DELETE /devices/{id} ────────────────────────────────────────────────
+
 
 @router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def api_delete_device(device_id: int, db: DB, user: CurrentUser):
@@ -136,21 +141,22 @@ async def api_delete_device(device_id: int, db: DB, user: CurrentUser):
     try:
         await delete_device(db, device_id, user.user_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
 
 # ── 4. GET /devices/{id}/metrics ─────────────────────────────────────────────
+
 
 @router.get("/devices/{device_id}/metrics")
 async def api_get_metrics(
     device_id: int,
     db: DB,
     user: CurrentUser,
-    from_dt: datetime | None = Query(default=None, alias="from"),
-    to_dt: datetime | None = Query(default=None, alias="to"),
-    interval: Literal["raw", "hourly"] = Query(default="raw"),
+    from_dt: Annotated[datetime | None, Query(alias="from")] = None,
+    to_dt: Annotated[datetime | None, Query(alias="to")] = None,
+    interval: Annotated[Literal["raw", "hourly"], Query()] = "raw",
 ):
     """Lay du lieu metric theo khoang thoi gian — cho bieu do Mobile/Web.
 
@@ -160,9 +166,9 @@ async def api_get_metrics(
     try:
         rows = await get_metrics(db, device_id, user.user_id, from_dt, to_dt, interval)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
     if interval == "hourly":
         return [MetricHourlyOut.model_validate(r) for r in rows]
@@ -171,21 +177,23 @@ async def api_get_metrics(
 
 # ── 5. GET /devices/{id}/processes ───────────────────────────────────────────
 
+
 @router.get("/devices/{device_id}/processes", response_model=ProcessSnapshotOut | None)
 async def api_get_processes(device_id: int, db: DB, user: CurrentUser):
     """Lay snapshot danh sach process moi nhat cua may."""
     try:
         snapshot = await get_latest_processes(db, device_id, user.user_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     if snapshot is None:
         return None
     return snapshot
 
 
 # ── 6. POST /devices/{id}/commands ───────────────────────────────────────────
+
 
 @router.post(
     "/devices/{device_id}/commands",
@@ -206,26 +214,27 @@ async def api_create_command(
             body.command_type, body.parameters, body.reason,
         )
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     return cmd
 
 
 # ── 7. GET /devices/{id}/commands ────────────────────────────────────────────
+
 
 @router.get("/devices/{device_id}/commands", response_model=list[CommandOut])
 async def api_list_commands(
     device_id: int,
     db: DB,
     user: CurrentUser,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ):
     """Lay lich su cac lenh dieu khien da gui va ket qua thuc thi."""
     try:
         commands = await list_commands(db, device_id, user.user_id, limit)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     return commands

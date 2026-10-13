@@ -5,7 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ── Device CRUD ──────────────────────────────────────────────────────────────
 
 CommandType = Literal["REBOOT", "RESTART_SERVICE", "KILL_PROCESS"]
@@ -60,6 +59,7 @@ class DeviceUpdate(BaseModel):
 
 # ── Device Detail + Static Info ──────────────────────────────────────────────
 
+
 class StaticInfoOut(BaseModel):
     """Thong tin phan cung tinh cua may."""
 
@@ -102,6 +102,7 @@ class DeviceDetailOut(BaseModel):
 
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
+
 class MetricOut(BaseModel):
     """1 diem du lieu metric — dung cho bieu do."""
 
@@ -136,6 +137,7 @@ class MetricHourlyOut(BaseModel):
 
 # ── Process Snapshots ────────────────────────────────────────────────────────
 
+
 class ProcessSnapshotOut(BaseModel):
     """GET /devices/{id}/processes — snapshot process moi nhat."""
 
@@ -148,6 +150,7 @@ class ProcessSnapshotOut(BaseModel):
 
 
 # ── Commands ─────────────────────────────────────────────────────────────────
+
 
 class CommandCreate(BaseModel):
     """POST /devices/{id}/commands — gui lenh dieu khien tu Mobile."""

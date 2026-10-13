@@ -1,9 +1,9 @@
 """Service layer cho module Device — business logic tach khoi router."""
 
 import secrets
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
-from sqlalchemy import select, update, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_device_token
@@ -17,8 +17,8 @@ from app.models.device import (
 )
 from app.models.organization import DeviceGroup, OrganizationMember
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 async def _check_org_membership(
     db: AsyncSession, user_id: int, org_id: int
@@ -56,6 +56,7 @@ async def _get_org_id_for_device(db: AsyncSession, device_id: int) -> int:
 
 
 # ── Device CRUD ──────────────────────────────────────────────────────────────
+
 
 async def create_device(
     db: AsyncSession, org_id: int, user_id: int,
@@ -217,6 +218,7 @@ async def delete_device(
 
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
+
 async def get_metrics(
     db: AsyncSession, device_id: int, user_id: int,
     from_dt: datetime | None, to_dt: datetime | None,
@@ -250,6 +252,7 @@ async def get_metrics(
 
 # ── Process Snapshots ────────────────────────────────────────────────────────
 
+
 async def get_latest_processes(
     db: AsyncSession, device_id: int, user_id: int,
 ) -> DeviceProcessSnapshot | None:
@@ -268,12 +271,13 @@ async def get_latest_processes(
 
 # ── Commands ─────────────────────────────────────────────────────────────────
 
+
 async def create_command(
     db: AsyncSession, device_id: int, user_id: int,
     command_type: str, parameters: dict | None, reason: str,
 ) -> DeviceCommand:
     """Tao lenh dieu khien — luu vao hang doi PENDING."""
-    device = await _get_device_or_404(db, device_id)
+    await _get_device_or_404(db, device_id)
     org_id = await _get_org_id_for_device(db, device_id)
     member = await _check_org_membership(db, user_id, org_id)
 
