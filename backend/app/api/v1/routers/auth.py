@@ -13,11 +13,13 @@ from app.schemas.auth import (
     RefreshIn,
     RegisterIn,
     TokenOut,
+    UserDetailOut,
     UserOut,
 )
 from app.services.auth import (
     authenticate_user,
     issue_tokens,
+    list_all_users,
     register_user,
     revoke_refresh_token,
     rotate_refresh_token,
@@ -37,6 +39,31 @@ async def get_me(
 ) -> User:
     """Lấy thông tin tài khoản hiện tại từ access token."""
     return user
+
+
+@router.get(
+    "/me/detail",
+    response_model=UserDetailOut,
+    summary="Lấy thông tin chi tiết tài khoản hiện tại",
+)
+async def get_me_detail(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Lấy đầy đủ thông tin chi tiết tài khoản hiện tại từ access token."""
+    return user
+
+
+@router.get(
+    "/users",
+    response_model=list[UserDetailOut],
+    summary="Lấy danh sách tất cả tài khoản",
+)
+async def get_all_users(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> list[User]:
+    """Lấy danh sách tất cả các tài khoản hiện tại trong hệ thống."""
+    return await list_all_users(db)
 
 
 @router.post(
@@ -125,12 +152,17 @@ async def register_fcm_token(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
-    """Lưu hoặc cập nhật FCM token cho thiết bị của tài khoản đang đăng nhập."""
-    await save_fcm_token(
+    """Gắn FCM token vào phiên refresh token đang đăng nhập."""
+    saved = await save_fcm_token(
         db,
         user.user_id,
+        payload.refresh_token,
         payload.fcm_token,
-        payload.device_label,
-        payload.app_version,
+        payload.device_info,
     )
+    if not saved:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

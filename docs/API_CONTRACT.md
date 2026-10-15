@@ -38,10 +38,14 @@ Lỗi trả về dạng `{"detail": "..."}`. Thời gian: ISO-8601 UTC.
 | POST | /auth/logout | revoke refresh token |
 | POST | /auth/fcm-token | đăng ký FCM token |
 | GET | /auth/me | thông tin tài khoản hiện tại, yêu cầu access token |
+| GET | /auth/me/detail | thông tin chi tiết đầy đủ tài khoản hiện tại |
+| GET | /auth/users | danh sách tất cả tài khoản người dùng trong hệ thống |
 
-`register` nhận JSON `{"username":"linh","email":"linh@example.com","password":"...","full_name":"..."}`; username dài 3–50 ký tự, password tối thiểu 8 và tối đa 72 byte UTF-8. Email/username trùng trả `409`. `login` nhận `{"identifier":"linh@example.com","password":"..."}`; `identifier` có thể là email hoặc username. Refresh và logout nhận `{"refresh_token":"..."}`. Refresh token được rotate mỗi lần dùng và chỉ bản SHA-256 được lưu trong PostgreSQL. Các endpoint ngoài register/login/refresh/logout yêu cầu `Authorization: Bearer <access_token>`; FCM nhận `{"fcm_token":"...","device_label":"...","app_version":"..."}`.
+`register` nhận JSON `{"username":"linh","email":"linh@example.com","password":"...","full_name":"..."}`; username dài 3–50 ký tự, password tối thiểu 8 và tối đa 72 byte UTF-8. Email/username trùng trả `409`. `login` nhận `{"identifier":"linh@example.com","password":"..."}`; `identifier` có thể là email hoặc username. Refresh và logout nhận `{"refresh_token":"..."}`. Refresh token được rotate mỗi lần dùng và chỉ bản SHA-256 được lưu trong auth_tokens. Các endpoint ngoài register/login/refresh/logout yêu cầu `Authorization: Bearer <access_token>`; FCM nhận `{"refresh_token":"...","fcm_token":"...","device_info":"..."}`. `GET /auth/users` trả về danh sách toàn bộ tài khoản với đầy đủ thông tin (ngoại trừ password_hash).
 
-Backend dùng SQLAlchemy async với driver `asyncpg`; `DATABASE_URL` có dạng `postgresql+asyncpg://user:password@host:5432/database`. Chạy trong Docker Compose thì `host` là `db`; chạy backend trực tiếp trên máy host thì dùng `localhost`. `database/schema.sql` được Docker nạp khi khởi tạo volume PostgreSQL lần đầu.
+Backend dùng SQLAlchemy async với driver `asyncpg`; `DATABASE_URL` có dạng `postgresql+asyncpg://user:password@host:5432/database`. Chạy trong Docker Compose thì `host` là `db`; chạy backend trực tiếp trên máy host thì dùng `localhost`. `database/dms01.sql` được Docker nạp khi khởi tạo volume PostgreSQL lần đầu.
+
+Với schema hiện tại, refresh token được lưu trong `auth_tokens` (chỉ lưu SHA-256). `POST /auth/fcm-token` nhận `{"refresh_token":"...","fcm_token":"...","device_info":"..."}` để gắn FCM vào đúng phiên đăng nhập; FCM được giữ khi refresh token được rotate.
 
 ## Organization
 | Method | Path |

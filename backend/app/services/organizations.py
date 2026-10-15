@@ -53,7 +53,6 @@ async def _get_member(
         .where(
             OrganizationMember.org_id == org_id,
             OrganizationMember.user_id == user_id,
-            Organization.is_active.is_(True),
             Organization.deleted_at.is_(None),
         )
     )
@@ -78,7 +77,6 @@ async def list_organizations(db: AsyncSession, user_id: int) -> list[dict]:
         .join(OrganizationMember, OrganizationMember.org_id == Organization.org_id)
         .where(
             OrganizationMember.user_id == user_id,
-            Organization.is_active.is_(True),
             Organization.deleted_at.is_(None),
         )
         .order_by(Organization.org_name)
@@ -135,8 +133,7 @@ async def join_organization(
         .join(Organization, Organization.org_id == OrganizationInvitation.org_id)
         .where(
             OrganizationInvitation.invite_code == invite_code.upper(),
-            OrganizationInvitation.is_active.is_(True),
-            Organization.is_active.is_(True),
+            OrganizationInvitation.revoked_at.is_(None),
             Organization.deleted_at.is_(None),
         )
         .with_for_update()
@@ -164,8 +161,6 @@ async def join_organization(
         org_id=invitation.org_id,
         user_id=user_id,
         role=invitation.default_role,
-        invited_by=invitation.created_by,
-        invite_code_used=invitation.invite_code,
     )
     invitation.use_count += 1
     db.add(member)
@@ -206,7 +201,6 @@ async def create_invitation(
     invitation = OrganizationInvitation(
         org_id=org_id,
         invite_code="".join(secrets.choice(alphabet) for _ in range(6)),
-        invite_token=secrets.token_urlsafe(48)[:64],
         default_role=payload.default_role,
         max_uses=payload.max_uses,
         expires_at=expires_at,
@@ -301,7 +295,6 @@ async def list_groups(
         select(DeviceGroup)
         .where(
             DeviceGroup.org_id == org_id,
-            DeviceGroup.is_active.is_(True),
         )
         .order_by(DeviceGroup.group_name)
     )
@@ -319,8 +312,6 @@ async def create_group(
         org_id=org_id,
         group_name=payload.group_name.strip(),
         description=payload.description,
-        icon=payload.icon,
-        color=payload.color,
     )
     db.add(group)
     await db.commit()

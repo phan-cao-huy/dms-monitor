@@ -1,4 +1,4 @@
-from app.models.auth import RefreshToken, User, UserFcmToken
+from app.models.auth import AuthToken, User
 from app.models.organization import (
     DeviceGroup,
     Organization,
@@ -11,7 +11,6 @@ __all__ = [
     "Organization",
     "OrganizationInvitation",
     "OrganizationMember",
-    "RefreshToken",
+    "AuthToken",
     "User",
-    "UserFcmToken",
 ]
