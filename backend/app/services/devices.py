@@ -1,0 +1,476 @@
+import hashlib
+import secrets
+from datetime import UTC, datetime
+from typing import Any, NoReturn
+
+from sqlalchemy import desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
+from app.models.organization import (
+    DeviceGroup,
+    Organization,
+    OrganizationMember,
+    UserGroupAccess,
+)
+from app.schemas.agent import CommandResultIn, HeartbeatIn
+from app.schemas.device import DeviceCommandCreate, DeviceCreate, DeviceUpdate
+
+
+class DeviceError(Exception):
+    def __init__(self, status_code: int, detail: str) -> None:
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
+def _fail(status_code: int, detail: str) -> NoReturn:
+    raise DeviceError(status_code, detail)
+
+
+def _utc_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _as_utc_naive(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(UTC).replace(tzinfo=None)
+    return value
+
+
+def generate_device_token() -> tuple[str, str, str]:
+    raw = "dms_" + secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    token_prefix = raw[:8]
+    return raw, token_hash, token_prefix
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
+
+
+async def verify_device_credentials(
+    db: AsyncSession, token: str, device_id: int | None = None
+) -> Device:
+    token_hash = hash_token(token)
+    stmt = select(Device).where(
+        Device.secret_token_hash == token_hash,
+        Device.archived_at.is_(None),
+    )
+    if device_id is not None:
+        stmt = stmt.where(Device.device_id == device_id)
+
+    result = await db.execute(stmt)
+    device = result.scalar_one_or_none()
+    if device is None:
+        _fail(401, "Invalid device credentials or device is archived")
+    return device
+
+
+async def _get_org_member(
+    db: AsyncSession, org_id: int, user_id: int
+) -> OrganizationMember:
+    result = await db.execute(
+        select(OrganizationMember)
+        .join(Organization, Organization.org_id == OrganizationMember.org_id)
+        .where(
+            OrganizationMember.org_id == org_id,
+            OrganizationMember.user_id == user_id,
+            Organization.deleted_at.is_(None),
+        )
+    )
+    member = result.scalar_one_or_none()
+    if member is None:
+        _fail(403, "You are not a member of this organization")
+    return member
+
+
+async def check_user_device_access(
+    db: AsyncSession,
+    device_id: int,
+    user_id: int,
+    required_roles: list[str] | None = None,
+) -> tuple[Device, OrganizationMember]:
+    result = await db.execute(
+        select(Device).where(Device.device_id == device_id)
+    )
+    device = result.scalar_one_or_none()
+    if device is None:
+        _fail(404, "Device not found")
+
+    member = await _get_org_member(db, device.org_id, user_id)
+
+    if member.role in ("Owner", "Admin"):
+        if required_roles and member.role not in required_roles:
+            _fail(403, "Permission denied for this action")
+        return device, member
+
+    # For Manager / Viewer: check if group restriction applies
+    if device.group_id is not None:
+        acc_result = await db.execute(
+            select(UserGroupAccess).where(
+                UserGroupAccess.user_id == user_id,
+                UserGroupAccess.group_id == device.group_id,
+            )
+        )
+        access = acc_result.scalar_one_or_none()
+        role = access.role if access else member.role
+    else:
+        role = member.role
+
+    if required_roles and role not in required_roles:
+        _fail(403, "Permission denied for this action")
+
+    return device, member
+
+
+async def create_device(
+    db: AsyncSession, org_id: int, user_id: int, payload: DeviceCreate
+) -> tuple[Device, str]:
+    member = await _get_org_member(db, org_id, user_id)
+    if member.role not in ("Owner", "Admin"):
+        _fail(403, "Only Owner or Admin can register devices")
+
+    if payload.group_id is not None:
+        group_res = await db.execute(
+            select(DeviceGroup).where(
+                DeviceGroup.group_id == payload.group_id,
+                DeviceGroup.org_id == org_id,
+            )
+        )
+        if group_res.scalar_one_or_none() is None:
+            _fail(404, "Device group not found in this organization")
+
+    raw_token, token_hash, token_prefix = generate_device_token()
+    device = Device(
+        org_id=org_id,
+        group_id=payload.group_id,
+        device_name=payload.device_name.strip(),
+        description=payload.description,
+        secret_token_hash=token_hash,
+        secret_token_prefix=token_prefix,
+        status="Offline",
+        offline_threshold_minutes=payload.offline_threshold_minutes,
+        created_by=user_id,
+    )
+    db.add(device)
+    await db.commit()
+    await db.refresh(device)
+    return device, raw_token
+
+
+def _calculate_device_status(device: Device, now: datetime) -> str:
+    if device.archived_at is not None or device.status == "Archived":
+        return "Archived"
+    if device.last_heartbeat is None:
+        return "Offline"
+    diff_minutes = (now - device.last_heartbeat).total_seconds() / 60
+    if diff_minutes > device.offline_threshold_minutes:
+        return "Offline"
+    return device.status if device.status in ("Online", "Warning") else "Online"
+
+
+async def list_devices(
+    db: AsyncSession, user_id: int, org_id: int | None = None
+) -> list[dict[str, Any]]:
+    now = _utc_naive()
+
+    # Get user memberships
+    stmt = (
+        select(OrganizationMember)
+        .join(Organization, Organization.org_id == OrganizationMember.org_id)
+        .where(
+            OrganizationMember.user_id == user_id,
+            Organization.deleted_at.is_(None),
+        )
+    )
+    if org_id is not None:
+        stmt = stmt.where(OrganizationMember.org_id == org_id)
+
+    members_res = await db.execute(stmt)
+    members = list(members_res.scalars().all())
+    if not members:
+        if org_id is not None:
+            _fail(403, "You are not a member of this organization")
+        return []
+
+    org_roles = {m.org_id: m.role for m in members}
+    target_org_ids = list(org_roles.keys())
+
+    # Get allowed groups for Manager/Viewer
+    group_access_res = await db.execute(
+        select(UserGroupAccess.group_id).where(UserGroupAccess.user_id == user_id)
+    )
+    accessible_group_ids = set(group_access_res.scalars().all())
+
+    dev_stmt = select(Device).where(
+        Device.org_id.in_(target_org_ids),
+        Device.archived_at.is_(None),
+    ).order_by(Device.device_id.desc())
+
+    dev_res = await db.execute(dev_stmt)
+    all_devices = list(dev_res.scalars().all())
+
+    result: list[dict[str, Any]] = []
+    for d in all_devices:
+        role = org_roles.get(d.org_id)
+        if role in ("Owner", "Admin"):
+            pass
+        else:
+            # Manager/Viewer: if group assigned, must have access
+            if d.group_id is not None and d.group_id not in accessible_group_ids:
+                continue
+
+        computed_status = _calculate_device_status(d, now)
+
+        result.append(
+            {
+                "device_id": d.device_id,
+                "org_id": d.org_id,
+                "group_id": d.group_id,
+                "device_name": d.device_name,
+                "description": d.description,
+                "secret_token_prefix": d.secret_token_prefix,
+                "status": computed_status,
+                "last_heartbeat": d.last_heartbeat,
+                "offline_threshold_minutes": d.offline_threshold_minutes,
+                "created_at": d.created_at,
+                "updated_at": d.updated_at,
+            }
+        )
+
+    return result
+
+
+async def get_device_detail(
+    db: AsyncSession, device_id: int, user_id: int
+) -> dict[str, Any]:
+    now = _utc_naive()
+    device, _ = await check_user_device_access(db, device_id, user_id)
+    computed_status = _calculate_device_status(device, now)
+
+    return {
+        "device_id": device.device_id,
+        "org_id": device.org_id,
+        "group_id": device.group_id,
+        "device_name": device.device_name,
+        "description": device.description,
+        "secret_token_prefix": device.secret_token_prefix,
+        "status": computed_status,
+        "last_heartbeat": device.last_heartbeat,
+        "offline_threshold_minutes": device.offline_threshold_minutes,
+        "static_info": device.static_info,
+        "top_processes": device.top_processes,
+        "watch_config": device.watch_config,
+        "watch_status": device.watch_status,
+        "archived_at": device.archived_at,
+        "created_at": device.created_at,
+        "updated_at": device.updated_at,
+    }
+
+
+async def update_device(
+    db: AsyncSession, device_id: int, user_id: int, payload: DeviceUpdate
+) -> Device:
+    device, member = await check_user_device_access(
+        db, device_id, user_id, required_roles=["Owner", "Admin", "Manager"]
+    )
+
+    if payload.group_id is not None:
+        group_res = await db.execute(
+            select(DeviceGroup).where(
+                DeviceGroup.group_id == payload.group_id,
+                DeviceGroup.org_id == device.org_id,
+            )
+        )
+        if group_res.scalar_one_or_none() is None:
+            _fail(404, "Device group not found in this organization")
+        device.group_id = payload.group_id
+
+    if payload.device_name is not None:
+        device.device_name = payload.device_name.strip()
+    if payload.description is not None:
+        device.description = payload.description
+    if payload.offline_threshold_minutes is not None:
+        device.offline_threshold_minutes = payload.offline_threshold_minutes
+    if payload.watch_config is not None:
+        device.watch_config = payload.watch_config
+
+    await db.commit()
+    await db.refresh(device)
+    return device
+
+
+async def archive_device(
+    db: AsyncSession, device_id: int, user_id: int
+) -> None:
+    device, _ = await check_user_device_access(
+        db, device_id, user_id, required_roles=["Owner", "Admin"]
+    )
+    device.archived_at = _utc_naive()
+    device.status = "Archived"
+    await db.commit()
+
+
+async def record_heartbeat(
+    db: AsyncSession, device: Device, payload: HeartbeatIn
+) -> None:
+    now = _utc_naive()
+    device.last_heartbeat = now
+    device.status = "Online"
+
+    if payload.static_info is not None:
+        device.static_info = payload.static_info
+
+    processes = payload.top_processes or payload.processes
+    if processes is not None:
+        device.top_processes = processes[:15]
+
+    if payload.watch_status is not None:
+        device.watch_status = payload.watch_status
+
+    metric = DeviceMetric(
+        device_id=device.device_id,
+        cpu_usage=payload.cpu_usage,
+        ram_usage=payload.ram_usage,
+        disk_usage=payload.disk_usage,
+        net_in_kbps=payload.net_in_kbps,
+        net_out_kbps=payload.net_out_kbps,
+        created_at=now,
+    )
+    db.add(metric)
+    await db.commit()
+
+
+async def get_device_metrics(
+    db: AsyncSession,
+    device_id: int,
+    user_id: int,
+    from_time: datetime | None = None,
+    to_time: datetime | None = None,
+    interval: str = "raw",
+    limit: int = 100,
+) -> list[Any]:
+    await check_user_device_access(db, device_id, user_id)
+
+    from_dt = _as_utc_naive(from_time)
+    to_dt = _as_utc_naive(to_time)
+
+    if interval == "hourly":
+        stmt = select(DeviceMetricHourly).where(
+            DeviceMetricHourly.device_id == device_id
+        )
+        if from_dt:
+            stmt = stmt.where(DeviceMetricHourly.hour_bucket >= from_dt)
+        if to_dt:
+            stmt = stmt.where(DeviceMetricHourly.hour_bucket <= to_dt)
+        stmt = stmt.order_by(DeviceMetricHourly.hour_bucket.asc()).limit(limit)
+        res = await db.execute(stmt)
+        return list(res.scalars().all())
+
+    stmt = select(DeviceMetric).where(DeviceMetric.device_id == device_id)
+    if from_dt:
+        stmt = stmt.where(DeviceMetric.created_at >= from_dt)
+    if to_dt:
+        stmt = stmt.where(DeviceMetric.created_at <= to_dt)
+    stmt = stmt.order_by(DeviceMetric.created_at.asc()).limit(limit)
+    res = await db.execute(stmt)
+    return list(res.scalars().all())
+
+
+async def create_device_command(
+    db: AsyncSession,
+    device_id: int,
+    user_id: int,
+    payload: DeviceCommandCreate,
+) -> DeviceCommand:
+    await check_user_device_access(
+        db, device_id, user_id, required_roles=["Owner", "Admin", "Manager"]
+    )
+
+    # Validate parameters per command_type
+    cmd_type = payload.command_type.upper()
+    params = payload.parameters or {}
+
+    if cmd_type == "KILL_PROCESS":
+        if "pid" not in params and "process_name" not in params:
+            _fail(422, "KILL_PROCESS requires 'pid' or 'process_name' in parameters")
+    elif cmd_type == "RESTART_SERVICE":
+        if "service_name" not in params:
+            _fail(422, "RESTART_SERVICE requires 'service_name' in parameters")
+
+    cmd = DeviceCommand(
+        device_id=device_id,
+        created_by=user_id,
+        command_type=cmd_type,
+        parameters=params,
+        reason=payload.reason.strip(),
+        status="PENDING",
+    )
+    db.add(cmd)
+    await db.commit()
+    await db.refresh(cmd)
+    return cmd
+
+
+async def list_device_commands(
+    db: AsyncSession, device_id: int, user_id: int, limit: int = 50
+) -> list[DeviceCommand]:
+    await check_user_device_access(db, device_id, user_id)
+    stmt = (
+        select(DeviceCommand)
+        .where(DeviceCommand.device_id == device_id)
+        .order_by(DeviceCommand.created_at.desc())
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    return list(res.scalars().all())
+
+
+async def fetch_pending_commands(
+    db: AsyncSession, device: Device
+) -> list[DeviceCommand]:
+    stmt = (
+        select(DeviceCommand)
+        .where(
+            DeviceCommand.device_id == device.device_id,
+            DeviceCommand.status == "PENDING",
+        )
+        .order_by(DeviceCommand.created_at.asc())
+        .with_for_update()
+    )
+    res = await db.execute(stmt)
+    commands = list(res.scalars().all())
+
+    for cmd in commands:
+        cmd.status = "EXECUTING"
+
+    if commands:
+        await db.commit()
+    return commands
+
+
+async def record_command_result(
+    db: AsyncSession,
+    device: Device,
+    command_id: int,
+    payload: CommandResultIn,
+) -> DeviceCommand:
+    stmt = select(DeviceCommand).where(
+        DeviceCommand.command_id == command_id,
+        DeviceCommand.device_id == device.device_id,
+    )
+    res = await db.execute(stmt)
+    cmd = res.scalar_one_or_none()
+    if cmd is None:
+        _fail(404, "Command not found for this device")
+
+    cmd.status = payload.status.upper()
+    cmd.output = payload.output or payload.error_message
+    cmd.completed_at = _utc_naive()
+
+    await db.commit()
+    await db.refresh(cmd)
+    return cmd

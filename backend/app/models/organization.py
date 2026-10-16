@@ -76,3 +76,22 @@ class DeviceGroup(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class UserGroupAccess(Base):
+    __tablename__ = "user_group_access"
+
+    access_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("device_groups.group_id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'Viewer'")
+    )
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+

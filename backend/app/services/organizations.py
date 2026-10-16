@@ -15,6 +15,7 @@ from app.models.organization import (
 )
 from app.schemas.organization import (
     DeviceGroupCreate,
+    DeviceGroupUpdate,
     InvitationCreate,
     MemberRoleUpdate,
     OrganizationCreate,
@@ -317,3 +318,40 @@ async def create_group(
     await db.commit()
     await db.refresh(group)
     return group
+
+
+async def get_group(
+    db: AsyncSession, group_id: int, user_id: int
+) -> DeviceGroup:
+    group = await db.get(DeviceGroup, group_id)
+    if group is None:
+        _fail(404, "Device group not found")
+    await _get_member(db, group.org_id, user_id)
+    return group
+
+
+async def update_group(
+    db: AsyncSession, group_id: int, user_id: int, payload: DeviceGroupUpdate
+) -> DeviceGroup:
+    group = await db.get(DeviceGroup, group_id)
+    if group is None:
+        _fail(404, "Device group not found")
+    await _require_admin(db, group.org_id, user_id)
+    if payload.group_name is not None:
+        group.group_name = payload.group_name.strip()
+    if payload.description is not None:
+        group.description = payload.description
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+async def delete_group(
+    db: AsyncSession, group_id: int, user_id: int
+) -> None:
+    group = await db.get(DeviceGroup, group_id)
+    if group is None:
+        _fail(404, "Device group not found")
+    await _require_admin(db, group.org_id, user_id)
+    await db.delete(group)
+    await db.commit()
