@@ -1,11 +1,12 @@
 from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.main import app
 from app.models.auth import User
-from app.models.device import Device, DeviceCommand, DeviceMetric
+from app.models.device import Device
 from app.models.organization import OrganizationMember
 
 
@@ -108,6 +109,8 @@ def test_list_devices_returns_dynamic_status():
                                     return [member]
                                 if "user_group_access" in sql:
                                     return []
+                                if "device_groups" in sql:
+                                    return []
                                 return [device]
 
                         return MockScalars()
@@ -156,11 +159,18 @@ def test_get_device_detail_includes_static_info_and_processes():
     async def override_db():
         class MockSession:
             async def execute(self, stmt):
+                sql = str(stmt).lower()
+
                 class MockResult:
                     def scalar_one_or_none(self):
-                        return device if "devices" in str(stmt).lower() else member
+                        if "device_metrics" in sql:
+                            return None
+                        return device if "devices" in sql else member
 
                 return MockResult()
+
+            async def get(self, entity, ident):
+                return None
 
         yield MockSession()
 

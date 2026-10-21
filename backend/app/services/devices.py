@@ -3,7 +3,7 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any, NoReturn
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
@@ -315,7 +315,7 @@ async def get_device_detail(
 async def update_device(
     db: AsyncSession, device_id: int, user_id: int, payload: DeviceUpdate
 ) -> Device:
-    device, member = await check_user_device_access(
+    device, _member = await check_user_device_access(
         db, device_id, user_id, required_roles=["Owner", "Admin", "Manager"]
     )
 
@@ -450,9 +450,8 @@ async def create_device_command(
     if cmd_type == "KILL_PROCESS":
         if "pid" not in params and "process_name" not in params:
             _fail(422, "KILL_PROCESS requires 'pid' or 'process_name' in parameters")
-    elif cmd_type == "RESTART_SERVICE":
-        if "service_name" not in params:
-            _fail(422, "RESTART_SERVICE requires 'service_name' in parameters")
+    elif cmd_type == "RESTART_SERVICE" and "service_name" not in params:
+        _fail(422, "RESTART_SERVICE requires 'service_name' in parameters")
 
     cmd = DeviceCommand(
         device_id=device_id,

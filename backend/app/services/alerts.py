@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any, NoReturn
+from typing import NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -12,7 +12,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, select, text
 
 from app.db.session import SessionLocal
 from app.models.alert import AlertHistory
@@ -59,8 +59,8 @@ async def check_offline_devices() -> None:
                     )
 
             await db.commit()
-        except Exception as exc:
-            logger.error(f"Lỗi kiểm tra offline: {exc}", exc_info=True)
+        except Exception:
+            logger.exception("Lỗi kiểm tra offline")
 
 
 async def check_command_timeouts() -> None:
@@ -83,8 +83,8 @@ async def check_command_timeouts() -> None:
 
             if timed_out:
                 await db.commit()
-        except Exception as exc:
-            logger.error(f"Lỗi kiểm tra timeout lệnh: {exc}", exc_info=True)
+        except Exception:
+            logger.exception("Lỗi kiểm tra timeout lệnh")
 
 
 async def aggregate_hourly_metrics() -> None:
@@ -137,8 +137,8 @@ async def aggregate_hourly_metrics() -> None:
             if rows:
                 await db.commit()
                 logger.info(f"Tổng hợp {len(rows)} bản ghi hourly cho bucket {prev_hour}.")
-        except Exception as exc:
-            logger.error(f"Lỗi tổng hợp hourly: {exc}", exc_info=True)
+        except Exception:
+            logger.exception("Lỗi tổng hợp hourly")
 
 
 async def manage_partitions() -> None:
@@ -150,8 +150,8 @@ async def manage_partitions() -> None:
             )
             msg = res.scalar()
             logger.info(f"Partition manager: {msg}")
-        except Exception as exc:
-            logger.error(f"Lỗi partition manager: {exc}", exc_info=True)
+        except Exception:
+            logger.exception("Lỗi partition manager")
 
 
 async def main() -> None:

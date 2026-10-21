@@ -1,11 +1,10 @@
-from datetime import datetime
 from fastapi.testclient import TestClient
 
 from app.core.deps import get_current_agent_device, get_optional_agent_device
 from app.db.session import get_db
 from app.main import app
 from app.models.device import Device, DeviceCommand
-from app.services.devices import generate_device_token, hash_token
+from app.services.devices import generate_device_token
 
 
 def test_agent_heartbeat_with_header_token():
@@ -206,7 +205,7 @@ def test_agent_pending_commands_and_go_agent_compatibility():
 
 
 def test_agent_command_result_post_and_put():
-    raw_token, token_hash, prefix = generate_device_token()
+    _raw_token, token_hash, prefix = generate_device_token()
     mock_device = Device(
         device_id=4,
         org_id=1,

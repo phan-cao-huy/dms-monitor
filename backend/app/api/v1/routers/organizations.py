@@ -10,7 +10,6 @@ from app.models.auth import User
 from app.models.organization import (
     DeviceGroup,
     OrganizationInvitation,
-    OrganizationMember,
 )
 from app.schemas.organization import (
     DeviceGroupCreate,

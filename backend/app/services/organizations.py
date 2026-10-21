@@ -425,7 +425,7 @@ async def assign_group_member(
     await _require_admin(db, group.org_id, actor_id)
 
     # Kiem tra target user phai thuoc to chuc
-    target_member = await _get_member(db, group.org_id, target_user_id)
+    await _get_member(db, group.org_id, target_user_id)
 
     existing = await db.scalar(
         select(UserGroupAccess).where(

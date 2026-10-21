@@ -8,15 +8,20 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.auth import User
 from app.models.organization import DeviceGroup
-from app.schemas.organization import DeviceGroupOut, DeviceGroupUpdate, GroupMemberAssign, GroupMemberOut
+from app.schemas.organization import (
+    DeviceGroupOut,
+    DeviceGroupUpdate,
+    GroupMemberAssign,
+    GroupMemberOut,
+)
 from app.services.organizations import (
     OrganizationError,
+    assign_group_member,
     delete_group,
     get_group,
-    update_group,
     list_group_members,
-    assign_group_member,
     remove_group_member,
+    update_group,
 )
 
 router = APIRouter(prefix="/groups", tags=["groups"])

@@ -1,5 +1,5 @@
 from collections.abc import Awaitable
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession

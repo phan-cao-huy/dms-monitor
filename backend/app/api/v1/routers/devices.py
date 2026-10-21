@@ -156,10 +156,10 @@ async def get_metrics(
     device_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
-    from_time: datetime | None = Query(default=None, alias="from"),
-    to_time: datetime | None = Query(default=None, alias="to"),
-    interval: str = Query(default="raw", pattern=r"^(raw|hourly)$"),
-    limit: int = Query(default=100, ge=1, le=1000),
+    from_time: Annotated[datetime | None, Query(alias="from")] = None,
+    to_time: Annotated[datetime | None, Query(alias="to")] = None,
+    interval: Annotated[str, Query(pattern=r"^(raw|hourly)$")] = "raw",
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
 ) -> Any:
     """Lấy dữ liệu hiệu năng CPU/RAM/Disk/Network theo chu kỳ raw (thô) hoặc hourly (tổng hợp theo giờ)."""
     return await _run(

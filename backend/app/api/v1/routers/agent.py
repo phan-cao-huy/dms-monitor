@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_agent_device, get_optional_agent_device
@@ -79,7 +79,7 @@ async def pending_commands(
     ]
 
     ua = request.headers.get("user-agent", "")
-    if ua.startswith("Go-http-client") or ua.startswith("DMS-Agent") or format == "object":
+    if ua.startswith(("Go-http-client", "DMS-Agent")) or format == "object":
         return CommandListResponse(commands=cmd_outs)
 
     return cmd_outs
