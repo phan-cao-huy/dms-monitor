@@ -56,6 +56,12 @@ func NewClient(cfg *config.Config) *Client {
 	}
 }
 
+func (c *Client) prepareRequest(req *http.Request) {
+	req.Header.Set("X-Device-Token", c.cfg.SecretToken)
+	req.Header.Set("Bypass-Tunnel-Reminder", "true")
+	req.Header.Set("User-Agent", "DMS-Agent/1.0")
+}
+
 // SendHeartbeat gui du lieu metric len Backend.
 // Tu dong retry toi da 3 lan voi exponential backoff.
 func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector.StaticInfo) error {
@@ -86,7 +92,7 @@ func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector
 			return fmt.Errorf("tao request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Device-Token", c.cfg.SecretToken)
+		c.prepareRequest(req)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -122,7 +128,7 @@ func (c *Client) FetchCommands() ([]Command, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tao request: %w", err)
 	}
-	req.Header.Set("X-Device-Token", c.cfg.SecretToken)
+	c.prepareRequest(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -130,16 +136,22 @@ func (c *Client) FetchCommands() ([]Command, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
 	var cmdResp CommandResponse
-	if err := json.NewDecoder(resp.Body).Decode(&cmdResp); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	if err := json.Unmarshal(body, &cmdResp); err == nil && cmdResp.Commands != nil {
+		return cmdResp.Commands, nil
 	}
-	return cmdResp.Commands, nil
+
+	var cmds []Command
+	if err := json.Unmarshal(body, &cmds); err == nil {
+		return cmds, nil
+	}
+
+	return nil, fmt.Errorf("decode response: %s", string(body))
 }
 
 // ReportCommandResult bao ket qua thuc thi lenh ve Backend.
@@ -155,7 +167,7 @@ func (c *Client) ReportCommandResult(result CommandResult) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Device-Token", c.cfg.SecretToken)
+	c.prepareRequest(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

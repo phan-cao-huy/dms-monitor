@@ -51,21 +51,40 @@ func Execute(cmd sender.Command) sender.CommandResult {
 func execReboot(params map[string]interface{}) (string, error) {
 	delay := 10
 	if d, ok := params["delay_seconds"]; ok {
-		if df, ok := d.(float64); ok {
-			delay = int(df)
+		switch v := d.(type) {
+		case float64:
+			delay = int(v)
+		case int:
+			delay = v
+		case int64:
+			delay = int(v)
+		case string:
+			if parsed, err := strconv.Atoi(v); err == nil && parsed >= 0 {
+				delay = parsed
+			}
 		}
 	}
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
+		// Huy shutdown cu neu co, roi moi dat lenh moi
+		_ = exec.Command("shutdown", "/a").Run()
 		cmd = exec.Command("shutdown", "/r", "/t", strconv.Itoa(delay), "/f")
 	} else {
-		cmd = exec.Command("sudo", "shutdown", "-r", fmt.Sprintf("+%d", delay/60))
+		if delay <= 0 {
+			cmd = exec.Command("sudo", "shutdown", "-r", "now")
+		} else {
+			mins := delay / 60
+			if mins < 1 {
+				mins = 1
+			}
+			cmd = exec.Command("sudo", "shutdown", "-r", fmt.Sprintf("+%d", mins))
+		}
 	}
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("reboot failed: %s — %w", string(out), err)
+		return "", fmt.Errorf("reboot failed: %s — %w", strings.TrimSpace(string(out)), err)
 	}
 	return fmt.Sprintf("Reboot sau %d giay. Output: %s", delay, strings.TrimSpace(string(out))), nil
 }
@@ -106,29 +125,45 @@ func execRestartService(params map[string]interface{}) (string, error) {
 	return fmt.Sprintf("Service '%s' da restart thanh cong.", name), nil
 }
 
+func parsePID(pidRaw interface{}) int {
+	switch v := pidRaw.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case string:
+		p, _ := strconv.Atoi(strings.TrimSpace(v))
+		return p
+	default:
+		p, _ := strconv.Atoi(fmt.Sprintf("%v", v))
+		return p
+	}
+}
+
 func execKillProcess(params map[string]interface{}) (string, error) {
 	var cmd *exec.Cmd
+	var targetPID int
 
 	if pidRaw, ok := params["pid"]; ok {
-		pid := 0
-		switch v := pidRaw.(type) {
-		case float64:
-			pid = int(v)
-		case int:
-			pid = v
-		}
-		if pid <= 0 {
+		targetPID = parsePID(pidRaw)
+		if targetPID <= 0 {
 			return "", fmt.Errorf("PID khong hop le: %v", pidRaw)
 		}
 		if runtime.GOOS == "windows" {
-			cmd = exec.Command("taskkill", "/F", "/PID", strconv.Itoa(pid))
+			// /F: Force kill, /T: Kill ca cay tien trinh (child processes)
+			cmd = exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(targetPID))
 		} else {
-			cmd = exec.Command("sudo", "kill", "-9", strconv.Itoa(pid))
+			cmd = exec.Command("sudo", "kill", "-9", strconv.Itoa(targetPID))
 		}
 	} else if pname, ok := params["process_name"]; ok {
-		name := fmt.Sprintf("%v", pname)
+		name := strings.TrimSpace(fmt.Sprintf("%v", pname))
+		if name == "" {
+			return "", fmt.Errorf("process_name rong")
+		}
 		if runtime.GOOS == "windows" {
-			cmd = exec.Command("taskkill", "/F", "/IM", name)
+			cmd = exec.Command("taskkill", "/F", "/T", "/IM", name)
 		} else {
 			cmd = exec.Command("sudo", "pkill", "-9", "-f", name)
 		}
@@ -137,8 +172,14 @@ func execKillProcess(params map[string]interface{}) (string, error) {
 	}
 
 	out, err := cmd.CombinedOutput()
+	outStr := strings.TrimSpace(string(out))
 	if err != nil {
-		return "", fmt.Errorf("kill failed: %s — %w", strings.TrimSpace(string(out)), err)
+		return "", fmt.Errorf("kill failed: %s — %w", outStr, err)
 	}
-	return fmt.Sprintf("Da kill thanh cong. Output: %s", strings.TrimSpace(string(out))), nil
+	// taskkill co the tra exit code 0 nhung output co ERROR (vd: access denied, process not found)
+	if strings.Contains(strings.ToUpper(outStr), "ERROR:") && !strings.Contains(strings.ToUpper(outStr), "SUCCESS:") {
+		return "", fmt.Errorf("kill failed: %s", outStr)
+	}
+
+	return fmt.Sprintf("Da kill thanh cong. Output: %s", outStr), nil
 }

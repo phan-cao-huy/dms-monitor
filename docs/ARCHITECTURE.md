@@ -41,7 +41,7 @@ Quy tắc: router **không** chứa SQL/logic; service **không** biết HTTP.
 
 | Đối tượng | Cách xác thực | Ghi chú |
 |---|---|---|
-| Người dùng (Mobile) | JWT access (15') + refresh token (lưu `sha256` trong `refresh_tokens`, rotate on use) | bcrypt cost ≥ 12 |
+| Người dùng (Mobile) | JWT access (15') + refresh token (lưu `sha256` trong `auth_tokens`, rotate on use) | bcrypt cost ≥ 12 |
 | Agent | `Authorization: Bearer <secret_token>` → so `sha256(token)` với `devices.secret_token_hash` | Token hiển thị **một lần** khi tạo thiết bị, DB chỉ lưu hash + prefix 8 ký tự |
 
 Phân quyền **2 cấp** (theo schema):

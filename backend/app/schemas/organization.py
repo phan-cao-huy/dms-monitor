@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 MemberRole = Literal["Owner", "Admin", "Manager", "Viewer"]
 InviteRole = Literal["Manager", "Viewer"]
 
@@ -47,12 +46,11 @@ class InvitationOut(BaseModel):
     invite_id: int
     org_id: int
     invite_code: str
-    invite_token: str
     default_role: InviteRole
     max_uses: int | None
     use_count: int
     expires_at: datetime | None
-    is_active: bool
+    revoked_at: datetime | None
     created_by: int | None
     created_at: datetime
 
@@ -73,8 +71,6 @@ class MemberRoleUpdate(BaseModel):
 class DeviceGroupCreate(BaseModel):
     group_name: str = Field(min_length=1, max_length=100)
     description: str | None = None
-    icon: str | None = Field(default="server", max_length=50)
-    color: str | None = Field(default="#4A90E2", pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
 class DeviceGroupOut(BaseModel):
@@ -84,7 +80,28 @@ class DeviceGroupOut(BaseModel):
     org_id: int
     group_name: str
     description: str | None
-    icon: str | None
-    color: str | None
-    is_active: bool
     created_at: datetime
+
+
+class DeviceGroupUpdate(BaseModel):
+    group_name: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = None
+
+
+
+class GroupMemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    access_id: int
+    user_id: int
+    group_id: int
+    username: str
+    email: str
+    full_name: str | None = None
+    role: Literal["Manager", "Viewer"]
+    granted_at: datetime
+
+
+class GroupMemberAssign(BaseModel):
+    user_id: int
+    role: Literal["Manager", "Viewer"] = "Viewer"

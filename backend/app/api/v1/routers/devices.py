@@ -1,240 +1,216 @@
-"""Router cho module Device — 7 API theo API_CONTRACT.md muc Devices & Metrics."""
-
+from collections.abc import Awaitable
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.auth import User
 from app.schemas.device import (
-    CommandCreate,
-    CommandOut,
+    DeviceCommandCreate,
+    DeviceCommandOut,
     DeviceCreate,
     DeviceCreateOut,
     DeviceDetailOut,
-    DeviceListItem,
+    DeviceOut,
     DeviceUpdate,
     MetricHourlyOut,
     MetricOut,
-    ProcessSnapshotOut,
 )
-from app.services.device_service import (
-    create_command,
+from app.services.devices import (
+    DeviceError,
+    archive_device,
     create_device,
-    delete_device,
+    create_device_command,
     get_device_detail,
-    get_latest_processes,
-    get_metrics,
-    list_commands,
+    get_device_metrics,
+    list_device_commands,
     list_devices,
     update_device,
 )
 
 router = APIRouter(tags=["devices"])
-
-DB = Annotated[AsyncSession, Depends(get_db)]
-CurrentUser = Annotated[User, Depends(get_current_user)]
+Result = TypeVar("Result")
 
 
-# ── 1. GET /orgs/{org_id}/devices ────────────────────────────────────────────
-
-
-@router.get("/orgs/{org_id}/devices", response_model=list[DeviceListItem])
-async def api_list_devices(
-    org_id: int,
-    db: DB,
-    user: CurrentUser,
-    group_id: Annotated[int | None, Query(description="Loc theo nhom")] = None,
-    status_filter: Annotated[
-        str | None, Query(alias="status", description="Loc theo trang thai")
-    ] = None,
-):
-    """Lay danh sach thiet bi trong to chuc — cho Dashboard Mobile/Web."""
+async def _run(operation: Awaitable[Result]) -> Result:
     try:
-        devices = await list_devices(db, org_id, user.user_id, group_id, status_filter)
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-    return devices
+        return await operation
+    except DeviceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        ) from exc
 
 
-# ── 2. POST /orgs/{org_id}/devices ───────────────────────────────────────────
+@router.get(
+    "/devices",
+    response_model=list[DeviceOut],
+    summary="Lấy danh sách thiết bị",
+)
+async def get_all_devices(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    org_id: int | None = Query(default=None, description="Lọc theo tổ chức"),
+) -> list[dict[str, Any]]:
+    """Lấy danh sách các thiết bị người dùng có quyền truy cập."""
+    return await _run(list_devices(db, user.user_id, org_id))
+
+
+@router.get(
+    "/orgs/{org_id}/devices",
+    response_model=list[DeviceOut],
+    summary="Lấy danh sách thiết bị theo tổ chức",
+)
+async def get_org_devices(
+    org_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Lấy danh sách thiết bị thuộc tổ chức cụ thể."""
+    return await _run(list_devices(db, user.user_id, org_id))
 
 
 @router.post(
     "/orgs/{org_id}/devices",
     response_model=DeviceCreateOut,
     status_code=status.HTTP_201_CREATED,
+    summary="Tạo thiết bị mới cho tổ chức",
 )
-async def api_create_device(
+async def post_device(
     org_id: int,
-    body: DeviceCreate,
-    db: DB,
-    user: CurrentUser,
-):
-    """Tao thiet bi moi — tra ve secret_token CHI 1 LAN duy nhat."""
-    try:
-        device, raw_token = await create_device(
-            db, org_id, user.user_id,
-            body.device_name, body.description, body.group_id,
-        )
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    payload: DeviceCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Tạo thiết bị mới và trả về secret_token duy nhất 1 lần để cấu hình Agent."""
+    device, raw_token, grp_name = await _run(
+        create_device(db, org_id, user.user_id, payload)
+    )
+    return {
+        "device_id": device.device_id,
+        "org_id": device.org_id,
+        "group_id": device.group_id,
+        "group_name": grp_name,
+        "device_name": device.device_name,
+        "description": device.description,
+        "secret_token": raw_token,
+        "secret_token_prefix": device.secret_token_prefix,
+        "status": device.status,
+        "created_at": device.created_at,
+    }
 
-    return DeviceCreateOut(
-        device_id=device.device_id,
-        device_name=device.device_name,
-        group_id=device.group_id,
-        status=device.status,
-        secret_token=raw_token,
-        secret_token_prefix=device.secret_token_prefix,
-        created_at=device.created_at,
+
+@router.get(
+    "/devices/{device_id}",
+    response_model=DeviceDetailOut,
+    summary="Chi tiết thiết bị",
+)
+async def get_device(
+    device_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Lấy thông tin chi tiết thiết bị bao gồm static_info, watch_status và top_processes."""
+    return await _run(get_device_detail(db, device_id, user.user_id))
+
+
+@router.patch(
+    "/devices/{device_id}",
+    response_model=DeviceOut,
+    summary="Cập nhật thiết bị",
+)
+async def patch_device(
+    device_id: int,
+    payload: DeviceUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> Any:
+    """Cập nhật tên, mô tả, nhóm hoặc cấu hình theo dõi của thiết bị."""
+    return await _run(update_device(db, device_id, user.user_id, payload))
+
+
+@router.delete(
+    "/devices/{device_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Lưu trữ / xóa thiết bị",
+)
+async def delete_device_endpoint(
+    device_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    """Đánh dấu thiết bị đã lưu trữ (Archived) và ngừng giám sát."""
+    await _run(archive_device(db, device_id, user.user_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/devices/{device_id}/metrics",
+    response_model=list[MetricOut] | list[MetricHourlyOut],
+    summary="Lấy lịch sử metric thiết bị",
+)
+async def get_metrics(
+    device_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    from_time: Annotated[datetime | None, Query(alias="from")] = None,
+    to_time: Annotated[datetime | None, Query(alias="to")] = None,
+    interval: Annotated[str, Query(pattern=r"^(raw|hourly)$")] = "raw",
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+) -> Any:
+    """Lấy dữ liệu hiệu năng CPU/RAM/Disk/Network theo chu kỳ raw (thô) hoặc hourly (tổng hợp theo giờ)."""
+    return await _run(
+        get_device_metrics(
+            db, device_id, user.user_id, from_time, to_time, interval, limit
+        )
     )
 
 
-# ── 3. GET /devices/{id} ────────────────────────────────────────────────────
-
-
-@router.get("/devices/{device_id}", response_model=DeviceDetailOut)
-async def api_get_device(device_id: int, db: DB, user: CurrentUser):
-    """Lay chi tiet thiet bi + thong tin phan cung tinh."""
-    try:
-        detail = await get_device_detail(db, device_id, user.user_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-    return detail
-
-
-# ── 3b. PATCH /devices/{id} ─────────────────────────────────────────────────
-
-
-@router.patch("/devices/{device_id}", response_model=DeviceDetailOut)
-async def api_update_device(
-    device_id: int, body: DeviceUpdate, db: DB, user: CurrentUser,
-):
-    """Cap nhat ten, mo ta, nhom cua thiet bi."""
-    try:
-        await update_device(
-            db, device_id, user.user_id,
-            body.device_name, body.description, body.group_id,
-        )
-        detail = await get_device_detail(db, device_id, user.user_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except (PermissionError, ValueError) as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    return detail
-
-
-# ── 3c. DELETE /devices/{id} ────────────────────────────────────────────────
-
-
-@router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def api_delete_device(device_id: int, db: DB, user: CurrentUser):
-    """Soft delete thiet bi (chuyen trang thai Archived)."""
-    try:
-        await delete_device(db, device_id, user.user_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-
-
-# ── 4. GET /devices/{id}/metrics ─────────────────────────────────────────────
-
-
-@router.get("/devices/{device_id}/metrics")
-async def api_get_metrics(
+@router.get(
+    "/devices/{device_id}/processes",
+    summary="Lấy snapshot tiến trình mới nhất",
+)
+async def get_processes(
     device_id: int,
-    db: DB,
-    user: CurrentUser,
-    from_dt: Annotated[datetime | None, Query(alias="from")] = None,
-    to_dt: Annotated[datetime | None, Query(alias="to")] = None,
-    interval: Annotated[Literal["raw", "hourly"], Query()] = "raw",
-):
-    """Lay du lieu metric theo khoang thoi gian — cho bieu do Mobile/Web.
-
-    - interval=raw: tra tung diem 1 phut (toi da 1440 diem = 1 ngay)
-    - interval=hourly: tra trung binh theo gio (cho bieu do 7 ngay / 30 ngay)
-    """
-    try:
-        rows = await get_metrics(db, device_id, user.user_id, from_dt, to_dt, interval)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-
-    if interval == "hourly":
-        return [MetricHourlyOut.model_validate(r) for r in rows]
-    return [MetricOut.model_validate(r) for r in rows]
-
-
-# ── 5. GET /devices/{id}/processes ───────────────────────────────────────────
-
-
-@router.get("/devices/{device_id}/processes", response_model=ProcessSnapshotOut | None)
-async def api_get_processes(device_id: int, db: DB, user: CurrentUser):
-    """Lay snapshot danh sach process moi nhat cua may."""
-    try:
-        snapshot = await get_latest_processes(db, device_id, user.user_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-    if snapshot is None:
-        return None
-    return snapshot
-
-
-# ── 6. POST /devices/{id}/commands ───────────────────────────────────────────
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Trả về danh sách 15 tiến trình sử dụng tài nguyên cao nhất từ heartbeat gần nhất."""
+    detail = await _run(get_device_detail(db, device_id, user.user_id))
+    return detail.get("top_processes") or []
 
 
 @router.post(
     "/devices/{device_id}/commands",
-    response_model=CommandOut,
+    response_model=DeviceCommandOut,
     status_code=status.HTTP_201_CREATED,
+    summary="Gửi lệnh điều khiển tới thiết bị",
 )
-async def api_create_command(
-    device_id: int, body: CommandCreate, db: DB, user: CurrentUser,
-):
-    """Gui lenh dieu khien tu xa (REBOOT / RESTART_SERVICE / KILL_PROCESS).
-
-    Lenh se duoc luu vao hang doi voi trang thai PENDING.
-    Agent se lay lenh nay qua GET /agent/commands va thuc thi.
-    """
-    try:
-        cmd = await create_command(
-            db, device_id, user.user_id,
-            body.command_type, body.parameters, body.reason,
-        )
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-    return cmd
-
-
-# ── 7. GET /devices/{id}/commands ────────────────────────────────────────────
-
-
-@router.get("/devices/{device_id}/commands", response_model=list[CommandOut])
-async def api_list_commands(
+async def post_command(
     device_id: int,
-    db: DB,
-    user: CurrentUser,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-):
-    """Lay lich su cac lenh dieu khien da gui va ket qua thuc thi."""
-    try:
-        commands = await list_commands(db, device_id, user.user_id, limit)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-    return commands
+    payload: DeviceCommandCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> Any:
+    """Gửi yêu cầu điều khiển từ xa (REBOOT, RESTART_SERVICE, KILL_PROCESS) kèm lý do bắt buộc."""
+    return await _run(
+        create_device_command(db, device_id, user.user_id, payload)
+    )
+
+
+@router.get(
+    "/devices/{device_id}/commands",
+    response_model=list[DeviceCommandOut],
+    summary="Lấy lịch sử lệnh điều khiển",
+)
+async def get_commands(
+    device_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    limit: int = Query(default=50, ge=1, le=200),
+) -> Any:
+    """Lấy lịch sử các lệnh đã gửi tới thiết bị này kèm trạng thái và kết quả trả về."""
+    return await _run(list_device_commands(db, device_id, user.user_id, limit))

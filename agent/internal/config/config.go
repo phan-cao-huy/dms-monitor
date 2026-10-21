@@ -1,11 +1,13 @@
-// Package config doc cau hinh tu file config.json hoac bien moi truong.
+// Package config doc cau hinh tu flags CLI, file config.json hoac bien moi truong.
 package config
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Config chua toan bo cau hinh Agent can.
@@ -19,16 +21,48 @@ type Config struct {
 	LogLevel                   string `json:"log_level"`
 }
 
-// Load doc config tu file config.json (tim trong thu muc hien tai hoac configs/).
+// Load doc config tu CLI flags, file config.json hoac bien moi truong.
 func Load() (*Config, error) {
-	// Thu tim file config.json o nhieu vi tri
+	var flagServer string
+	var flagToken string
+	var flagID int
+
+	flag.StringVar(&flagServer, "server", "", "Backend URL (e.g. http://10.37.9.0:8000)")
+	flag.StringVar(&flagToken, "token", "", "Secret pairing token")
+	flag.IntVar(&flagID, "id", 0, "Device ID")
+	flag.IntVar(&flagID, "device", 0, "Device ID (alias)")
+	flag.Parse()
+
+	// 1. Neu co du tham so CLI thi uu tien chay ngay
+	if flagServer != "" && flagToken != "" && flagID > 0 {
+		server := strings.TrimRight(flagServer, "/")
+		if !strings.HasSuffix(server, "/api/v1") {
+			server = server + "/api/v1"
+		}
+		cfg := &Config{
+			BackendURL:                 server,
+			SecretToken:                flagToken,
+			DeviceID:                   flagID,
+			HeartbeatIntervalSeconds:   10,
+			CommandPollIntervalSeconds: 5,
+			ProcessTopN:                15,
+			LogLevel:                   "info",
+		}
+		// Tu dong luu config.json de lan sau khoi dong khong can go lai tham so
+		if data, err := json.MarshalIndent(cfg, "", "  "); err == nil {
+			_ = os.WriteFile("config.json", data, 0644)
+		}
+		fmt.Printf("[CONFIG] Configured via CLI flags (server=%s, id=%d)\n", cfg.BackendURL, cfg.DeviceID)
+		return cfg, nil
+	}
+
+	// 2. Thu tim file config.json o nhieu vi tri
 	candidates := []string{
 		"config.json",
 		"configs/config.json",
 		filepath.Join("configs", "config.json"),
 	}
 
-	// Neu co bien moi truong chi dinh duong dan
 	if envPath := os.Getenv("DMS_CONFIG_PATH"); envPath != "" {
 		candidates = append([]string{envPath}, candidates...)
 	}
@@ -46,11 +80,10 @@ func Load() (*Config, error) {
 	}
 
 	if data == nil {
-		return nil, fmt.Errorf("khong tim thay config.json. Tao file configs/config.json tu config.example.json")
+		return nil, fmt.Errorf("chua co cau hinh! Hay chay: dms-agent.exe -server <url> -token <token> -id <id>")
 	}
 
 	cfg := &Config{
-		// Gia tri mac dinh
 		HeartbeatIntervalSeconds:   60,
 		CommandPollIntervalSeconds: 10,
 		ProcessTopN:                15,
@@ -59,6 +92,12 @@ func Load() (*Config, error) {
 
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("loi parse %s: %w", loadedPath, err)
+	}
+
+	// Chuan hoa BackendURL
+	cfg.BackendURL = strings.TrimRight(cfg.BackendURL, "/")
+	if !strings.HasSuffix(cfg.BackendURL, "/api/v1") {
+		cfg.BackendURL = cfg.BackendURL + "/api/v1"
 	}
 
 	// Validate

@@ -10,7 +10,6 @@ from app.models.auth import User
 from app.models.organization import (
     DeviceGroup,
     OrganizationInvitation,
-    OrganizationMember,
 )
 from app.schemas.organization import (
     DeviceGroupCreate,
@@ -203,3 +202,18 @@ async def post_group(
 ) -> DeviceGroup:
     """Tạo cụm thiết bị mới; chỉ Owner hoặc Admin được phép."""
     return await _run(create_group(db, org_id, user.user_id, payload))
+
+
+@router.post(
+    "/{org_id}/leave",
+    status_code=status.HTTP_200_OK,
+    summary="Tự rời tổ chức",
+)
+async def leave_organization_endpoint(
+    org_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """Người dùng tự rời khỏi tổ chức hiện tại."""
+    await _run(remove_member(db, org_id, user.user_id, user.user_id))
+    return {"message": "Đã rời tổ chức thành công"}

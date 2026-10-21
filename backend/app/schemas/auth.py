@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class RegisterIn(BaseModel):
@@ -25,16 +27,26 @@ class RefreshIn(BaseModel):
 
 
 class FcmTokenIn(BaseModel):
+    refresh_token: str = Field(min_length=1)
     fcm_token: str = Field(min_length=1)
-    device_label: str | None = Field(default=None, max_length=255)
-    app_version: str | None = Field(default=None, max_length=20)
+    device_info: str | None = Field(default=None, max_length=255)
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: int
     username: str
     email: EmailStr
     full_name: str | None
+
+
+class UserDetailOut(UserOut):
+    avatar_url: str | None = None
+    is_email_verified: bool | None = False
+    last_login_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class TokenOut(BaseModel):
