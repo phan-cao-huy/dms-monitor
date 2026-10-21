@@ -17,6 +17,7 @@ class DeviceCreateOut(BaseModel):
     device_id: int
     org_id: int
     group_id: int | None
+    group_name: str | None = None
     device_name: str
     description: str | None
     secret_token: str
@@ -39,6 +40,7 @@ class DeviceOut(BaseModel):
     device_id: int
     org_id: int
     group_id: int | None
+    group_name: str | None = None
     device_name: str
     description: str | None
     secret_token_prefix: str
@@ -58,6 +60,17 @@ class DeviceDetailOut(DeviceOut):
     watch_config: dict[str, Any] | None = None
     watch_status: dict[str, Any] | None = None
     archived_at: datetime | None = None
+
+    # Dynamic metrics & thermal/GPU
+    net_in_kbps: float | None = None
+    net_out_kbps: float | None = None
+    uptime_seconds: int | None = None
+    cpu_temp_c: float | None = None
+    gpu_name: str | None = None
+    gpu_usage_pct: float | None = None
+    gpu_temp_c: float | None = None
+    gpu_vram_total_mb: int | None = None
+    gpu_vram_used_mb: int | None = None
 
 
 class MetricOut(BaseModel):

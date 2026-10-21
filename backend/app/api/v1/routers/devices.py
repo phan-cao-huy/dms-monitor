@@ -86,13 +86,14 @@ async def post_device(
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, Any]:
     """Tạo thiết bị mới và trả về secret_token duy nhất 1 lần để cấu hình Agent."""
-    device, raw_token = await _run(
+    device, raw_token, grp_name = await _run(
         create_device(db, org_id, user.user_id, payload)
     )
     return {
         "device_id": device.device_id,
         "org_id": device.org_id,
         "group_id": device.group_id,
+        "group_name": grp_name,
         "device_name": device.device_name,
         "description": device.description,
         "secret_token": raw_token,

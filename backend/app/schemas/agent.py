@@ -27,6 +27,14 @@ class HeartbeatIn(BaseModel):
     uptime_seconds: int | None = None
     agent_version: str | None = None
 
+    # Nhiet do & GPU
+    cpu_temp_c: float | None = None
+    gpu_name: str | None = None
+    gpu_usage_pct: float | None = None
+    gpu_temp_c: float | None = None
+    gpu_vram_total_mb: int | None = None
+    gpu_vram_used_mb: int | None = None
+
     static_info: dict[str, Any] | None = None
     processes: list[dict[str, Any]] | None = None
     top_processes: list[dict[str, Any]] | None = None
@@ -55,6 +63,12 @@ class HeartbeatIn(BaseModel):
                 "uptime_seconds",
                 "agent_version",
                 "processes",
+                "cpu_temp_c",
+                "gpu_name",
+                "gpu_usage_pct",
+                "gpu_temp_c",
+                "gpu_vram_total_mb",
+                "gpu_vram_used_mb",
             ]:
                 if k in m and merged.get(k) is None:
                     merged[k] = m[k]

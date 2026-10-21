@@ -3,7 +3,7 @@ import string
 from datetime import UTC, datetime
 from typing import NoReturn
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import User
@@ -269,7 +269,8 @@ async def update_member_role(
 async def remove_member(
     db: AsyncSession, org_id: int, actor_id: int, target_id: int
 ) -> None:
-    actor = await _require_admin(db, org_id, actor_id)
+    from app.models.organization import DeviceGroup, UserGroupAccess
+
     target = await db.scalar(
         select(OrganizationMember)
         .where(
@@ -279,11 +280,37 @@ async def remove_member(
         .with_for_update()
     )
     if target is None:
-        _fail(404, "Organization member not found")
+        _fail(404, "Không tìm thấy thành viên trong tổ chức")
+
     if target.role == "Owner":
-        _fail(403, "The organization owner cannot be removed")
+        _fail(403, "Chủ sở hữu (Owner) không thể rời tổ chức. Vui lòng chuyển quyền hoặc xóa tổ chức.")
+
+    # Truong hop tu roi to chuc (Self-leave)
+    if actor_id == target_id:
+        # Xoa cac quyen phan cum (UserGroupAccess) cua user trong to chuc nay
+        group_ids_sub = select(DeviceGroup.group_id).where(DeviceGroup.org_id == org_id)
+        await db.execute(
+            delete(UserGroupAccess).where(
+                UserGroupAccess.user_id == target_id,
+                UserGroupAccess.group_id.in_(group_ids_sub),
+            )
+        )
+        await db.delete(target)
+        await db.commit()
+        return
+
+    # Truong hop admin/owner xoa thanh vien khac
+    actor = await _require_admin(db, org_id, actor_id)
     if actor.role != "Owner" and target.role == "Admin":
-        _fail(403, "Only the organization owner can remove Admin members")
+        _fail(403, "Chỉ Owner mới có quyền xóa thành viên Quản trị viên (Admin)")
+
+    group_ids_sub = select(DeviceGroup.group_id).where(DeviceGroup.org_id == org_id)
+    await db.execute(
+        delete(UserGroupAccess).where(
+            UserGroupAccess.user_id == target_id,
+            UserGroupAccess.group_id.in_(group_ids_sub),
+        )
+    )
     await db.delete(target)
     await db.commit()
 
@@ -355,3 +382,109 @@ async def delete_group(
     await _require_admin(db, group.org_id, user_id)
     await db.delete(group)
     await db.commit()
+
+
+async def list_group_members(
+    db: AsyncSession, group_id: int, actor_id: int
+) -> list[dict]:
+    from app.models.organization import UserGroupAccess
+    group = await db.get(DeviceGroup, group_id)
+    if group is None:
+        _fail(404, "Device group not found")
+    await _get_member(db, group.org_id, actor_id)
+
+    stmt = (
+        select(UserGroupAccess, User)
+        .join(User, User.user_id == UserGroupAccess.user_id)
+        .where(UserGroupAccess.group_id == group_id)
+        .order_by(UserGroupAccess.granted_at.desc())
+    )
+    res = await db.execute(stmt)
+    items = []
+    for access, user in res.all():
+        items.append({
+            "access_id": access.access_id,
+            "user_id": user.user_id,
+            "group_id": access.group_id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": access.role,
+            "granted_at": access.granted_at,
+        })
+    return items
+
+
+async def assign_group_member(
+    db: AsyncSession, group_id: int, actor_id: int, target_user_id: int, role: str
+) -> dict:
+    from app.models.organization import UserGroupAccess
+    group = await db.get(DeviceGroup, group_id)
+    if group is None:
+        _fail(404, "Device group not found")
+    await _require_admin(db, group.org_id, actor_id)
+
+    # Kiem tra target user phai thuoc to chuc
+    target_member = await _get_member(db, group.org_id, target_user_id)
+
+    existing = await db.scalar(
+        select(UserGroupAccess).where(
+            UserGroupAccess.group_id == group_id,
+            UserGroupAccess.user_id == target_user_id,
+        ).with_for_update()
+    )
+    if existing:
+        existing.role = role
+        await db.commit()
+        await db.refresh(existing)
+        target_user = await db.get(User, target_user_id)
+        return {
+            "access_id": existing.access_id,
+            "user_id": target_user.user_id,
+            "group_id": existing.group_id,
+            "username": target_user.username,
+            "email": target_user.email,
+            "full_name": target_user.full_name,
+            "role": existing.role,
+            "granted_at": existing.granted_at,
+        }
+
+    access = UserGroupAccess(
+        group_id=group_id,
+        user_id=target_user_id,
+        role=role,
+    )
+    db.add(access)
+    await db.commit()
+    await db.refresh(access)
+    target_user = await db.get(User, target_user_id)
+    return {
+        "access_id": access.access_id,
+        "user_id": target_user.user_id,
+        "group_id": access.group_id,
+        "username": target_user.username,
+        "email": target_user.email,
+        "full_name": target_user.full_name,
+        "role": access.role,
+        "granted_at": access.granted_at,
+    }
+
+
+async def remove_group_member(
+    db: AsyncSession, group_id: int, actor_id: int, target_user_id: int
+) -> None:
+    from app.models.organization import UserGroupAccess
+    group = await db.get(DeviceGroup, group_id)
+    if group is None:
+        _fail(404, "Device group not found")
+    await _require_admin(db, group.org_id, actor_id)
+
+    access = await db.scalar(
+        select(UserGroupAccess).where(
+            UserGroupAccess.group_id == group_id,
+            UserGroupAccess.user_id == target_user_id,
+        )
+    )
+    if access:
+        await db.delete(access)
+        await db.commit()

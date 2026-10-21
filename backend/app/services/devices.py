@@ -116,23 +116,26 @@ async def check_user_device_access(
             )
         )
         access = acc_result.scalar_one_or_none()
-        role = access.role if access else member.role
+        if access is None:
+            _fail(403, "Bạn không có quyền truy cập cụm thiết bị này")
+        role = access.role
     else:
         role = member.role
 
     if required_roles and role not in required_roles:
-        _fail(403, "Permission denied for this action")
+        _fail(403, f"Quyền {role} không được phép thực hiện hành động này (yêu cầu {', '.join(required_roles)})")
 
     return device, member
 
 
 async def create_device(
     db: AsyncSession, org_id: int, user_id: int, payload: DeviceCreate
-) -> tuple[Device, str]:
+) -> tuple[Device, str, str | None]:
     member = await _get_org_member(db, org_id, user_id)
     if member.role not in ("Owner", "Admin"):
         _fail(403, "Only Owner or Admin can register devices")
 
+    grp_name: str | None = None
     if payload.group_id is not None:
         group_res = await db.execute(
             select(DeviceGroup).where(
@@ -140,8 +143,10 @@ async def create_device(
                 DeviceGroup.org_id == org_id,
             )
         )
-        if group_res.scalar_one_or_none() is None:
+        grp = group_res.scalar_one_or_none()
+        if grp is None:
             _fail(404, "Device group not found in this organization")
+        grp_name = grp.group_name
 
     raw_token, token_hash, token_prefix = generate_device_token()
     device = Device(
@@ -158,7 +163,7 @@ async def create_device(
     db.add(device)
     await db.commit()
     await db.refresh(device)
-    return device, raw_token
+    return device, raw_token, grp_name
 
 
 def _calculate_device_status(device: Device, now: datetime) -> str:
@@ -205,6 +210,12 @@ async def list_devices(
     )
     accessible_group_ids = set(group_access_res.scalars().all())
 
+    # Map group_id to group_name
+    groups_res = await db.execute(
+        select(DeviceGroup).where(DeviceGroup.org_id.in_(target_org_ids))
+    )
+    group_map = {g.group_id: g.group_name for g in groups_res.scalars().all()}
+
     dev_stmt = select(Device).where(
         Device.org_id.in_(target_org_ids),
         Device.archived_at.is_(None),
@@ -230,6 +241,7 @@ async def list_devices(
                 "device_id": d.device_id,
                 "org_id": d.org_id,
                 "group_id": d.group_id,
+                "group_name": group_map.get(d.group_id) if d.group_id else None,
                 "device_name": d.device_name,
                 "description": d.description,
                 "secret_token_prefix": d.secret_token_prefix,
@@ -251,10 +263,27 @@ async def get_device_detail(
     device, _ = await check_user_device_access(db, device_id, user_id)
     computed_status = _calculate_device_status(device, now)
 
+    # Lay metric moi nhat de tra ve day du cac thong so % CPU, RAM, Disk, Net
+    latest_res = await db.execute(
+        select(DeviceMetric)
+        .where(DeviceMetric.device_id == device_id)
+        .order_by(DeviceMetric.created_at.desc())
+        .limit(1)
+    )
+    latest_metric = latest_res.scalar_one_or_none()
+
+    static = device.static_info or {}
+    group_name = None
+    if device.group_id:
+        group_obj = await db.get(DeviceGroup, device.group_id)
+        if group_obj:
+            group_name = group_obj.group_name
+
     return {
         "device_id": device.device_id,
         "org_id": device.org_id,
         "group_id": device.group_id,
+        "group_name": group_name,
         "device_name": device.device_name,
         "description": device.description,
         "secret_token_prefix": device.secret_token_prefix,
@@ -268,6 +297,18 @@ async def get_device_detail(
         "archived_at": device.archived_at,
         "created_at": device.created_at,
         "updated_at": device.updated_at,
+        "cpu_usage": latest_metric.cpu_usage if latest_metric else None,
+        "ram_usage": latest_metric.ram_usage if latest_metric else None,
+        "disk_usage": latest_metric.disk_usage if latest_metric else None,
+        "net_in_kbps": latest_metric.net_in_kbps if latest_metric else None,
+        "net_out_kbps": latest_metric.net_out_kbps if latest_metric else None,
+        "uptime_seconds": static.get("uptime_seconds"),
+        "cpu_temp_c": static.get("cpu_temp_c"),
+        "gpu_name": static.get("gpu_name"),
+        "gpu_usage_pct": static.get("gpu_usage_pct"),
+        "gpu_temp_c": static.get("gpu_temp_c"),
+        "gpu_vram_total_mb": static.get("gpu_vram_total_mb"),
+        "gpu_vram_used_mb": static.get("gpu_vram_used_mb"),
     }
 
 
@@ -279,15 +320,18 @@ async def update_device(
     )
 
     if payload.group_id is not None:
-        group_res = await db.execute(
-            select(DeviceGroup).where(
-                DeviceGroup.group_id == payload.group_id,
-                DeviceGroup.org_id == device.org_id,
+        if payload.group_id <= 0:
+            device.group_id = None
+        else:
+            group_res = await db.execute(
+                select(DeviceGroup).where(
+                    DeviceGroup.group_id == payload.group_id,
+                    DeviceGroup.org_id == device.org_id,
+                )
             )
-        )
-        if group_res.scalar_one_or_none() is None:
-            _fail(404, "Device group not found in this organization")
-        device.group_id = payload.group_id
+            if group_res.scalar_one_or_none() is None:
+                _fail(404, "Device group not found in this organization")
+            device.group_id = payload.group_id
 
     if payload.device_name is not None:
         device.device_name = payload.device_name.strip()
@@ -321,8 +365,17 @@ async def record_heartbeat(
     device.last_heartbeat = now
     device.status = "Online"
 
+    current_static = dict(device.static_info or {})
     if payload.static_info is not None:
-        device.static_info = payload.static_info
+        current_static.update(payload.static_info)
+
+    # Cap nhat thong so dynamic (Nhiet do, GPU) vao static_info de Android luon doc duoc
+    for f_name in ["cpu_temp_c", "gpu_name", "gpu_usage_pct", "gpu_temp_c", "gpu_vram_total_mb", "gpu_vram_used_mb"]:
+        val = getattr(payload, f_name, None)
+        if val is not None:
+            current_static[f_name] = val
+
+    device.static_info = current_static
 
     processes = payload.top_processes or payload.processes
     if processes is not None:

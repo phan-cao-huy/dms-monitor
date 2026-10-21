@@ -2,9 +2,13 @@
 package collector
 
 import (
+	"encoding/json"
 	"fmt"
+	"os/exec"
 	"runtime"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -33,6 +37,13 @@ type Metrics struct {
 	UptimeSeconds int64         `json:"uptime_seconds"`
 	AgentVersion  string        `json:"agent_version"`
 	Processes     []ProcessInfo `json:"processes"`
+	// Nhiệt độ & GPU
+	CPUTempC      float64       `json:"cpu_temp_c,omitempty"`
+	GPUName       string        `json:"gpu_name,omitempty"`
+	GPUUsagePct   float64       `json:"gpu_usage_pct,omitempty"`
+	GPUTempC      float64       `json:"gpu_temp_c,omitempty"`
+	GPUVramTotalMB int64        `json:"gpu_vram_total_mb,omitempty"`
+	GPUVramUsedMB  int64        `json:"gpu_vram_used_mb,omitempty"`
 }
 
 // ProcessInfo chua thong tin 1 process.
@@ -57,6 +68,7 @@ type StaticInfo struct {
 	RAMTotalMB    int64   `json:"ram_total_mb"`
 	DiskTotalGB   float64 `json:"disk_total_gb"`
 	AgentVersion  string  `json:"agent_version"`
+	GPUName       string  `json:"gpu_name,omitempty"`
 }
 
 // CollectMetrics thu thap toan bo thong so he thong tai thoi diem goi.
@@ -104,6 +116,9 @@ func CollectMetrics(topN int) (*Metrics, error) {
 	// Top N Process
 	m.Processes = collectTopProcesses(topN)
 
+	// Nhiệt độ CPU & GPU (Windows dùng WMI, Linux dùng sensors)
+	collectThermalGPU(m)
+
 	return m, nil
 }
 
@@ -138,6 +153,20 @@ func CollectStaticInfo() (*StaticInfo, error) {
 	}
 	if du, err := disk.Usage(rootPath); err == nil {
 		info.DiskTotalGB = round2(float64(du.Total) / 1024 / 1024 / 1024)
+	}
+
+	// GPU Name trong static info
+	if runtime.GOOS == "windows" {
+		outNvidia, errNvidia := exec.Command("nvidia-smi", "--query-gpu=name", "--format=csv,noheader").Output()
+		if errNvidia == nil && len(outNvidia) > 0 {
+			info.GPUName = strings.TrimSpace(strings.Split(string(outNvidia), "\n")[0])
+		} else {
+			psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name"
+			outPs, errPs := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
+			if errPs == nil && len(outPs) > 0 {
+				info.GPUName = strings.TrimSpace(string(outPs))
+			}
+		}
 	}
 
 	return info, nil
@@ -195,6 +224,141 @@ func collectTopProcesses(topN int) []ProcessInfo {
 }
 
 func round2(v float64) float64 { return float64(int(v*100)) / 100 }
+
+// collectThermalGPU thu thap nhiet do va thong tin GPU.
+func collectThermalGPU(m *Metrics) {
+	if runtime.GOOS == "windows" {
+		collectWindowsGPU(m)
+		collectWindowsCPUTemp(m)
+	} else {
+		collectLinuxTemp(m)
+		collectLinuxGPU(m)
+	}
+}
+
+func collectWindowsGPU(m *Metrics) {
+	// 1. Uu tien dung nvidia-smi (chinh xac va nhanh nhat cho NVIDIA GPU)
+	outNvidia, errNvidia := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used", "--format=csv,noheader,nounits").Output()
+	if errNvidia == nil && len(outNvidia) > 0 {
+		firstLine := strings.Split(strings.TrimSpace(string(outNvidia)), "\n")[0]
+		parts := strings.Split(firstLine, ",")
+		if len(parts) >= 5 {
+			m.GPUName = strings.TrimSpace(parts[0])
+			if usage, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); err == nil {
+				m.GPUUsagePct = round2(usage)
+			}
+			if temp, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
+				m.GPUTempC = round2(temp)
+			}
+			if totalMB, err := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64); err == nil {
+				m.GPUVramTotalMB = totalMB
+			}
+			if usedMB, err := strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 64); err == nil {
+				m.GPUVramUsedMB = usedMB
+			}
+			return
+		}
+	}
+
+	// 2. Fallback sang PowerShell Get-CimInstance (hoat dong tren moi Windows 10/11 ke ca khi khong co wmic)
+	psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 Name, AdapterRAM | ConvertTo-Json -Compress"
+	outPs, errPs := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
+	if errPs == nil && len(outPs) > 0 {
+		var gpuData struct {
+			Name       string `json:"Name"`
+			AdapterRAM int64  `json:"AdapterRAM"`
+		}
+		if err := json.Unmarshal(outPs, &gpuData); err == nil && gpuData.Name != "" {
+			m.GPUName = gpuData.Name
+			if gpuData.AdapterRAM > 1024*1024 {
+				m.GPUVramTotalMB = gpuData.AdapterRAM / 1024 / 1024
+			}
+		}
+	}
+}
+
+func collectWindowsCPUTemp(m *Metrics) {
+	// Thu lay qua PowerShell Get-CimInstance MSAcpi_ThermalZoneTemperature
+	psCmd := "Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentTemperature"
+	out, err := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
+	if err == nil && len(out) > 0 {
+		s := strings.TrimSpace(string(out))
+		if v, err := strconv.ParseFloat(s, 64); err == nil && v > 2000 {
+			// Don vi 1/10 Kelvin -> Celsius
+			celsius := (v / 10.0) - 273.15
+			if celsius > 0 && celsius < 120 {
+				m.CPUTempC = round2(celsius)
+				return
+			}
+		}
+	}
+
+	// Neu khong co CPU temp doc lap, co the dung GPU temp lam tham chieu neu may dang nong
+	if m.CPUTempC == 0 && m.GPUTempC > 0 {
+		// Neu co GPUTempC thi van co thong tin nhiet do he thong
+	}
+}
+
+func collectLinuxTemp(m *Metrics) {
+	out, err := exec.Command("sensors", "-j").Output()
+	if err != nil || len(out) == 0 {
+		return
+	}
+	// Lay nhiet do CPU tu sensors -j output (tim "temp1_input" hoac "Tdie")
+	var maxTemp float64
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "temp") && strings.Contains(line, ":") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				valStr := strings.TrimSpace(strings.Trim(parts[1], " ,"))
+				if v, err := strconv.ParseFloat(valStr, 64); err == nil && v > 0 && v < 150 {
+					if v > maxTemp {
+						maxTemp = v
+					}
+				}
+			}
+		}
+	}
+	if maxTemp > 0 {
+		m.CPUTempC = maxTemp
+	}
+}
+
+func collectLinuxGPU(m *Metrics) {
+	// Thu nvidia-smi truoc
+	out, err := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used",
+		"--format=csv,noheader,nounits").Output()
+	if err == nil && len(out) > 0 {
+		parts := strings.Split(strings.TrimSpace(string(out)), ",")
+		if len(parts) >= 5 {
+			m.GPUName = strings.TrimSpace(parts[0])
+			if v, e := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); e == nil {
+				m.GPUUsagePct = round2(v)
+			}
+			if v, e := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); e == nil {
+				m.GPUTempC = round2(v)
+			}
+			if v, e := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64); e == nil {
+				m.GPUVramTotalMB = v
+			}
+			if v, e := strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 64); e == nil {
+				m.GPUVramUsedMB = v
+			}
+		}
+		return
+	}
+	// Thu rocm-smi cho AMD
+	out2, err2 := exec.Command("rocm-smi", "--showuse", "--showtemp", "--showmeminfo", "vram").Output()
+	if err2 == nil && len(out2) > 0 {
+		m.GPUName = "AMD GPU (rocm-smi)"
+	}
+}
+
+func isNumeric(s string) bool {
+	_, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	return err == nil
+}
 
 // FormatBytes chuyen bytes thanh chuoi de doc (cho log).
 func FormatBytes(b uint64) string {

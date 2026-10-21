@@ -88,3 +88,21 @@ class DeviceGroupUpdate(BaseModel):
     group_name: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = None
 
+
+
+class GroupMemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    access_id: int
+    user_id: int
+    group_id: int
+    username: str
+    email: str
+    full_name: str | None = None
+    role: Literal["Manager", "Viewer"]
+    granted_at: datetime
+
+
+class GroupMemberAssign(BaseModel):
+    user_id: int
+    role: Literal["Manager", "Viewer"] = "Viewer"

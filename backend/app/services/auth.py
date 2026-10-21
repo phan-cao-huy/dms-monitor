@@ -37,6 +37,8 @@ def _new_refresh_token(
 
 
 async def register_user(db: AsyncSession, payload: RegisterIn) -> User:
+    from app.models.organization import Organization, OrganizationMember
+
     user = User(
         username=payload.username.lower(),
         email=str(payload.email).lower(),
@@ -44,6 +46,25 @@ async def register_user(db: AsyncSession, payload: RegisterIn) -> User:
         full_name=payload.full_name,
     )
     db.add(user)
+    await db.flush()
+
+    # Tu dong tao to chuc ca nhan mac dinh cho tai khoan moi (User la Owner)
+    display_name = payload.full_name or payload.username
+    default_org = Organization(
+        org_name=f"Tổ chức của {display_name}",
+        description=f"Không gian làm việc cá nhân của {display_name}",
+        owner_id=user.user_id,
+    )
+    db.add(default_org)
+    await db.flush()
+
+    member = OrganizationMember(
+        org_id=default_org.org_id,
+        user_id=user.user_id,
+        role="Owner",
+    )
+    db.add(member)
+
     await db.commit()
     await db.refresh(user)
     return user
