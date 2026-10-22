@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.api.RetrofitClient
 import com.example.myapplication.data.model.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +49,7 @@ class DeviceDetailViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -66,7 +68,8 @@ class DeviceDetailViewModel : ViewModel() {
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(metrics = response.body()!!)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // metrics lỗi không hiển thị, giữ list rỗng
             }
         }
@@ -79,7 +82,8 @@ class DeviceDetailViewModel : ViewModel() {
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(processes = response.body()!!)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // processes lỗi không hiển thị, giữ list rỗng
             }
         }
@@ -92,7 +96,8 @@ class DeviceDetailViewModel : ViewModel() {
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(commands = response.body()!!)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // command history lỗi không hiển thị, giữ list rỗng
             }
         }
@@ -147,6 +152,7 @@ class DeviceDetailViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể gửi lệnh: ${e.message}"
@@ -177,6 +183,7 @@ class DeviceDetailViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể cập nhật cụm: ${e.message}"
@@ -200,6 +207,7 @@ class DeviceDetailViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể xóa thiết bị: ${e.message}"

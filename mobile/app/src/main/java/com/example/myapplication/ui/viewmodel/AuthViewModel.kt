@@ -8,6 +8,7 @@ import com.example.myapplication.data.local.TokenManager
 import com.example.myapplication.data.model.LoginRequest
 import com.example.myapplication.data.model.RegisterRequest
 import com.example.myapplication.data.model.UserInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,7 +63,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val user = try {
                     val meResponse = RetrofitClient.apiService.getMe()
                     if (meResponse.isSuccessful) meResponse.body() else null
-                } catch (_: Exception) { null }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    null
+                }
                 _uiState.value = _uiState.value.copy(isLoggedIn = true, user = user)
             } else {
                 _uiState.value = _uiState.value.copy(isLoggedIn = false, user = null)
@@ -83,7 +87,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     val user = try {
                         val meResponse = RetrofitClient.apiService.getMe()
                         if (meResponse.isSuccessful) meResponse.body() else null
-                    } catch (_: Exception) { null }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        null
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isLoggedIn = true,
@@ -96,6 +103,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -123,6 +131,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -142,7 +151,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         com.example.myapplication.data.model.RefreshRequest(refreshToken)
                     )
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
             tokenManager.clearAll()
         }
     }

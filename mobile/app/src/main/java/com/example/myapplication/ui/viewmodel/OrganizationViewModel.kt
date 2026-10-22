@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.api.RetrofitClient
 import com.example.myapplication.data.local.TokenManager
 import com.example.myapplication.data.model.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,10 +31,6 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
     private val _uiState = MutableStateFlow(OrganizationUiState())
     val uiState: StateFlow<OrganizationUiState> = _uiState.asStateFlow()
 
-    init {
-        loadData()
-    }
-
     fun resetState() {
         // Huỷ tất cả job đang chạy để tránh network call cũ ghi đè state mới
         viewModelScope.coroutineContext[kotlinx.coroutines.Job]?.children?.forEach { it.cancel() }
@@ -48,12 +45,15 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
 
     fun loadMembers() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 var orgId = tokenManager.currentOrgId.first()
                 val orgsResponse = try {
                     RetrofitClient.apiService.getOrganizations()
-                } catch (_: Exception) { null }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    null
+                }
 
                 val orgList = if (orgsResponse?.isSuccessful == true) orgsResponse.body().orEmpty() else emptyList()
 
@@ -85,6 +85,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -101,7 +102,9 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(invitations = response.body()!!)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -118,7 +121,9 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                         loadGroupMembers(group.groupId)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -131,7 +136,9 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     currentMap[groupId] = response.body()!!
                     _uiState.value = _uiState.value.copy(groupMembers = currentMap)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -157,6 +164,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể tạo cụm: ${e.message}"
@@ -183,6 +191,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể xóa cụm: ${e.message}"
@@ -212,6 +221,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Lỗi khi cấp quyền: ${e.message}"
@@ -238,6 +248,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Lỗi khi xóa quyền: ${e.message}"
@@ -267,6 +278,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể cập nhật quyền: ${e.message}"
@@ -294,6 +306,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể xóa thành viên: ${e.message}"
@@ -324,6 +337,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể rời tổ chức: ${e.message}"
@@ -353,6 +367,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể tạo mã mời: ${e.message}"
@@ -385,6 +400,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể tham gia tổ chức: ${e.message}"
@@ -416,6 +432,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể tạo tổ chức: ${e.message}"

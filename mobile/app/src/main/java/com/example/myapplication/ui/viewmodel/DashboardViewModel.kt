@@ -9,6 +9,7 @@ import com.example.myapplication.data.model.Alert
 import com.example.myapplication.data.model.Device
 import com.example.myapplication.data.model.DeviceGroup
 import com.example.myapplication.data.model.Organization
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,10 +42,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    init {
-        loadOrganizations()
-    }
-
     /**
      * Reset toàn bộ state về trạng thái ban đầu và huỷ tất cả các job đang chạy.
      * Phải gọi trước khi đăng xuất để tránh rò rỉ dữ liệu sang tài khoản khác.
@@ -57,7 +54,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun loadOrganizations() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val response = RetrofitClient.apiService.getOrganizations()
                 if (response.isSuccessful && response.body() != null) {
@@ -94,6 +91,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -133,7 +131,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(groups = response.body()!!)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -143,7 +143,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun loadDevices(orgId: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val response = RetrofitClient.apiService.getDevices(orgId)
                 if (response.isSuccessful && response.body() != null) {
@@ -158,6 +158,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -174,7 +175,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(alerts = response.body()!!)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 // Không hiển thị lỗi cho alerts riêng để tránh spam UI
             }
         }
@@ -228,6 +230,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể tạo thiết bị: ${e.message}"
@@ -250,7 +253,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         // KHÔNG copy isLoading = false và KHÔNG đụng đến newlyCreatedDevice
                     )
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -267,6 +272,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     markAlertResolvedLocally(alertId)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 markAlertResolvedLocally(alertId)
             }
         }

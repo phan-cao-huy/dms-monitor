@@ -59,6 +59,7 @@ object AppUpdateManager {
                     Result.failure(Exception("HTTP ${response.code()}: ${response.message()}"))
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Result.failure(e)
             }
         }
