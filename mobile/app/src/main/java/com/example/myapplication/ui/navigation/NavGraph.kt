@@ -140,6 +140,15 @@ fun NavGraph(
                 },
                 filteredDevices = dashboardViewModel.getFilteredDevices(),
                 onSelectGroupFilter = { dashboardViewModel.selectGroupFilter(it) },
+                onSelectOrg = { orgId ->
+                    orgViewModel.selectOrganization(orgId)
+                    val org = dashboardState.organizations.find { it.id == orgId }
+                    if (org != null) {
+                        dashboardViewModel.selectOrganization(org)
+                    } else {
+                        dashboardViewModel.loadOrganizations()
+                    }
+                },
                 onCreateDevice = { name, grpId -> dashboardViewModel.createDevice(name, grpId) },
                 onDismissCreatedDevice = { dashboardViewModel.clearNewlyCreatedDevice() },
                 // Org callbacks

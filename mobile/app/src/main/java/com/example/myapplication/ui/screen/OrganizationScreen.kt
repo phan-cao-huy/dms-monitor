@@ -131,6 +131,7 @@ fun OrgToastNotification(
 fun OrganizationScreen(
     uiState: OrganizationUiState,
     currentUserId: String? = null,
+    onSelectOrg: (String) -> Unit = {},
     onLoadMembers: () -> Unit,
     onLoadInvitations: () -> Unit,
     onLoadGroups: () -> Unit = {},
@@ -151,12 +152,16 @@ fun OrganizationScreen(
 
     var popupMessage by remember { mutableStateOf<String?>(null) }
     var popupIsSuccess by remember { mutableStateOf(true) }
+    var showOrgMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.successMessage) {
         val msg = uiState.successMessage
         if (msg != null) {
             popupIsSuccess = true
             popupMessage = msg
+            if (selectedTab == 3) {
+                selectedTab = 0
+            }
             onClearMessages()
         }
     }
@@ -191,17 +196,96 @@ fun OrganizationScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    uiState.orgName?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    } ?: Text(
-                        text = "Chưa tham gia tổ chức nào",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = uiState.organizations.isNotEmpty()) {
+                                    showOrgMenu = true
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Business,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = uiState.orgName ?: "Chưa tham gia tổ chức nào",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                if (uiState.organizations.size > 1) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        Icons.Default.ArrowDropDown,
+                                        contentDescription = "Chuyển tổ chức",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showOrgMenu,
+                            onDismissRequest = { showOrgMenu = false }
+                        ) {
+                            Text(
+                                text = "Chọn tổ chức quản lý",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            HorizontalDivider()
+                            uiState.organizations.forEach { org ->
+                                val isSelected = org.id == uiState.orgId
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(
+                                                text = org.orgName,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Unspecified
+                                            )
+                                            if (!org.description.isNullOrBlank()) {
+                                                Text(
+                                                    text = org.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    },
+                                    trailingIcon = {
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "Đang chọn",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        showOrgMenu = false
+                                        if (!isSelected) {
+                                            onSelectOrg(org.id)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

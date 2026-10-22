@@ -23,6 +23,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] (Worker) %(message)s",
 )
 logger = logging.getLogger("worker")
+RAM_ALERT_THRESHOLD = 90.0
+RAM_ALERT_MESSAGE_PREFIX = "RAM vượt ngưỡng 90%"
 
 
 def _utc_naive() -> datetime:
@@ -61,6 +63,82 @@ async def check_offline_devices() -> None:
             await db.commit()
         except Exception:
             logger.exception("Lỗi kiểm tra offline")
+
+
+async def check_high_ram_devices() -> None:
+    """Ghi cảnh báo khi RAM vượt 90% và tự đóng khi mức dùng hạ xuống."""
+    now = _utc_naive()
+    async with SessionLocal() as db:
+        try:
+            result = await db.execute(
+                select(Device).where(
+                    Device.archived_at.is_(None),
+                    Device.status.in_(("Online", "Warning")),
+                )
+            )
+            devices = list(result.scalars().all())
+
+            for device in devices:
+                metric_result = await db.execute(
+                    select(DeviceMetric)
+                    .where(DeviceMetric.device_id == device.device_id)
+                    .order_by(DeviceMetric.created_at.desc(), DeviceMetric.metric_id.desc())
+                    .limit(1)
+                )
+                metric = metric_result.scalar_one_or_none()
+                if metric is None:
+                    continue
+
+                alert_result = await db.execute(
+                    select(AlertHistory)
+                    .where(
+                        AlertHistory.device_id == device.device_id,
+                        AlertHistory.resolved_at.is_(None),
+                        AlertHistory.message.startswith(RAM_ALERT_MESSAGE_PREFIX),
+                    )
+                    .order_by(AlertHistory.created_at.desc())
+                    .limit(1)
+                )
+                active_alert = alert_result.scalar_one_or_none()
+
+                if metric.ram_usage >= RAM_ALERT_THRESHOLD:
+                    device.status = "Warning"
+                    message = (
+                        f"{RAM_ALERT_MESSAGE_PREFIX} "
+                        f"(thiết bị '{device.device_name}', hiện tại {metric.ram_usage:.1f}%)."
+                    )
+                    if active_alert is None:
+                        db.add(
+                            AlertHistory(
+                                device_id=device.device_id,
+                                severity="WARNING",
+                                message=message,
+                                metric_value=metric.ram_usage,
+                                threshold_value=RAM_ALERT_THRESHOLD,
+                                notification_status="PENDING",
+                            )
+                        )
+                    else:
+                        active_alert.message = message
+                        active_alert.metric_value = metric.ram_usage
+                        active_alert.threshold_value = RAM_ALERT_THRESHOLD
+                else:
+                    if active_alert is not None:
+                        active_alert.resolved_at = now
+                    if device.status == "Warning":
+                        other_alert_res = await db.execute(
+                            select(AlertHistory.alert_id).where(
+                                AlertHistory.device_id == device.device_id,
+                                AlertHistory.resolved_at.is_(None),
+                                AlertHistory.alert_id != (active_alert.alert_id if active_alert else 0),
+                            ).limit(1)
+                        )
+                        if other_alert_res.scalar_one_or_none() is None:
+                            device.status = "Online"
+
+            await db.commit()
+        except Exception:
+            logger.exception("Lỗi kiểm tra cảnh báo RAM")
 
 
 async def check_command_timeouts() -> None:
@@ -159,6 +237,7 @@ async def main() -> None:
     scheduler = AsyncIOScheduler()
 
     scheduler.add_job(check_offline_devices, "interval", minutes=1)
+    scheduler.add_job(check_high_ram_devices, "interval", minutes=1)
     scheduler.add_job(check_command_timeouts, "interval", minutes=1)
     scheduler.add_job(aggregate_hourly_metrics, "cron", minute=5)
     scheduler.add_job(manage_partitions, "cron", day_of_week="sun", hour=0, minute=0)

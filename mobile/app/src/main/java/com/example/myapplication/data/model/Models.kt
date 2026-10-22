@@ -50,6 +50,13 @@ data class JoinOrgRequest(
     @SerializedName("invite_code") val inviteCode: String
 )
 
+data class JoinOrgResponse(
+    @SerializedName("org_id", alternate = ["id"]) val orgId: String,
+    @SerializedName("user_id") val userId: String? = null,
+    val role: String? = null,
+    @SerializedName("joined_at") val joinedAt: String? = null
+)
+
 // === Organization Members ===
 data class OrgMember(
     @SerializedName("user_id") val userId: String,

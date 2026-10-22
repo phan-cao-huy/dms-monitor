@@ -32,6 +32,7 @@ fun MainScreen(
     onRefreshDashboard: () -> Unit,
     filteredDevices: List<Device>,
     onSelectGroupFilter: (Int?) -> Unit = {},
+    onSelectOrg: (String) -> Unit = {},
     onCreateDevice: (String, String?) -> Unit = { _, _ -> },
     onDismissCreatedDevice: () -> Unit = {},
     // Org callbacks
@@ -112,6 +113,7 @@ fun MainScreen(
                     onRefresh = onRefreshDashboard,
                     filteredDevices = filteredDevices,
                     onSelectGroupFilter = onSelectGroupFilter,
+                    onSelectOrg = { org -> onSelectOrg(org.id) },
                     onCreateDevice = onCreateDevice,
                     onDismissCreatedDevice = onDismissCreatedDevice,
                     currentUser = currentUser,
@@ -120,6 +122,7 @@ fun MainScreen(
                 1 -> OrganizationScreen(
                     uiState = orgState,
                     currentUserId = currentUser?.id,
+                    onSelectOrg = onSelectOrg,
                     onLoadMembers = onLoadMembers,
                     onLoadInvitations = onLoadInvitations,
                     onLoadGroups = onLoadGroups,

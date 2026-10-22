@@ -171,7 +171,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private fun loadAlerts(orgId: String) {
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.apiService.getAlerts(orgId, resolved = false)
+                val response = RetrofitClient.apiService.getAlerts(orgId, resolved = null)
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(alerts = response.body()!!)
                 }

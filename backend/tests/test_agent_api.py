@@ -270,3 +270,68 @@ def test_agent_command_result_post_and_put():
     finally:
         app.dependency_overrides.pop(get_current_agent_device, None)
         app.dependency_overrides.pop(get_db, None)
+
+
+def test_agent_heartbeat_high_ram_triggers_warning_alert():
+    from app.models.alert import AlertHistory
+
+    raw_token, token_hash, prefix = generate_device_token()
+    mock_device = Device(
+        device_id=10,
+        org_id=1,
+        device_name="HighRAM-PC",
+        secret_token_hash=token_hash,
+        secret_token_prefix=prefix,
+        status="Online",
+        offline_threshold_minutes=5,
+    )
+
+    added_objects = []
+
+    async def override_device():
+        return mock_device
+
+    async def override_db():
+        class MockSession:
+            def add(self, obj):
+                added_objects.append(obj)
+
+            async def commit(self):
+                pass
+
+            async def execute(self, stmt):
+                class MockResult:
+                    def scalar_one_or_none(self):
+                        return None
+
+                return MockResult()
+
+        yield MockSession()
+
+    app.dependency_overrides[get_optional_agent_device] = override_device
+    app.dependency_overrides[get_db] = override_db
+    try:
+        client = TestClient(app)
+        payload = {
+            "cpu_usage": 40.0,
+            "ram_usage": 91.5,
+            "disk_usage": 50.0,
+        }
+        res = client.post(
+            "/api/v1/agent/heartbeat",
+            json=payload,
+            headers={"X-Device-Token": raw_token},
+        )
+        assert res.status_code == 202
+        assert mock_device.status == "Warning"
+
+        # Check AlertHistory was created
+        alert = next((obj for obj in added_objects if isinstance(obj, AlertHistory)), None)
+        assert alert is not None
+        assert alert.severity == "WARNING"
+        assert "RAM vượt ngưỡng 90%" in alert.message
+        assert alert.metric_value == 91.5
+    finally:
+        app.dependency_overrides.pop(get_optional_agent_device, None)
+        app.dependency_overrides.pop(get_db, None)
+

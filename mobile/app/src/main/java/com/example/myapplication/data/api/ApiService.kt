@@ -30,7 +30,7 @@ interface ApiService {
     suspend fun createOrganization(@Body request: CreateOrgRequest): Response<Organization>
 
     @POST("orgs/join")
-    suspend fun joinOrganization(@Body request: JoinOrgRequest): Response<Unit>
+    suspend fun joinOrganization(@Body request: JoinOrgRequest): Response<JoinOrgResponse>
 
     // === Organization Members ===
     @GET("orgs/{org_id}/members")
@@ -147,7 +147,7 @@ interface ApiService {
     @GET("orgs/{org_id}/alerts")
     suspend fun getAlerts(
         @Path("org_id") orgId: String,
-        @Query("resolved") resolved: Boolean? = false
+        @Query("resolved") resolved: Boolean? = null
     ): Response<List<Alert>>
 
     @POST("alerts/{id}/resolve")

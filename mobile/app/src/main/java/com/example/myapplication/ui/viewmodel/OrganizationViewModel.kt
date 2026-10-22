@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 data class OrganizationUiState(
     val isLoading: Boolean = false,
+    val organizations: List<Organization> = emptyList(),
     val orgId: String? = null,
     val orgName: String? = null,
     val members: List<OrgMember> = emptyList(),
@@ -37,17 +38,24 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
         _uiState.value = OrganizationUiState()
     }
 
-    fun loadData() {
-        loadMembers()
-        loadInvitations()
-        loadGroups()
+    fun selectOrganization(orgId: String) {
+        viewModelScope.launch {
+            tokenManager.saveOrgId(orgId)
+            loadData(targetOrgId = orgId)
+        }
     }
 
-    fun loadMembers() {
+    fun loadData(targetOrgId: String? = null) {
+        loadMembers(targetOrgId)
+        loadInvitations(targetOrgId)
+        loadGroups(targetOrgId)
+    }
+
+    fun loadMembers(targetOrgId: String? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                var orgId = tokenManager.currentOrgId.first()
+                var orgId = targetOrgId ?: tokenManager.currentOrgId.first()
                 val orgsResponse = try {
                     RetrofitClient.apiService.getOrganizations()
                 } catch (e: Exception) {
@@ -55,11 +63,20 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     null
                 }
 
+                if (orgsResponse?.code() == 401) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Phiên đăng nhập hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại."
+                    )
+                    return@launch
+                }
+
                 val orgList = if (orgsResponse?.isSuccessful == true) orgsResponse.body().orEmpty() else emptyList()
 
                 if (orgList.isEmpty()) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        organizations = emptyList(),
                         orgId = null,
                         orgName = null,
                         members = emptyList(),
@@ -73,7 +90,11 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 val currentOrg = orgList.find { it.id == orgId } ?: orgList.first()
                 orgId = currentOrg.id
                 tokenManager.saveOrgId(orgId)
-                _uiState.value = _uiState.value.copy(orgId = orgId, orgName = currentOrg.orgName)
+                _uiState.value = _uiState.value.copy(
+                    organizations = orgList,
+                    orgId = orgId,
+                    orgName = currentOrg.orgName
+                )
 
                 val response = RetrofitClient.apiService.getOrgMembers(orgId)
                 if (response.isSuccessful && response.body() != null) {
@@ -94,10 +115,11 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun loadInvitations() {
+    fun loadInvitations(targetOrgId: String? = null) {
         viewModelScope.launch {
             try {
-                val orgId = _uiState.value.orgId ?: tokenManager.currentOrgId.first() ?: return@launch
+                val orgId = targetOrgId ?: _uiState.value.orgId ?: tokenManager.currentOrgId.first() ?: return@launch
+                if (orgId.isBlank()) return@launch
                 val response = RetrofitClient.apiService.getInvitations(orgId)
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(invitations = response.body()!!)
@@ -108,10 +130,11 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun loadGroups() {
+    fun loadGroups(targetOrgId: String? = null) {
         viewModelScope.launch {
             try {
-                val orgId = _uiState.value.orgId ?: tokenManager.currentOrgId.first() ?: return@launch
+                val orgId = targetOrgId ?: _uiState.value.orgId ?: tokenManager.currentOrgId.first() ?: return@launch
+                if (orgId.isBlank()) return@launch
                 val response = RetrofitClient.apiService.getGroups(orgId)
                 if (response.isSuccessful && response.body() != null) {
                     val groups = response.body()!!
@@ -376,20 +399,23 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun joinOrganization(inviteCode: String, onJoined: () -> Unit = {}) {
+    fun joinOrganization(inviteCode: String, onJoined: (String) -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, successMessage = null)
             try {
                 val response = RetrofitClient.apiService.joinOrganization(
                     JoinOrgRequest(inviteCode = inviteCode.trim().uppercase())
                 )
-                if (response.isSuccessful) {
+                if (response.isSuccessful && response.body() != null) {
+                    val joinedOrgId = response.body()!!.orgId
+                    tokenManager.saveOrgId(joinedOrgId)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        orgId = joinedOrgId,
                         successMessage = "Đã tham gia tổ chức thành công!"
                     )
-                    loadData()
-                    onJoined()
+                    loadData(targetOrgId = joinedOrgId)
+                    onJoined(joinedOrgId)
                 } else {
                     val errorMsg = when (response.code()) {
                         404 -> "Mã mời không tồn tại hoặc đã hết hạn"
@@ -409,7 +435,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun createOrganization(orgName: String, description: String?, onCreated: () -> Unit = {}) {
+    fun createOrganization(orgName: String, description: String?, onCreated: (String) -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, successMessage = null)
             try {
@@ -421,10 +447,11 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     tokenManager.saveOrgId(created.id)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        orgId = created.id,
                         successMessage = "Đã tạo tổ chức '$orgName' thành công!"
                     )
-                    loadData()
-                    onCreated()
+                    loadData(targetOrgId = created.id)
+                    onCreated(created.id)
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

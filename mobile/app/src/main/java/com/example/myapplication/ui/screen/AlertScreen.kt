@@ -133,18 +133,18 @@ fun AlertCard(alert: Alert, onResolve: () -> Unit) {
         )
     }
 
-    val severityColor = when (alert.severity) {
+    val severityColor = when (alert.severity?.uppercase()) {
         "CRITICAL" -> Color(0xFFD32F2F)
-        "HIGH" -> Color(0xFFE65100)
+        "HIGH", "WARNING" -> Color(0xFFE65100)
         "MEDIUM" -> Color(0xFFFF9800)
-        "LOW" -> Color(0xFF4CAF50)
+        "LOW", "INFO" -> Color(0xFF4CAF50)
         else -> Color.Gray
     }
 
-    val severityIcon = when (alert.severity) {
+    val severityIcon = when (alert.severity?.uppercase()) {
         "CRITICAL" -> Icons.Default.Error
-        "HIGH" -> Icons.Default.Warning
-        "MEDIUM" -> Icons.Default.Info
+        "HIGH", "WARNING" -> Icons.Default.Warning
+        "MEDIUM", "INFO" -> Icons.Default.Info
         else -> Icons.Default.NotificationsNone
     }
 

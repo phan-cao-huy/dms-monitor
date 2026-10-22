@@ -1,15 +1,43 @@
+from contextlib import asynccontextmanager
 import os
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.api.v1.api import api_router
+from app.workers.runner import (
+    check_command_timeouts,
+    check_high_ram_devices,
+    check_offline_devices,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = None
+    if os.getenv("TESTING") != "1":
+        try:
+            scheduler = AsyncIOScheduler()
+            scheduler.add_job(check_offline_devices, "interval", minutes=1)
+            scheduler.add_job(check_high_ram_devices, "interval", minutes=1)
+            scheduler.add_job(check_command_timeouts, "interval", minutes=1)
+            scheduler.start()
+        except Exception:
+            pass
+    try:
+        yield
+    finally:
+        if scheduler is not None and scheduler.running:
+            scheduler.shutdown()
+
 
 app = FastAPI(
     title="DMS - Device Monitoring System",
     description="Backend API Server cho hệ thống giám sát máy tính từ xa (Mobile App & Agent).",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

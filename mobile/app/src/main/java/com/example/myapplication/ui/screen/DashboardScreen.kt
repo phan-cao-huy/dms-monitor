@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.data.model.Alert
 import com.example.myapplication.data.model.Device
+import com.example.myapplication.data.model.Organization
 import com.example.myapplication.data.model.UserInfo
 import com.example.myapplication.ui.i18n.LocalAppStrings
 import com.example.myapplication.ui.viewmodel.DashboardUiState
@@ -46,6 +47,7 @@ fun DashboardScreen(
     onRefresh: () -> Unit,
     filteredDevices: List<Device>,
     onSelectGroupFilter: (Int?) -> Unit = {},
+    onSelectOrg: (Organization) -> Unit = {},
     onCreateDevice: (String, String?) -> Unit = { _, _ -> },
     onDismissCreatedDevice: () -> Unit = {},
     currentUser: UserInfo? = null,
@@ -295,21 +297,82 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
+            var showOrgMenu by remember { mutableStateOf(false) }
             TopAppBar(
                 title = {
-                    Column {
-                        Text("DMS Monitor", style = MaterialTheme.typography.titleMedium)
-                        uiState.selectedOrg?.let {
+                    Box {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = uiState.organizations.isNotEmpty()) {
+                                    showOrgMenu = true
+                                }
+                                .padding(vertical = 2.dp, horizontal = 4.dp)
+                        ) {
+                            Column {
+                                Text("DMS Monitor", style = MaterialTheme.typography.titleMedium)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = uiState.selectedOrg?.orgName ?: "Chưa chọn tổ chức",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (uiState.organizations.size > 1) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            Icons.Default.ArrowDropDown,
+                                            contentDescription = "Chuyển tổ chức",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showOrgMenu,
+                            onDismissRequest = { showOrgMenu = false }
+                        ) {
                             Text(
-                                text = it.orgName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = if (strings.isEnglish) "Switch Organization" else "Chuyển tổ chức",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.primary
                             )
-                        } ?: Text(
-                            text = "Chưa chọn tổ chức",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            HorizontalDivider()
+                            uiState.organizations.forEach { org ->
+                                val isSelected = org.id == uiState.selectedOrg?.id
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = org.orgName,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Unspecified
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        showOrgMenu = false
+                                        if (!isSelected) {
+                                            onSelectOrg(org)
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {

@@ -6,6 +6,7 @@ from typing import Any, NoReturn
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.alert import AlertHistory
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
 from app.models.organization import (
     DeviceGroup,
@@ -365,7 +366,6 @@ async def record_heartbeat(
 ) -> None:
     now = _utc_naive()
     device.last_heartbeat = now
-    device.status = "Online"
 
     current_static = dict(device.static_info or {})
     if payload.static_info is not None:
@@ -404,6 +404,81 @@ async def record_heartbeat(
         created_at=now,
     )
     db.add(metric)
+
+    # Xu ly canh bao RAM >= 90% thoi gian thuc
+    ram_usage = payload.ram_usage
+    RAM_ALERT_THRESHOLD = 90.0
+    RAM_ALERT_MESSAGE_PREFIX = "RAM vượt ngưỡng 90%"
+
+    if ram_usage >= RAM_ALERT_THRESHOLD:
+        device.status = "Warning"
+        message = (
+            f"{RAM_ALERT_MESSAGE_PREFIX} "
+            f"(thiết bị '{device.device_name}', hiện tại {ram_usage:.1f}%)."
+        )
+        active_alert = None
+        if hasattr(db, "execute"):
+            alert_stmt = (
+                select(AlertHistory)
+                .where(
+                    AlertHistory.device_id == device.device_id,
+                    AlertHistory.resolved_at.is_(None),
+                    AlertHistory.message.startswith(RAM_ALERT_MESSAGE_PREFIX),
+                )
+                .order_by(AlertHistory.created_at.desc())
+                .limit(1)
+            )
+            alert_res = await db.execute(alert_stmt)
+            active_alert = alert_res.scalar_one_or_none()
+
+        if active_alert is None:
+            db.add(
+                AlertHistory(
+                    device_id=device.device_id,
+                    severity="WARNING",
+                    message=message,
+                    metric_value=ram_usage,
+                    threshold_value=RAM_ALERT_THRESHOLD,
+                    notification_status="PENDING",
+                )
+            )
+        else:
+            active_alert.message = message
+            active_alert.metric_value = ram_usage
+            active_alert.threshold_value = RAM_ALERT_THRESHOLD
+    else:
+        # Neu RAM da ha xuong duoi 90%, tu dong giai quyet canh bao RAM cu (neu co)
+        if hasattr(db, "execute"):
+            alert_stmt = (
+                select(AlertHistory)
+                .where(
+                    AlertHistory.device_id == device.device_id,
+                    AlertHistory.resolved_at.is_(None),
+                    AlertHistory.message.startswith(RAM_ALERT_MESSAGE_PREFIX),
+                )
+                .order_by(AlertHistory.created_at.desc())
+                .limit(1)
+            )
+            alert_res = await db.execute(alert_stmt)
+            active_alert = alert_res.scalar_one_or_none()
+            if active_alert is not None:
+                active_alert.resolved_at = now
+
+            # Chi reset ve Online neu khong con canh bao nao khac dang mo
+            other_stmt = (
+                select(AlertHistory.alert_id)
+                .where(
+                    AlertHistory.device_id == device.device_id,
+                    AlertHistory.resolved_at.is_(None),
+                )
+                .limit(1)
+            )
+            other_res = await db.execute(other_stmt)
+            if other_res.scalar_one_or_none() is None:
+                device.status = "Online"
+        else:
+            device.status = "Online"
+
     await db.commit()
 
 

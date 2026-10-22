@@ -21,9 +21,13 @@ class TokenManager(private val context: Context) {
 
     // Cache token trong bộ nhớ để tránh runBlocking trên OkHttp thread
     private val cachedAccessToken = AtomicReference<String?>(null)
+    private val cachedRefreshToken = AtomicReference<String?>(null)
 
     val accessToken: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[ACCESS_TOKEN_KEY].also { cachedAccessToken.set(it) }
+        prefs[ACCESS_TOKEN_KEY].also {
+            cachedAccessToken.set(it)
+            cachedRefreshToken.set(prefs[REFRESH_TOKEN_KEY])
+        }
     }
 
     val refreshToken: Flow<String?> = context.dataStore.data.map { prefs ->
@@ -36,9 +40,11 @@ class TokenManager(private val context: Context) {
 
     // Đọc từ cache in-memory — KHÔNG chặn thread
     fun getAccessTokenSync(): String? = cachedAccessToken.get()
+    fun getRefreshTokenSync(): String? = cachedRefreshToken.get()
 
     suspend fun saveTokens(accessToken: String, refreshToken: String) {
         cachedAccessToken.set(accessToken)
+        cachedRefreshToken.set(refreshToken)
         context.dataStore.edit { prefs ->
             prefs[ACCESS_TOKEN_KEY] = accessToken
             prefs[REFRESH_TOKEN_KEY] = refreshToken
@@ -53,12 +59,15 @@ class TokenManager(private val context: Context) {
 
     suspend fun clearAll() {
         cachedAccessToken.set(null)
+        cachedRefreshToken.set(null)
         context.dataStore.edit { it.clear() }
     }
 
     suspend fun isLoggedIn(): Boolean {
-        val token = context.dataStore.data.first()[ACCESS_TOKEN_KEY]
+        val prefs = context.dataStore.data.first()
+        val token = prefs[ACCESS_TOKEN_KEY]
         cachedAccessToken.set(token)
+        cachedRefreshToken.set(prefs[REFRESH_TOKEN_KEY])
         return token != null
     }
 }

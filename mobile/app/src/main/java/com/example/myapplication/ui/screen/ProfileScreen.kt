@@ -244,8 +244,8 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(if (strings.isEnglish) "High RAM Alert (>85%)" else "Cảnh báo tràn RAM (>85%)", fontWeight = FontWeight.SemiBold)
-                            Text(if (strings.isEnglish) "Notify when RAM memory is low" else "Báo động khi cạn kiệt bộ nhớ RAM", style = MaterialTheme.typography.bodySmall)
+                            Text(if (strings.isEnglish) "High RAM Alert (>90%)" else "Cảnh báo RAM vượt 90%", fontWeight = FontWeight.SemiBold)
+                            Text(if (strings.isEnglish) "Notify when RAM usage exceeds 90%" else "Cảnh báo khi mức sử dụng RAM vượt 90%", style = MaterialTheme.typography.bodySmall)
                         }
                         Switch(checked = notifyRam, onCheckedChange = { notifyRam = it }, enabled = notifyPush)
                     }
