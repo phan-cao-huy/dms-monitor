@@ -309,6 +309,8 @@ async def get_device_detail(
         "gpu_temp_c": static.get("gpu_temp_c"),
         "gpu_vram_total_mb": static.get("gpu_vram_total_mb"),
         "gpu_vram_used_mb": static.get("gpu_vram_used_mb"),
+        # Danh sach tat ca o cung (lay tu static_info, duoc luu boi agent moi heartbeat)
+        "disks": static.get("disks"),
     }
 
 
@@ -374,6 +376,14 @@ async def record_heartbeat(
         val = getattr(payload, f_name, None)
         if val is not None:
             current_static[f_name] = val
+
+    # Luu uptime vao static_info
+    if payload.uptime_seconds is not None:
+        current_static["uptime_seconds"] = payload.uptime_seconds
+
+    # Luu danh sach tat ca o cung (disks) vao static_info
+    if payload.disks is not None and len(payload.disks) > 0:
+        current_static["disks"] = payload.disks
 
     device.static_info = current_static
 

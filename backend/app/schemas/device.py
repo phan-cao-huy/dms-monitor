@@ -72,6 +72,9 @@ class DeviceDetailOut(DeviceOut):
     gpu_vram_total_mb: int | None = None
     gpu_vram_used_mb: int | None = None
 
+    # Danh sach tat ca o cung tu agent
+    disks: list[dict[str, Any]] | None = None
+
 
 class MetricOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
