@@ -20,7 +20,17 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-const AgentVersion = "1.0.0"
+const AgentVersion = "1.1.0"
+
+// DiskInfo chua thong tin 1 o cung / partition.
+type DiskInfo struct {
+	Mountpoint  string  `json:"mountpoint"`
+	Fstype      string  `json:"fstype"`
+	TotalGB     float64 `json:"total_gb"`
+	UsedGB      float64 `json:"used_gb"`
+	FreeGB      float64 `json:"free_gb"`
+	UsedPercent float64 `json:"used_percent"`
+}
 
 // Metrics chua du lieu 1 lan heartbeat — map 1:1 voi bang device_metrics.
 type Metrics struct {
@@ -29,21 +39,22 @@ type Metrics struct {
 	CPULoad5m     float64       `json:"cpu_load_5m"`
 	RAMUsage      float64       `json:"ram_usage"`
 	RAMUsedMB     int64         `json:"ram_used_mb"`
-	DiskUsage     float64       `json:"disk_usage"`
-	DiskUsedGB    float64       `json:"disk_used_gb"`
+	DiskUsage     float64       `json:"disk_usage"`   // o chinh (C:\ hoac /)
+	DiskUsedGB    float64       `json:"disk_used_gb"` // o chinh
+	Disks         []DiskInfo    `json:"disks"`        // tat ca o cung
 	NetInKbps     float64       `json:"net_in_kbps"`
 	NetOutKbps    float64       `json:"net_out_kbps"`
 	PingLatencyMs float64       `json:"ping_latency_ms"`
 	UptimeSeconds int64         `json:"uptime_seconds"`
 	AgentVersion  string        `json:"agent_version"`
 	Processes     []ProcessInfo `json:"processes"`
-	// Nhiệt độ & GPU
-	CPUTempC      float64       `json:"cpu_temp_c,omitempty"`
-	GPUName       string        `json:"gpu_name,omitempty"`
-	GPUUsagePct   float64       `json:"gpu_usage_pct,omitempty"`
-	GPUTempC      float64       `json:"gpu_temp_c,omitempty"`
-	GPUVramTotalMB int64        `json:"gpu_vram_total_mb,omitempty"`
-	GPUVramUsedMB  int64        `json:"gpu_vram_used_mb,omitempty"`
+	// Nhiet do & GPU
+	CPUTempC       float64 `json:"cpu_temp_c,omitempty"`
+	GPUName        string  `json:"gpu_name,omitempty"`
+	GPUUsagePct    float64 `json:"gpu_usage_pct,omitempty"`
+	GPUTempC       float64 `json:"gpu_temp_c,omitempty"`
+	GPUVramTotalMB int64   `json:"gpu_vram_total_mb,omitempty"`
+	GPUVramUsedMB  int64   `json:"gpu_vram_used_mb,omitempty"`
 }
 
 // ProcessInfo chua thong tin 1 process.
@@ -58,17 +69,18 @@ type ProcessInfo struct {
 
 // StaticInfo chua thong tin tinh cua may — chi gui 1 lan khi dang ky.
 type StaticInfo struct {
-	Hostname      string  `json:"hostname"`
-	OSName        string  `json:"os_name"`
-	OSVersion     string  `json:"os_version"`
-	KernelVersion string  `json:"kernel_version"`
-	Arch          string  `json:"arch"`
-	CPUModel      string  `json:"cpu_model"`
-	CPUCores      int     `json:"cpu_cores"`
-	RAMTotalMB    int64   `json:"ram_total_mb"`
-	DiskTotalGB   float64 `json:"disk_total_gb"`
-	AgentVersion  string  `json:"agent_version"`
-	GPUName       string  `json:"gpu_name,omitempty"`
+	Hostname      string     `json:"hostname"`
+	OSName        string     `json:"os_name"`
+	OSVersion     string     `json:"os_version"`
+	KernelVersion string     `json:"kernel_version"`
+	Arch          string     `json:"arch"`
+	CPUModel      string     `json:"cpu_model"`
+	CPUCores      int        `json:"cpu_cores"`
+	RAMTotalMB    int64      `json:"ram_total_mb"`
+	DiskTotalGB   float64    `json:"disk_total_gb"` // o chinh
+	Disks         []DiskInfo `json:"disks"`         // tat ca o cung
+	AgentVersion  string     `json:"agent_version"`
+	GPUName       string     `json:"gpu_name,omitempty"`
 }
 
 // CollectMetrics thu thap toan bo thong so he thong tai thoi diem goi.
@@ -95,14 +107,24 @@ func CollectMetrics(topN int) (*Metrics, error) {
 		m.RAMUsedMB = int64(vm.Used / 1024 / 1024)
 	}
 
-	// Disk (o root: C:\ tren Windows, / tren Linux)
+	// Disk - doc tat ca partition
+	m.Disks = collectAllDisks()
+	// O chinh: C:\ tren Windows, / tren Linux
 	rootPath := "/"
 	if runtime.GOOS == "windows" {
 		rootPath = "C:\\"
 	}
-	if du, err := disk.Usage(rootPath); err == nil {
-		m.DiskUsage = round2(du.UsedPercent)
-		m.DiskUsedGB = round2(float64(du.Used) / 1024 / 1024 / 1024)
+	for _, d := range m.Disks {
+		if strings.EqualFold(d.Mountpoint, rootPath) || d.Mountpoint == rootPath {
+			m.DiskUsage = d.UsedPercent
+			m.DiskUsedGB = d.UsedGB
+			break
+		}
+	}
+	// Fallback: neu khong tim thay o chinh, lay o dau tien
+	if m.DiskUsage == 0 && len(m.Disks) > 0 {
+		m.DiskUsage = m.Disks[0].UsedPercent
+		m.DiskUsedGB = m.Disks[0].UsedGB
 	}
 
 	// Network I/O (delta trong 1 giay)
@@ -116,10 +138,53 @@ func CollectMetrics(topN int) (*Metrics, error) {
 	// Top N Process
 	m.Processes = collectTopProcesses(topN)
 
-	// Nhiệt độ CPU & GPU (Windows dùng WMI, Linux dùng sensors)
+	// Nhiet do CPU & GPU
 	collectThermalGPU(m)
 
 	return m, nil
+}
+
+// collectAllDisks lay thong tin tat ca cac o cung / partition dang mount.
+func collectAllDisks() []DiskInfo {
+	partitions, err := disk.Partitions(false) // false = chi lay physical drives
+	if err != nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var result []DiskInfo
+
+	for _, p := range partitions {
+		// Bo qua cac filesystem ao / doc-only
+		fs := strings.ToLower(p.Fstype)
+		if fs == "tmpfs" || fs == "devtmpfs" || fs == "sysfs" || fs == "proc" ||
+			fs == "devfs" || fs == "squashfs" || fs == "overlay" || fs == "aufs" ||
+			strings.HasPrefix(fs, "fuse.") {
+			continue
+		}
+
+		mp := p.Mountpoint
+		if seen[mp] {
+			continue
+		}
+		seen[mp] = true
+
+		usage, err := disk.Usage(mp)
+		if err != nil || usage.Total == 0 {
+			continue
+		}
+
+		result = append(result, DiskInfo{
+			Mountpoint:  mp,
+			Fstype:      p.Fstype,
+			TotalGB:     round2(float64(usage.Total) / 1024 / 1024 / 1024),
+			UsedGB:      round2(float64(usage.Used) / 1024 / 1024 / 1024),
+			FreeGB:      round2(float64(usage.Free) / 1024 / 1024 / 1024),
+			UsedPercent: round2(usage.UsedPercent),
+		})
+	}
+
+	return result
 }
 
 // CollectStaticInfo thu thap thong tin phan cung (chi can goi 1 lan).
@@ -147,12 +212,21 @@ func CollectStaticInfo() (*StaticInfo, error) {
 		info.RAMTotalMB = int64(vm.Total / 1024 / 1024)
 	}
 
+	// Tat ca o cung
+	info.Disks = collectAllDisks()
+	// O chinh
 	rootPath := "/"
 	if runtime.GOOS == "windows" {
 		rootPath = "C:\\"
 	}
-	if du, err := disk.Usage(rootPath); err == nil {
-		info.DiskTotalGB = round2(float64(du.Total) / 1024 / 1024 / 1024)
+	for _, d := range info.Disks {
+		if strings.EqualFold(d.Mountpoint, rootPath) || d.Mountpoint == rootPath {
+			info.DiskTotalGB = d.TotalGB
+			break
+		}
+	}
+	if info.DiskTotalGB == 0 && len(info.Disks) > 0 {
+		info.DiskTotalGB = info.Disks[0].TotalGB
 	}
 
 	// GPU Name trong static info
@@ -260,7 +334,7 @@ func collectWindowsGPU(m *Metrics) {
 		}
 	}
 
-	// 2. Fallback sang PowerShell Get-CimInstance (hoat dong tren moi Windows 10/11 ke ca khi khong co wmic)
+	// 2. Fallback sang PowerShell Get-CimInstance
 	psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 Name, AdapterRAM | ConvertTo-Json -Compress"
 	outPs, errPs := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
 	if errPs == nil && len(outPs) > 0 {
@@ -278,24 +352,16 @@ func collectWindowsGPU(m *Metrics) {
 }
 
 func collectWindowsCPUTemp(m *Metrics) {
-	// Thu lay qua PowerShell Get-CimInstance MSAcpi_ThermalZoneTemperature
 	psCmd := "Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentTemperature"
 	out, err := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
 	if err == nil && len(out) > 0 {
 		s := strings.TrimSpace(string(out))
 		if v, err := strconv.ParseFloat(s, 64); err == nil && v > 2000 {
-			// Don vi 1/10 Kelvin -> Celsius
 			celsius := (v / 10.0) - 273.15
 			if celsius > 0 && celsius < 120 {
 				m.CPUTempC = round2(celsius)
-				return
 			}
 		}
-	}
-
-	// Neu khong co CPU temp doc lap, co the dung GPU temp lam tham chieu neu may dang nong
-	if m.CPUTempC == 0 && m.GPUTempC > 0 {
-		// Neu co GPUTempC thi van co thong tin nhiet do he thong
 	}
 }
 
@@ -304,7 +370,6 @@ func collectLinuxTemp(m *Metrics) {
 	if err != nil || len(out) == 0 {
 		return
 	}
-	// Lay nhiet do CPU tu sensors -j output (tim "temp1_input" hoac "Tdie")
 	var maxTemp float64
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
@@ -326,7 +391,6 @@ func collectLinuxTemp(m *Metrics) {
 }
 
 func collectLinuxGPU(m *Metrics) {
-	// Thu nvidia-smi truoc
 	out, err := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used",
 		"--format=csv,noheader,nounits").Output()
 	if err == nil && len(out) > 0 {
@@ -353,11 +417,6 @@ func collectLinuxGPU(m *Metrics) {
 	if err2 == nil && len(out2) > 0 {
 		m.GPUName = "AMD GPU (rocm-smi)"
 	}
-}
-
-func isNumeric(s string) bool {
-	_, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
-	return err == nil
 }
 
 // FormatBytes chuyen bytes thanh chuoi de doc (cho log).

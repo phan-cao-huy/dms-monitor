@@ -40,6 +40,9 @@ class HeartbeatIn(BaseModel):
     top_processes: list[dict[str, Any]] | None = None
     watch_status: dict[str, Any] | None = None
 
+    # Danh sach tat ca o cung (moi o la dict: mountpoint, total_gb, used_gb, free_gb, used_percent)
+    disks: list[dict[str, Any]] | None = None
+
     # Nested container from Go Agent
     metrics: dict[str, Any] | None = None
 
@@ -57,6 +60,7 @@ class HeartbeatIn(BaseModel):
                 "ram_used_mb",
                 "disk_usage",
                 "disk_used_gb",
+                "disks",
                 "net_in_kbps",
                 "net_out_kbps",
                 "ping_latency_ms",
