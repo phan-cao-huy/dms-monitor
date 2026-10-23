@@ -2,7 +2,7 @@ from collections.abc import Awaitable
 from datetime import datetime
 from typing import Annotated, Any, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -28,6 +28,7 @@ from app.services.devices import (
     get_device_metrics,
     list_device_commands,
     list_devices,
+    regenerate_device_token,
     update_device,
 )
 
@@ -82,12 +83,19 @@ async def get_org_devices(
 async def post_device(
     org_id: int,
     payload: DeviceCreate,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, Any]:
     """Tạo thiết bị mới và trả về secret_token duy nhất 1 lần để cấu hình Agent."""
     device, raw_token, grp_name = await _run(
         create_device(db, org_id, user.user_id, payload)
+    )
+    # Tao lenh cai dat 1 dong cho nguoi dung copy truc tiep
+    base_url = str(request.base_url).rstrip("/")
+    install_cmd = (
+        f"& ([scriptblock]::Create((irm '{base_url}/static/install.ps1'))) "
+        f"-Server {base_url} -Token {raw_token} -DeviceId {device.device_id}"
     )
     return {
         "device_id": device.device_id,
@@ -100,6 +108,7 @@ async def post_device(
         "secret_token_prefix": device.secret_token_prefix,
         "status": device.status,
         "created_at": device.created_at,
+        "install_command": install_cmd,
     }
 
 
@@ -181,6 +190,32 @@ async def get_processes(
     """Trả về danh sách 15 tiến trình sử dụng tài nguyên cao nhất từ heartbeat gần nhất."""
     detail = await _run(get_device_detail(db, device_id, user.user_id))
     return detail.get("top_processes") or []
+
+
+@router.post(
+    "/devices/{device_id}/regenerate-token",
+    summary="Tạo lại secret token (token cũ mất hiệu lực)",
+)
+async def post_regenerate_token(
+    device_id: int,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Reset secret token — dùng khi token bị lộ hoặc muốn lấy lại install_command."""
+    device, raw_token = await _run(regenerate_device_token(db, device_id, user.user_id))
+    base_url = str(request.base_url).rstrip("/")
+    install_cmd = (
+        f"& ([scriptblock]::Create((irm '{base_url}/static/install.ps1'))) "
+        f"-Server {base_url} -Token {raw_token} -DeviceId {device.device_id}"
+    )
+    return {
+        "device_id": device.device_id,
+        "secret_token": raw_token,
+        "secret_token_prefix": device.secret_token_prefix,
+        "install_command": install_cmd,
+        "note": "Token cu da mat hieu luc. Agent dang chay can cap nhat config.json.",
+    }
 
 
 @router.post(

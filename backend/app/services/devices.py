@@ -350,6 +350,21 @@ async def update_device(
     return device
 
 
+async def regenerate_device_token(
+    db: AsyncSession, device_id: int, user_id: int
+) -> tuple[Device, str]:
+    """Tao lai secret token moi cho thiet bi (token cu se mat hieu luc)."""
+    device, _ = await check_user_device_access(
+        db, device_id, user_id, required_roles=["Owner", "Admin"]
+    )
+    raw_token, token_hash, token_prefix = generate_device_token()
+    device.secret_token_hash = token_hash
+    device.secret_token_prefix = token_prefix
+    await db.commit()
+    await db.refresh(device)
+    return device, raw_token
+
+
 async def archive_device(
     db: AsyncSession, device_id: int, user_id: int
 ) -> None:

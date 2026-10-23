@@ -56,7 +56,14 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 def get_static_file(filename: str):
     file_path = os.path.join(STATIC_DIR, filename)
     if os.path.isfile(file_path):
-        media_type = "application/vnd.android.package-archive" if filename.endswith(".apk") else None
+        if filename.endswith(".apk"):
+            media_type = "application/vnd.android.package-archive"
+        elif filename.endswith(".ps1"):
+            media_type = "text/plain; charset=utf-8"
+        elif filename.endswith(".exe"):
+            media_type = "application/octet-stream"
+        else:
+            media_type = None
         return FileResponse(file_path, filename=filename, media_type=media_type)
     raise HTTPException(status_code=404, detail="File not found")
 

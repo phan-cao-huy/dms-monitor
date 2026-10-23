@@ -24,6 +24,8 @@ class DeviceCreateOut(BaseModel):
     secret_token_prefix: str
     status: str
     created_at: datetime
+    # Lenh PowerShell 1 dong de cai Agent, chi hien 1 lan khi tao thiet bi
+    install_command: str | None = None
 
 
 class DeviceUpdate(BaseModel):
