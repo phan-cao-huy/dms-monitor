@@ -48,6 +48,11 @@ func Execute(cmd sender.Command) sender.CommandResult {
 	return result
 }
 
+// hw tao exec.Cmd an cua so va ap dung hideWindow (dinh nghia trong exec_windows.go / exec_other.go).
+func hw(name string, args ...string) *exec.Cmd {
+	return hideWindow(exec.Command(name, args...))
+}
+
 func execReboot(params map[string]interface{}) (string, error) {
 	delay := 10
 	if d, ok := params["delay_seconds"]; ok {
@@ -68,17 +73,17 @@ func execReboot(params map[string]interface{}) (string, error) {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		// Huy shutdown cu neu co, roi moi dat lenh moi
-		_ = exec.Command("shutdown", "/a").Run()
-		cmd = exec.Command("shutdown", "/r", "/t", strconv.Itoa(delay), "/f")
+		_ = hw("shutdown", "/a").Run()
+		cmd = hw("shutdown", "/r", "/t", strconv.Itoa(delay), "/f")
 	} else {
 		if delay <= 0 {
-			cmd = exec.Command("sudo", "shutdown", "-r", "now")
+			cmd = hw("sudo", "shutdown", "-r", "now")
 		} else {
 			mins := delay / 60
 			if mins < 1 {
 				mins = 1
 			}
-			cmd = exec.Command("sudo", "shutdown", "-r", fmt.Sprintf("+%d", mins))
+			cmd = hw("sudo", "shutdown", "-r", fmt.Sprintf("+%d", mins))
 		}
 	}
 
@@ -104,12 +109,11 @@ func execRestartService(params map[string]interface{}) (string, error) {
 		}
 	}
 
-	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		stopCmd := exec.Command("net", "stop", name)
+		stopCmd := hw("net", "stop", name)
 		stopOut, _ := stopCmd.CombinedOutput()
-		cmd = exec.Command("net", "start", name)
-		startOut, err := cmd.CombinedOutput()
+		startCmd := hw("net", "start", name)
+		startOut, err := startCmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("restart service '%s' failed: stop=%s, start=%s — %w",
 				name, strings.TrimSpace(string(stopOut)), strings.TrimSpace(string(startOut)), err)
@@ -117,7 +121,7 @@ func execRestartService(params map[string]interface{}) (string, error) {
 		return fmt.Sprintf("Service '%s' da restart.", name), nil
 	}
 
-	cmd = exec.Command("sudo", "systemctl", "restart", name)
+	cmd := hw("sudo", "systemctl", "restart", name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("restart service '%s' failed: %s — %w", name, string(out), err)
@@ -153,9 +157,9 @@ func execKillProcess(params map[string]interface{}) (string, error) {
 		}
 		if runtime.GOOS == "windows" {
 			// /F: Force kill, /T: Kill ca cay tien trinh (child processes)
-			cmd = exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(targetPID))
+			cmd = hw("taskkill", "/F", "/T", "/PID", strconv.Itoa(targetPID))
 		} else {
-			cmd = exec.Command("sudo", "kill", "-9", strconv.Itoa(targetPID))
+			cmd = hw("sudo", "kill", "-9", strconv.Itoa(targetPID))
 		}
 	} else if pname, ok := params["process_name"]; ok {
 		name := strings.TrimSpace(fmt.Sprintf("%v", pname))
@@ -163,9 +167,9 @@ func execKillProcess(params map[string]interface{}) (string, error) {
 			return "", fmt.Errorf("process_name rong")
 		}
 		if runtime.GOOS == "windows" {
-			cmd = exec.Command("taskkill", "/F", "/T", "/IM", name)
+			cmd = hw("taskkill", "/F", "/T", "/IM", name)
 		} else {
-			cmd = exec.Command("sudo", "pkill", "-9", "-f", name)
+			cmd = hw("sudo", "pkill", "-9", "-f", name)
 		}
 	} else {
 		return "", fmt.Errorf("can co pid hoac process_name trong parameters")

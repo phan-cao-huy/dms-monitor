@@ -4,7 +4,6 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"runtime"
 	"sort"
 	"strconv"
@@ -231,12 +230,12 @@ func CollectStaticInfo() (*StaticInfo, error) {
 
 	// GPU Name trong static info
 	if runtime.GOOS == "windows" {
-		outNvidia, errNvidia := exec.Command("nvidia-smi", "--query-gpu=name", "--format=csv,noheader").Output()
+		outNvidia, errNvidia := hiddenCmd("nvidia-smi", "--query-gpu=name", "--format=csv,noheader").Output()
 		if errNvidia == nil && len(outNvidia) > 0 {
 			info.GPUName = strings.TrimSpace(strings.Split(string(outNvidia), "\n")[0])
 		} else {
 			psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name"
-			outPs, errPs := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
+			outPs, errPs := hiddenCmd("powershell", "-NoProfile", "-Command", psCmd).Output()
 			if errPs == nil && len(outPs) > 0 {
 				info.GPUName = strings.TrimSpace(string(outPs))
 			}
@@ -312,7 +311,7 @@ func collectThermalGPU(m *Metrics) {
 
 func collectWindowsGPU(m *Metrics) {
 	// 1. Uu tien dung nvidia-smi (chinh xac va nhanh nhat cho NVIDIA GPU)
-	outNvidia, errNvidia := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used", "--format=csv,noheader,nounits").Output()
+	outNvidia, errNvidia := hiddenCmd("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used", "--format=csv,noheader,nounits").Output()
 	if errNvidia == nil && len(outNvidia) > 0 {
 		firstLine := strings.Split(strings.TrimSpace(string(outNvidia)), "\n")[0]
 		parts := strings.Split(firstLine, ",")
@@ -336,7 +335,7 @@ func collectWindowsGPU(m *Metrics) {
 
 	// 2. Fallback sang PowerShell Get-CimInstance
 	psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 Name, AdapterRAM | ConvertTo-Json -Compress"
-	outPs, errPs := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
+	outPs, errPs := hiddenCmd("powershell", "-NoProfile", "-Command", psCmd).Output()
 	if errPs == nil && len(outPs) > 0 {
 		var gpuData struct {
 			Name       string `json:"Name"`
@@ -353,7 +352,7 @@ func collectWindowsGPU(m *Metrics) {
 
 func collectWindowsCPUTemp(m *Metrics) {
 	psCmd := "Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentTemperature"
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", psCmd).Output()
+	out, err := hiddenCmd("powershell", "-NoProfile", "-Command", psCmd).Output()
 	if err == nil && len(out) > 0 {
 		s := strings.TrimSpace(string(out))
 		if v, err := strconv.ParseFloat(s, 64); err == nil && v > 2000 {
@@ -366,7 +365,7 @@ func collectWindowsCPUTemp(m *Metrics) {
 }
 
 func collectLinuxTemp(m *Metrics) {
-	out, err := exec.Command("sensors", "-j").Output()
+	out, err := hiddenCmd("sensors", "-j").Output()
 	if err != nil || len(out) == 0 {
 		return
 	}
@@ -391,7 +390,7 @@ func collectLinuxTemp(m *Metrics) {
 }
 
 func collectLinuxGPU(m *Metrics) {
-	out, err := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used",
+	out, err := hiddenCmd("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used",
 		"--format=csv,noheader,nounits").Output()
 	if err == nil && len(out) > 0 {
 		parts := strings.Split(strings.TrimSpace(string(out)), ",")
@@ -413,7 +412,7 @@ func collectLinuxGPU(m *Metrics) {
 		return
 	}
 	// Thu rocm-smi cho AMD
-	out2, err2 := exec.Command("rocm-smi", "--showuse", "--showtemp", "--showmeminfo", "vram").Output()
+	out2, err2 := hiddenCmd("rocm-smi", "--showuse", "--showtemp", "--showmeminfo", "vram").Output()
 	if err2 == nil && len(out2) > 0 {
 		m.GPUName = "AMD GPU (rocm-smi)"
 	}

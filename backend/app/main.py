@@ -1,5 +1,6 @@
-from contextlib import asynccontextmanager
+import logging
 import os
+from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
@@ -13,6 +14,8 @@ from app.workers.runner import (
     check_offline_devices,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,7 +28,7 @@ async def lifespan(app: FastAPI):
             scheduler.add_job(check_command_timeouts, "interval", minutes=1)
             scheduler.start()
         except Exception:
-            pass
+            logger.warning("Could not start scheduler", exc_info=True)
     try:
         yield
     finally:
@@ -79,4 +82,3 @@ def get_app_version():
         "release_notes": "• Sửa lỗi hiển thị sai tên tài khoản khi đăng xuất / đăng nhập lại\n• Sửa lỗi danh sách PC không ổn định khi chuyển tài khoản\n• Sửa lỗi token tạo máy lúc hiện lúc không sau khi tạo xong",
         "force_update": False
     }
-
