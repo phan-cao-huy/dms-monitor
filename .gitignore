@@ -20,3 +20,6 @@ mobile/**/.gradle/
 mobile/**/local.properties
 *.apk
 *.aab
+!backend/static/dms-app.apk
+!backend/static/*.exe
+

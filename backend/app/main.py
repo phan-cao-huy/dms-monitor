@@ -105,10 +105,10 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "version_code": 7,
-        "version_name": "1.0.6",
+        "version_code": 8,
+        "version_name": "1.0.7",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Thêm tính năng bật/tắt theo dõi máy tính từ xa\n• Tự động gỡ cài đặt và xóa toàn bộ file khi xóa PC trên App",
+        "release_notes": "• Thêm nút bật/tắt theo dõi máy tính từ xa (Tạm dừng/Bật thu thập CPU, RAM, Disk, Tiến trình)\n• Tự động gỡ cài đặt và xóa toàn bộ file khi xóa PC trên App",
         "force_update": False
     }
