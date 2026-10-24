@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -34,6 +35,9 @@ class Device(Base):
     secret_token_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'Offline'")
+    )
+    is_monitoring: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, server_default=text("true")
     )
     last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime)
     offline_threshold_minutes: Mapped[int] = mapped_column(

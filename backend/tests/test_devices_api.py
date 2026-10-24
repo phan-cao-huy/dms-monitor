@@ -262,3 +262,85 @@ def test_post_device_command_validation_and_creation():
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         app.dependency_overrides.pop(get_db, None)
+
+
+
+def test_toggle_monitoring_and_delete_sends_uninstall():
+    user = _mock_user()
+    org_member = OrganizationMember(member_id=1, org_id=10, user_id=1, role="Owner")
+    device = Device(
+        device_id=5,
+        org_id=10,
+        device_name="Toggle-PC",
+        description="Test toggle",
+        secret_token_hash="hash",
+        secret_token_prefix="dms_5555",
+        status="Online",
+        is_monitoring=True,
+        last_heartbeat=_now(),
+        offline_threshold_minutes=5,
+        created_at=datetime(2026, 1, 1),
+        updated_at=datetime(2026, 1, 1),
+    )
+
+    added_objects = []
+
+    async def override_user():
+        return user
+
+    async def override_db():
+        class MockSession:
+            async def execute(self, stmt):
+                sql = str(stmt).lower()
+                class MockResult:
+                    def scalar_one_or_none(self):
+                        if "devices" in sql:
+                            return device
+                        return org_member
+
+                return MockResult()
+
+            async def get(self, model, ident):
+                return device
+
+            def add(self, obj):
+                added_objects.append(obj)
+
+            async def commit(self):
+                pass
+
+        yield MockSession()
+
+    app.dependency_overrides[get_current_user] = override_user
+    app.dependency_overrides[get_db] = override_db
+    try:
+        client = TestClient(app)
+        # 1. Toggle monitoring off
+        res_off = client.post("/api/v1/devices/5/toggle-monitoring", json={"is_monitoring": False})
+        assert res_off.status_code == 200
+        assert res_off.json()["is_monitoring"] is False
+        assert res_off.json()["status"] == "Paused"
+
+        # Check PAUSE_MONITORING command enqueued
+        assert any(getattr(o, "command_type", None) == "PAUSE_MONITORING" for o in added_objects)
+
+        # 2. Toggle monitoring back on
+        res_on = client.post("/api/v1/devices/5/toggle-monitoring", json={"is_monitoring": True})
+        assert res_on.status_code == 200
+        assert res_on.json()["is_monitoring"] is True
+        assert res_on.json()["status"] == "Online"
+
+        # Check RESUME_MONITORING command enqueued
+        assert any(getattr(o, "command_type", None) == "RESUME_MONITORING" for o in added_objects)
+
+        # 3. Delete device sends UNINSTALL command
+        res_del = client.delete("/api/v1/devices/5")
+        assert res_del.status_code == 204
+        assert device.status == "Archived"
+        assert device.archived_at is not None
+
+        # Check UNINSTALL command enqueued
+        assert any(getattr(o, "command_type", None) == "UNINSTALL" for o in added_objects)
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)

@@ -89,6 +89,7 @@ def test_auth_and_organization_models_match_dms01_tables():
             "secret_token_hash",
             "secret_token_prefix",
             "status",
+            "is_monitoring",
             "last_heartbeat",
             "offline_threshold_minutes",
             "static_info",

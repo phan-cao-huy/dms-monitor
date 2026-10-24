@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 
 from sqlalchemy import select
@@ -170,6 +170,8 @@ async def create_device(
 def _calculate_device_status(device: Device, now: datetime) -> str:
     if device.archived_at is not None or device.status == "Archived":
         return "Archived"
+    if getattr(device, "is_monitoring", None) is False or device.status == "Paused":
+        return "Paused"
     if device.last_heartbeat is None:
         return "Offline"
     diff_minutes = (now - device.last_heartbeat).total_seconds() / 60
@@ -249,6 +251,7 @@ async def list_devices(
                 "status": computed_status,
                 "last_heartbeat": d.last_heartbeat,
                 "offline_threshold_minutes": d.offline_threshold_minutes,
+                "is_monitoring": getattr(d, "is_monitoring", None) is not False,
                 "created_at": d.created_at,
                 "updated_at": d.updated_at,
             }
@@ -291,6 +294,7 @@ async def get_device_detail(
         "status": computed_status,
         "last_heartbeat": device.last_heartbeat,
         "offline_threshold_minutes": device.offline_threshold_minutes,
+        "is_monitoring": getattr(device, "is_monitoring", None) is not False,
         "static_info": device.static_info,
         "top_processes": device.top_processes,
         "watch_config": device.watch_config,
@@ -365,12 +369,73 @@ async def regenerate_device_token(
     return device, raw_token
 
 
+async def toggle_device_monitoring(
+    db: AsyncSession,
+    device_id: int,
+    user_id: int,
+    is_monitoring: bool | None = None,
+) -> dict[str, Any]:
+    device, _ = await check_user_device_access(
+        db, device_id, user_id, required_roles=["Owner", "Admin", "Member"]
+    )
+    current_state = getattr(device, "is_monitoring", True)
+    new_state = is_monitoring if is_monitoring is not None else not current_state
+
+    device.is_monitoring = new_state
+    cmd_type = "RESUME_MONITORING" if new_state else "PAUSE_MONITORING"
+    reason = (
+        "Người dùng kích hoạt lại theo dõi trên app"
+        if new_state
+        else "Người dùng tạm dừng theo dõi trên app"
+    )
+
+    toggle_cmd = DeviceCommand(
+        device_id=device_id,
+        created_by=user_id,
+        command_type=cmd_type,
+        parameters={},
+        reason=reason,
+        status="PENDING",
+    )
+    db.add(toggle_cmd)
+
+    if not new_state:
+        device.status = "Paused"
+    else:
+        threshold = device.offline_threshold_minutes or 5
+        cutoff = _utc_naive() - timedelta(minutes=threshold)
+        if device.last_heartbeat and device.last_heartbeat >= cutoff:
+            device.status = "Online"
+        else:
+            device.status = "Offline"
+
+    device.updated_at = _utc_naive()
+    await db.commit()
+
+    return {
+        "device_id": device.device_id,
+        "is_monitoring": device.is_monitoring,
+        "status": device.status,
+    }
+
+
 async def archive_device(
     db: AsyncSession, device_id: int, user_id: int
 ) -> None:
     device, _ = await check_user_device_access(
         db, device_id, user_id, required_roles=["Owner", "Admin"]
     )
+    # Day lenh UNINSTALL xuong cho PC tu dong go bo va xoa toan bo file
+    uninstall_cmd = DeviceCommand(
+        device_id=device_id,
+        created_by=user_id,
+        command_type="UNINSTALL",
+        parameters={"cleanup_dir": True, "stop_service": True},
+        reason="Nguoi dung yeu cau xoa thiet bi va go sach phan mem khoi may tinh",
+        status="PENDING",
+    )
+    db.add(uninstall_cmd)
+
     device.archived_at = _utc_naive()
     device.status = "Archived"
     await db.commit()
@@ -381,6 +446,11 @@ async def record_heartbeat(
 ) -> None:
     now = _utc_naive()
     device.last_heartbeat = now
+
+    if getattr(device, "is_monitoring", None) is False:
+        device.status = "Paused"
+        await db.commit()
+        return
 
     current_static = dict(device.static_info or {})
     if payload.static_info is not None:

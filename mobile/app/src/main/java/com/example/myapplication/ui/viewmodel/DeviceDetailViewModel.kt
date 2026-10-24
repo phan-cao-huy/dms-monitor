@@ -161,6 +161,46 @@ class DeviceDetailViewModel : ViewModel() {
         }
     }
 
+    fun toggleMonitoring(deviceId: String, enable: Boolean? = null) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, commandSuccess = null, error = null)
+            try {
+                val req = enable?.let { ToggleMonitoringRequest(it) }
+                val response = RetrofitClient.apiService.toggleMonitoring(deviceId, req)
+                if (response.isSuccessful && response.body() != null) {
+                    val result = response.body()!!
+                    val currentDev = _uiState.value.device
+                    val updatedDev = currentDev?.copy(
+                        isMonitoring = result.isMonitoring,
+                        status = result.status
+                    )
+                    val statusText = if (result.isMonitoring) {
+                        "Đã kích hoạt theo dõi máy tính thành công!"
+                    } else {
+                        "Đã tạm dừng theo dõi máy tính! Agent sẽ không quét tiến trình & tài nguyên."
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        device = updatedDev,
+                        commandSuccess = statusText
+                    )
+                    loadCommands(deviceId)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Không thể chuyển trạng thái theo dõi (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Không thể kết nối máy chủ: ${e.message}"
+                )
+            }
+        }
+    }
+
     fun updateDeviceGroup(deviceId: String, groupId: Int?, onUpdated: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)

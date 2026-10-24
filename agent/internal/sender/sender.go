@@ -64,7 +64,17 @@ func (c *Client) prepareRequest(req *http.Request) {
 
 // SendHeartbeat gui du lieu metric len Backend.
 // Tu dong retry toi da 3 lan voi exponential backoff.
-func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector.StaticInfo) error {
+// HeartbeatResponse chua thong tin phan hoi tu backend sau khi nhan heartbeat.
+type HeartbeatResponse struct {
+	Accepted          bool  `json:"accepted"`
+	MonitoringEnabled *bool `json:"monitoring_enabled,omitempty"`
+}
+
+// SendHeartbeat gui du lieu metric len Backend.
+// Tu dong retry toi da 3 lan voi exponential backoff.
+// SendHeartbeat gui du lieu metric len Backend.
+// Tu dong retry toi da 3 lan voi exponential backoff.
+func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector.StaticInfo) (*HeartbeatResponse, error) {
 	payload := HeartbeatPayload{
 		DeviceID:    c.cfg.DeviceID,
 		SecretToken: c.cfg.SecretToken,
@@ -74,7 +84,7 @@ func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
+		return nil, fmt.Errorf("marshal payload: %w", err)
 	}
 
 	url := c.cfg.BackendURL + "/agent/heartbeat"
@@ -89,7 +99,7 @@ func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector
 
 		req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 		if err != nil {
-			return fmt.Errorf("tao request: %w", err)
+			return nil, fmt.Errorf("tao request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		c.prepareRequest(req)
@@ -106,21 +116,24 @@ func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			log.Printf("[SENDER] OK Heartbeat gui thanh cong (HTTP %d)", resp.StatusCode)
-			return nil
+			var hr HeartbeatResponse
+			if err := json.Unmarshal(respBody, &hr); err == nil {
+				return &hr, nil
+			}
+			return &HeartbeatResponse{Accepted: true}, nil
 		}
 
 		lastErr = fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
 		log.Printf("[SENDER] Phan hoi loi: %v", lastErr)
 
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			return lastErr
+			return nil, lastErr
 		}
 	}
 
-	return fmt.Errorf("het retry: %w", lastErr)
+	return nil, fmt.Errorf("het retry: %w", lastErr)
 }
 
-// FetchCommands lay danh sach lenh dieu khien dang cho tu Backend.
 func (c *Client) FetchCommands() ([]Command, error) {
 	url := fmt.Sprintf("%s/agent/commands?device_id=%d", c.cfg.BackendURL, c.cfg.DeviceID)
 

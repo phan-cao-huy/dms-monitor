@@ -53,6 +53,11 @@ async def heartbeat(
             )
 
     await record_heartbeat(db, device, payload)
+    is_mon = getattr(device, "is_monitoring", None)
+    if is_mon is False:
+        return {"accepted": True, "monitoring_enabled": False}
+    if payload.processes is None and payload.cpu_usage == 0 and payload.ram_usage == 0:
+        return {"accepted": True, "monitoring_enabled": True}
     return {"accepted": True}
 
 

@@ -47,6 +47,7 @@ class DeviceOut(BaseModel):
     description: str | None
     secret_token_prefix: str
     status: str
+    is_monitoring: bool = True
     last_heartbeat: datetime | None
     offline_threshold_minutes: int
     cpu_usage: float | None = None
@@ -125,3 +126,7 @@ class DeviceCommandOut(BaseModel):
     output: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
+
+
+class ToggleMonitoringIn(BaseModel):
+    is_monitoring: bool | None = None

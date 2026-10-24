@@ -126,7 +126,8 @@ data class UpdateDeviceGroupRequest(
 data class Device(
     @SerializedName("device_id", alternate = ["id"]) val id: String = "",
     @SerializedName("device_name", alternate = ["name"]) val name: String = "",
-    val status: String = "Offline", // Online, Offline, Warning, Maintenance, Archived
+    val status: String = "Offline", // Online, Offline, Warning, Maintenance, Archived, Paused
+    @SerializedName("is_monitoring") val isMonitoring: Boolean = true,
     @SerializedName("cpu_usage") val cpuUsage: Float? = null,
     @SerializedName("ram_usage") val ramUsage: Float? = null,
     @SerializedName("disk_usage") val diskUsage: Float? = null,
@@ -139,6 +140,7 @@ data class DeviceDetail(
     @SerializedName("device_id", alternate = ["id"]) val id: String = "",
     @SerializedName("device_name", alternate = ["name"]) val name: String = "",
     val status: String = "Offline",
+    @SerializedName("is_monitoring") val isMonitoring: Boolean = true,
     @SerializedName("group_id") val groupId: String? = null,
     @SerializedName("group_name") val groupName: String? = null,
     val description: String? = null,
@@ -158,6 +160,16 @@ data class DeviceDetail(
     @SerializedName("net_in_kbps") val netInKbps: Float? = null,
     @SerializedName("net_out_kbps") val netOutKbps: Float? = null,
     @SerializedName("uptime_seconds") val uptimeSeconds: Long? = null
+)
+
+data class ToggleMonitoringRequest(
+    @SerializedName("is_monitoring") val isMonitoring: Boolean? = null
+)
+
+data class ToggleMonitoringResponse(
+    @SerializedName("device_id") val deviceId: Int = 0,
+    @SerializedName("is_monitoring") val isMonitoring: Boolean = true,
+    @SerializedName("status") val status: String = ""
 )
 
 data class StaticInfo(

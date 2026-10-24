@@ -131,6 +131,7 @@ CREATE TABLE devices (
     secret_token_hash         VARCHAR(64) UNIQUE NOT NULL,
     secret_token_prefix       VARCHAR(8)  NOT NULL,
     status                    VARCHAR(20) DEFAULT 'Offline',
+    is_monitoring             BOOLEAN DEFAULT TRUE,
     last_heartbeat            TIMESTAMP,
     offline_threshold_minutes INT DEFAULT 5,
     static_info               JSONB,    -- {hostname, os_name, os_version, arch, cpu_model, cpu_cores,

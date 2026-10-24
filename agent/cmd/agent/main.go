@@ -142,6 +142,26 @@ func runAgent(stopCh <-chan struct{}) {
 }
 
 func sendHeartbeat(client *sender.Client, cfg *config.Config, staticInfo *collector.StaticInfo, isFirst bool) {
+	if executor.IsMonitoringPaused() {
+		log.Println("[HEARTBEAT] Che do TAM DUNG (Pause) dang bat — bo qua thu thap tien trinh va metric")
+		minimalMetrics := &collector.Metrics{
+			Processes: nil,
+		}
+		var si *collector.StaticInfo
+		if isFirst {
+			si = staticInfo
+		}
+		resp, err := client.SendHeartbeat(minimalMetrics, si)
+		if err != nil {
+			log.Printf("[HEARTBEAT] FAIL Gui that bai: %v", err)
+			return
+		}
+		if resp != nil && resp.MonitoringEnabled != nil && *resp.MonitoringEnabled {
+			executor.SetMonitoringPaused(false)
+		}
+		return
+	}
+
 	log.Println("[HEARTBEAT] Dang thu thap du lieu he thong...")
 
 	metrics, err := collector.CollectMetrics(cfg.ProcessTopN)
@@ -162,8 +182,13 @@ func sendHeartbeat(client *sender.Client, cfg *config.Config, staticInfo *collec
 		si = staticInfo
 	}
 
-	if err := client.SendHeartbeat(metrics, si); err != nil {
+	resp, err := client.SendHeartbeat(metrics, si)
+	if err != nil {
 		log.Printf("[HEARTBEAT] FAIL Gui that bai: %v", err)
+		return
+	}
+	if resp != nil && resp.MonitoringEnabled != nil && !*resp.MonitoringEnabled {
+		executor.SetMonitoringPaused(true)
 	}
 }
 

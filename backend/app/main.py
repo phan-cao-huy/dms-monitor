@@ -6,8 +6,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from sqlalchemy import text
 
 from app.api.v1.api import api_router
+from app.db.session import engine
 from app.workers.runner import (
     check_command_timeouts,
     check_high_ram_devices,
@@ -17,10 +19,33 @@ from app.workers.runner import (
 logger = logging.getLogger(__name__)
 
 
+async def _ensure_db_schema() -> None:
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_monitoring BOOLEAN NOT NULL DEFAULT TRUE;"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE devices DROP CONSTRAINT IF EXISTS chk_device_status;"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE devices ADD CONSTRAINT chk_device_status CHECK (status IN ('Online', 'Offline', 'Warning', 'Archived', 'Paused'));"
+                )
+            )
+    except Exception:
+        logger.warning("Could not auto-migrate schema", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = None
     if os.getenv("TESTING") != "1":
+        await _ensure_db_schema()
         try:
             scheduler = AsyncIOScheduler()
             scheduler.add_job(check_offline_devices, "interval", minutes=1)
@@ -84,6 +109,6 @@ def get_app_version():
         "version_name": "1.0.6",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Sửa lỗi hiển thị sai tên tài khoản khi đăng xuất / đăng nhập lại\n• Sửa lỗi danh sách PC không ổn định khi chuyển tài khoản\n• Sửa lỗi token tạo máy lúc hiện lúc không sau khi tạo xong",
+        "release_notes": "• Thêm tính năng bật/tắt theo dõi máy tính từ xa\n• Tự động gỡ cài đặt và xóa toàn bộ file khi xóa PC trên App",
         "force_update": False
     }

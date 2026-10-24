@@ -654,6 +654,7 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
         "Offline" -> Color.Gray
         "Warning" -> Color(0xFFFF9800)
         "Maintenance" -> Color(0xFF2196F3)
+        "Paused" -> Color(0xFFFF9800)
         else -> Color.Gray
     }
 
@@ -662,6 +663,7 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
         "Offline" -> Icons.Default.Cancel
         "Warning" -> Icons.Default.Warning
         "Maintenance" -> Icons.Default.Build
+        "Paused" -> Icons.Default.PauseCircle
         else -> Icons.AutoMirrored.Filled.HelpOutline
     }
 
@@ -732,7 +734,19 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
             }
 
             // CPU & RAM
-            if (device.status == "Online" || device.status == "Warning") {
+            if (device.status == "Paused") {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color(0xFFFFF3E0)
+                ) {
+                    Text(
+                        text = "Tạm dừng",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFE65100),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            } else if (device.status == "Online" || device.status == "Warning") {
                 Column(horizontalAlignment = Alignment.End) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(

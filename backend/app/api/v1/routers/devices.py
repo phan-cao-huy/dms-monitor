@@ -18,6 +18,7 @@ from app.schemas.device import (
     DeviceUpdate,
     MetricHourlyOut,
     MetricOut,
+    ToggleMonitoringIn,
 )
 from app.services.devices import (
     DeviceError,
@@ -29,6 +30,7 @@ from app.services.devices import (
     list_device_commands,
     list_devices,
     regenerate_device_token,
+    toggle_device_monitoring,
     update_device,
 )
 
@@ -134,11 +136,27 @@ async def get_device(
 async def patch_device(
     device_id: int,
     payload: DeviceUpdate,
+    ToggleMonitoringIn,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> Any:
     """Cập nhật tên, mô tả, nhóm hoặc cấu hình theo dõi của thiết bị."""
     return await _run(update_device(db, device_id, user.user_id, payload))
+
+
+@router.post(
+    "/devices/{device_id}/toggle-monitoring",
+    summary="Bật / Tắt theo dõi thiết bị",
+)
+async def post_toggle_monitoring(
+    device_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    payload: ToggleMonitoringIn | None = None,
+) -> dict[str, Any]:
+    """Bật hoặc tạm dừng theo dõi thiết bị từ App Mobile."""
+    is_mon = payload.is_monitoring if payload else None
+    return await _run(toggle_device_monitoring(db, device_id, user.user_id, is_mon))
 
 
 @router.delete(

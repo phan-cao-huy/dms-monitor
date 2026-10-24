@@ -111,6 +111,12 @@ interface ApiService {
     @GET("devices/{id}")
     suspend fun getDeviceDetail(@Path("id") deviceId: String): Response<DeviceDetail>
 
+    @POST("devices/{id}/toggle-monitoring")
+    suspend fun toggleMonitoring(
+        @Path("id") deviceId: String,
+        @Body request: ToggleMonitoringRequest? = null
+    ): Response<ToggleMonitoringResponse>
+
     @GET("devices/{id}/metrics")
     suspend fun getDeviceMetrics(
         @Path("id") deviceId: String,

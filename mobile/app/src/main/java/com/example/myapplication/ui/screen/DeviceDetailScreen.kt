@@ -41,6 +41,7 @@ fun DeviceDetailScreen(
     onSendCommand: (String, String, Map<String, Any>?, String) -> Unit,
     onClearMessages: () -> Unit,
     onUpdateDeviceGroup: (String, Int?) -> Unit = { _, _ -> },
+    onToggleMonitoring: ((String, Boolean?) -> Unit)? = null,
     onDeleteDevice: (() -> Unit)? = null
 ) {
     val tabs = listOf("Tổng quan", "Biểu đồ", "Tiến trình", "Lệnh")
@@ -49,13 +50,18 @@ fun DeviceDetailScreen(
     if (showTopDeleteDialog && onDeleteDevice != null) {
         AlertDialog(
             onDismissRequest = { showTopDeleteDialog = false },
-            title = { Text("Xác nhận xóa thiết bị") },
-            text = { Text("Bạn có chắc chắn muốn xóa thiết bị '${uiState.device?.name ?: deviceId}'? Thao tác này sẽ ngắt kết nối agent.") },
+            title = { Text("Xác nhận gỡ cài đặt & xóa PC") },
+            text = {
+                Text(
+                    "Bạn có chắc chắn muốn xóa thiết bị '${uiState.device?.name ?: deviceId}'?\n\n" +
+                    "⚠️ CẢNH BÁO: Hệ thống sẽ tự động gửi lệnh gỡ cài đặt (UNINSTALL) đến máy tính để dừng Windows Service và xóa sạch toàn bộ thư mục C:\\DMS-Agent, logs và cấu hình trên máy tính."
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = { showTopDeleteDialog = false; onDeleteDevice() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Xóa thiết bị") }
+                ) { Text("Xóa & gỡ sạch file") }
             },
             dismissButton = {
                 TextButton(onClick = { showTopDeleteDialog = false }) { Text("Hủy") }
@@ -129,9 +135,19 @@ fun DeviceDetailScreen(
             }
 
             when (uiState.selectedTab) {
-                0 -> OverviewTab(uiState.device, groups) { grpId -> onUpdateDeviceGroup(deviceId, grpId) }
+                0 -> OverviewTab(
+                    device = uiState.device,
+                    groups = groups,
+                    onToggleMonitoring = { enable -> onToggleMonitoring?.invoke(deviceId, enable) },
+                    onUpdateDeviceGroup = { grpId -> onUpdateDeviceGroup(deviceId, grpId) }
+                )
                 1 -> MetricsTab(uiState.metrics)
-                2 -> ProcessesTab(uiState.processes, deviceId, onSendCommand)
+                2 -> ProcessesTab(
+                    processes = uiState.processes,
+                    deviceId = deviceId,
+                    isMonitoring = uiState.device?.isMonitoring ?: true,
+                    onSendCommand = onSendCommand
+                )
                 3 -> CommandsTab(uiState.commands, deviceId, onSendCommand)
             }
         }
@@ -145,6 +161,7 @@ fun DeviceDetailScreen(
 fun OverviewTab(
     device: DeviceDetail?,
     groups: List<com.example.myapplication.data.model.DeviceGroup> = emptyList(),
+    onToggleMonitoring: ((Boolean?) -> Unit)? = null,
     onUpdateDeviceGroup: (Int?) -> Unit = {}
 ) {
     if (device == null) {
@@ -169,6 +186,7 @@ fun OverviewTab(
             val statusColor = when (device.status) {
                 "Online" -> Color(0xFF4CAF50)
                 "Warning" -> Color(0xFFFF9800)
+                "Paused" -> Color(0xFFFF9800)
                 else -> Color.Gray
             }
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -181,7 +199,11 @@ fun OverviewTab(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(device.status, fontWeight = FontWeight.Bold, color = statusColor)
+                        Text(
+                            if (device.status == "Paused") "Đang tạm dừng theo dõi" else device.status,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
                         device.lastHeartbeat?.let {
                             Text("Heartbeat: ${it.take(19).replace('T', ' ')}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -194,6 +216,60 @@ fun OverviewTab(
                             Text("${if (d > 0) "${d}d " else ""}${h}h ${m}m", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
+                }
+            }
+        }
+
+        // Monitoring Control Card (Bật / Tắt theo dõi tiến trình máy tính)
+        item {
+            val isMonitoring = device.isMonitoring
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isMonitoring) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (isMonitoring) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = null,
+                            tint = if (isMonitoring) MaterialTheme.colorScheme.primary else Color.Gray,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "Theo dõi máy tính",
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                if (isMonitoring)
+                                    "Đang bật: Thu thập tiến trình, CPU, RAM, Disk"
+                                else
+                                    "Đang tắt: Ngừng quét tiến trình & tài nguyên",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isMonitoring) Color(0xFF2E7D32) else Color(0xFFE65100)
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isMonitoring,
+                        onCheckedChange = { checked ->
+                            onToggleMonitoring?.invoke(checked)
+                        }
+                    )
                 }
             }
         }
@@ -629,6 +705,7 @@ fun StatLabel(label: String, value: String, color: Color) {
 fun ProcessesTab(
     processes: List<ProcessInfo>,
     deviceId: String,
+    isMonitoring: Boolean = true,
     onSendCommand: (String, String, Map<String, Any>?, String) -> Unit
 ) {
     var showKillDialog by remember { mutableStateOf<ProcessInfo?>(null) }
@@ -694,7 +771,26 @@ fun ProcessesTab(
     }
 
     if (processes.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Chưa có dữ liệu tiến trình") }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                Icon(
+                    if (!isMonitoring) Icons.Default.PauseCircle else Icons.Default.Info,
+                    contentDescription = null,
+                    tint = if (!isMonitoring) Color(0xFFE65100) else Color.Gray,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    if (!isMonitoring)
+                        "Theo dõi tiến trình đang tạm dừng trên máy tính này.\nHãy bật công tắc theo dõi ở tab Tổng quan để cập nhật lại."
+                    else
+                        "Chưa có dữ liệu tiến trình từ máy tính.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
         return
     }
 

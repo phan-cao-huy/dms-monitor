@@ -236,6 +236,9 @@ fun NavGraph(
                     detailViewModel.sendCommand(id, type, params, reason)
                 },
                 onClearMessages = { detailViewModel.clearMessages() },
+                onToggleMonitoring = { devId, enable ->
+                    detailViewModel.toggleMonitoring(devId, enable)
+                },
                 onUpdateDeviceGroup = { devId, grpId ->
                     detailViewModel.updateDeviceGroup(devId, grpId) {
                         dashboardViewModel.refreshCurrentOrgDevices()
