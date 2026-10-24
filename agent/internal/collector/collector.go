@@ -2,7 +2,6 @@
 package collector
 
 import (
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"sort"
@@ -230,14 +229,15 @@ func CollectStaticInfo() (*StaticInfo, error) {
 
 	// GPU Name trong static info
 	if runtime.GOOS == "windows" {
-		outNvidia, errNvidia := hiddenCmd("nvidia-smi", "--query-gpu=name", "--format=csv,noheader").Output()
-		if errNvidia == nil && len(outNvidia) > 0 {
-			info.GPUName = strings.TrimSpace(strings.Split(string(outNvidia), "\n")[0])
-		} else {
-			psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name"
-			outPs, errPs := hiddenCmd("powershell", "-NoProfile", "-Command", psCmd).Output()
-			if errPs == nil && len(outPs) > 0 {
-				info.GPUName = strings.TrimSpace(string(outPs))
+		if hasNvidiaSmi() {
+			outNvidia, errNvidia := hiddenCmd("nvidia-smi", "--query-gpu=name", "--format=csv,noheader").Output()
+			if errNvidia == nil && len(outNvidia) > 0 {
+				info.GPUName = strings.TrimSpace(strings.Split(string(outNvidia), "\n")[0])
+			}
+		}
+		if info.GPUName == "" {
+			if name, _, err := getWindowsWmiGPU(); err == nil && name != "" {
+				info.GPUName = name
 			}
 		}
 	}
@@ -311,56 +311,43 @@ func collectThermalGPU(m *Metrics) {
 
 func collectWindowsGPU(m *Metrics) {
 	// 1. Uu tien dung nvidia-smi (chinh xac va nhanh nhat cho NVIDIA GPU)
-	outNvidia, errNvidia := hiddenCmd("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used", "--format=csv,noheader,nounits").Output()
-	if errNvidia == nil && len(outNvidia) > 0 {
-		firstLine := strings.Split(strings.TrimSpace(string(outNvidia)), "\n")[0]
-		parts := strings.Split(firstLine, ",")
-		if len(parts) >= 5 {
-			m.GPUName = strings.TrimSpace(parts[0])
-			if usage, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); err == nil {
-				m.GPUUsagePct = round2(usage)
+	if hasNvidiaSmi() {
+		outNvidia, errNvidia := hiddenCmd("nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.total,memory.used", "--format=csv,noheader,nounits").Output()
+		if errNvidia == nil && len(outNvidia) > 0 {
+			firstLine := strings.Split(strings.TrimSpace(string(outNvidia)), "\n")[0]
+			parts := strings.Split(firstLine, ",")
+			if len(parts) >= 5 {
+				m.GPUName = strings.TrimSpace(parts[0])
+				if usage, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); err == nil {
+					m.GPUUsagePct = round2(usage)
+				}
+				if temp, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
+					m.GPUTempC = round2(temp)
+				}
+				if totalMB, err := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64); err == nil {
+					m.GPUVramTotalMB = totalMB
+				}
+				if usedMB, err := strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 64); err == nil {
+					m.GPUVramUsedMB = usedMB
+				}
+				return
 			}
-			if temp, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
-				m.GPUTempC = round2(temp)
-			}
-			if totalMB, err := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64); err == nil {
-				m.GPUVramTotalMB = totalMB
-			}
-			if usedMB, err := strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 64); err == nil {
-				m.GPUVramUsedMB = usedMB
-			}
-			return
 		}
 	}
 
-	// 2. Fallback sang PowerShell Get-CimInstance
-	psCmd := "Get-CimInstance Win32_VideoController | Select-Object -First 1 Name, AdapterRAM | ConvertTo-Json -Compress"
-	outPs, errPs := hiddenCmd("powershell", "-NoProfile", "-Command", psCmd).Output()
-	if errPs == nil && len(outPs) > 0 {
-		var gpuData struct {
-			Name       string `json:"Name"`
-			AdapterRAM int64  `json:"AdapterRAM"`
-		}
-		if err := json.Unmarshal(outPs, &gpuData); err == nil && gpuData.Name != "" {
-			m.GPUName = gpuData.Name
-			if gpuData.AdapterRAM > 1024*1024 {
-				m.GPUVramTotalMB = gpuData.AdapterRAM / 1024 / 1024
-			}
+	// 2. Fallback sang native WMI (0 chuong trinh con, 0 cua so cmd)
+	if name, ramMB, err := getWindowsWmiGPU(); err == nil && name != "" {
+		m.GPUName = name
+		if ramMB > 0 {
+			m.GPUVramTotalMB = int64(ramMB)
 		}
 	}
 }
 
 func collectWindowsCPUTemp(m *Metrics) {
-	psCmd := "Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentTemperature"
-	out, err := hiddenCmd("powershell", "-NoProfile", "-Command", psCmd).Output()
-	if err == nil && len(out) > 0 {
-		s := strings.TrimSpace(string(out))
-		if v, err := strconv.ParseFloat(s, 64); err == nil && v > 2000 {
-			celsius := (v / 10.0) - 273.15
-			if celsius > 0 && celsius < 120 {
-				m.CPUTempC = round2(celsius)
-			}
-		}
+	// Query native WMI root/wmi (0 chuong trinh con, 0 cua so cmd)
+	if tempC, err := getWindowsWmiCPUTemp(); err == nil && tempC > 0 && tempC < 120 {
+		m.CPUTempC = round2(tempC)
 	}
 }
 

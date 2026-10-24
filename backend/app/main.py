@@ -67,7 +67,12 @@ def get_static_file(filename: str):
             media_type = "application/octet-stream"
         else:
             media_type = None
-        return FileResponse(file_path, filename=filename, media_type=media_type)
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return FileResponse(file_path, filename=filename, media_type=media_type, headers=headers)
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/api/v1/app/version")

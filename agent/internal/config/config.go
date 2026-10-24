@@ -2,6 +2,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -33,6 +34,12 @@ func Load() (*Config, error) {
 	flag.IntVar(&flagID, "device", 0, "Device ID (alias)")
 	flag.Parse()
 
+	// Lay thu muc chua file exe (quan trong khi chay duoi dang Windows Service hoac tu thu muc khac)
+	var exeDir string
+	if exePath, err := os.Executable(); err == nil {
+		exeDir = filepath.Dir(exePath)
+	}
+
 	// 1. Neu co du tham so CLI thi uu tien chay ngay
 	if flagServer != "" && flagToken != "" && flagID > 0 {
 		server := strings.TrimRight(flagServer, "/")
@@ -48,20 +55,27 @@ func Load() (*Config, error) {
 			ProcessTopN:                15,
 			LogLevel:                   "info",
 		}
-		// Tu dong luu config.json de lan sau khoi dong khong can go lai tham so
+		// Tu dong luu config.json vao cung thu muc voi exe de lan sau khoi dong khong can go lai tham so
 		if data, err := json.MarshalIndent(cfg, "", "  "); err == nil {
+			if exeDir != "" {
+				_ = os.WriteFile(filepath.Join(exeDir, "config.json"), data, 0644)
+			}
 			_ = os.WriteFile("config.json", data, 0644)
 		}
 		fmt.Printf("[CONFIG] Configured via CLI flags (server=%s, id=%d)\n", cfg.BackendURL, cfg.DeviceID)
 		return cfg, nil
 	}
 
-	// 2. Thu tim file config.json o nhieu vi tri
-	candidates := []string{
+	// 2. Thu tim file config.json o nhieu vi tri (uu tien thu muc cung file exe)
+	candidates := []string{}
+	if exeDir != "" {
+		candidates = append(candidates, filepath.Join(exeDir, "config.json"))
+	}
+	candidates = append(candidates,
 		"config.json",
 		"configs/config.json",
 		filepath.Join("configs", "config.json"),
-	}
+	)
 
 	if envPath := os.Getenv("DMS_CONFIG_PATH"); envPath != "" {
 		candidates = append([]string{envPath}, candidates...)
@@ -83,6 +97,9 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("chua co cau hinh! Hay chay: dms-agent.exe -server <url> -token <token> -id <id>")
 	}
 
+	// Loai bo UTF-8 BOM neu co (do PowerShell Set-Content -Encoding UTF8 tren Windows tao ra)
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+
 	cfg := &Config{
 		HeartbeatIntervalSeconds:   60,
 		CommandPollIntervalSeconds: 10,
@@ -100,17 +117,16 @@ func Load() (*Config, error) {
 		cfg.BackendURL = cfg.BackendURL + "/api/v1"
 	}
 
-	// Validate
+	// Validate cac truong bat buoc
 	if cfg.BackendURL == "" {
-		return nil, fmt.Errorf("backend_url chua duoc cau hinh trong %s", loadedPath)
+		return nil, fmt.Errorf("backend_url khong duoc de trong")
 	}
-	if cfg.SecretToken == "" || cfg.SecretToken == "PASTE_TOKEN_FROM_APP" {
-		return nil, fmt.Errorf("secret_token chua duoc cau hinh trong %s", loadedPath)
+	if cfg.SecretToken == "" {
+		return nil, fmt.Errorf("secret_token khong duoc de trong")
 	}
 	if cfg.DeviceID <= 0 {
-		return nil, fmt.Errorf("device_id phai > 0 trong %s", loadedPath)
+		return nil, fmt.Errorf("device_id khong hop le: %d", cfg.DeviceID)
 	}
 
-	fmt.Printf("[CONFIG] Loaded from: %s\n", loadedPath)
 	return cfg, nil
 }

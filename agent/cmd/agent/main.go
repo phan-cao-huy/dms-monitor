@@ -1,10 +1,10 @@
 // DMS Agent - entrypoint.
-// Build anẩn (khong co cua so CMD):
-//   go build -ldflags="-H=windowsgui" -o dms-agent.exe ./cmd/agent
+// Build an (khong co cua so console):
+//   go build -ldflags="-s -w -H=windowsgui" -o dms-agent.exe ./cmd/agent
 //
 // Dung qua CLI:
 //   dms-agent.exe -server http://IP:8000 -token dms_xxx -id 15
-//   dms-agent.exe -install    <- cai lam Windows Service (chay ngam, tu dong khi boot)
+//   dms-agent.exe -install    <- cai lam Windows Service (chay ngam trong Session 0, boot cung Windows)
 //   dms-agent.exe -uninstall  <- go cai Windows Service
 package main
 
@@ -28,27 +28,34 @@ import (
 
 const serviceName = "DMS-Agent"
 const serviceDisplayName = "DMS Monitor Agent"
-const serviceDesc = "He thong giam sat may tinh tu xa - DMS Monitor Agent"
+const serviceDesc = "He thong giam sat may tinh tu xa - DMS Monitor Agent v1.1.0"
 
 func main() {
-	// --- Parse flags TRUOC khi goi flag.Parse() trong config.Load() ---
+	// Ghi log ra file dms-agent.log cung thu muc voi exe
+	setupLogFile()
+
+	// 1. Kiem tra xem co phai duoc khoi dong boi Windows Service Control Manager khong
+	if isWindowsService() {
+		log.Println("[INIT] Khoi dong duoi dang Windows Service (Session 0)...")
+		if err := runWindowsService(); err != nil {
+			log.Fatalf("[FATAL] Loi chay Windows Service: %v", err)
+		}
+		return
+	}
+
+	// 2. Parse flags CLI neu chay thu cong
 	installFlag := flag.Bool("install", false, "Cai DMS Agent lam Windows Service")
 	uninstallFlag := flag.Bool("uninstall", false, "Go cai DMS Agent Windows Service")
-	runAsService := flag.Bool("service", false, "Chay o che do Windows Service (dung noi bo)")
 
-	// config.Load() se goi flag.Parse() ben trong, nen chung ta parse truoc
-	// va truyen lai cho no bang args rut gon
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "-install", "--install":
-			setupLogFile()
 			if err := installService(); err != nil {
 				fmt.Fprintf(os.Stderr, "Loi cai service: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Println("Da cai DMS Agent thanh Windows Service thanh cong!")
-			fmt.Println("Service se tu dong chay khi may tinh khoi dong.")
-			fmt.Println("De kiem tra: services.msc -> tim 'DMS-Agent'")
+			fmt.Println("Service se tu dong chay ngam moi khi may tinh khoi dong.")
 			return
 		case "-uninstall", "--uninstall":
 			if err := uninstallService(); err != nil {
@@ -62,10 +69,6 @@ func main() {
 
 	_ = installFlag
 	_ = uninstallFlag
-	_ = runAsService
-
-	// Setup log file truoc khi load config
-	setupLogFile()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	log.Println("===================================================")
@@ -73,7 +76,22 @@ func main() {
 	log.Println("  He thong Giam sat May tinh Tu xa")
 	log.Println("===================================================")
 
-	// 1. Doc cau hinh
+	// 3. Chay o che do Interactive (CLI / Test)
+	stopCh := make(chan struct{})
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go runAgent(stopCh)
+
+	sig := <-quit
+	log.Printf("[INFO] Nhan tin hieu %v — Dang dung Agent...", sig)
+	close(stopCh)
+	time.Sleep(500 * time.Millisecond)
+	log.Println("[INFO] Agent da dung. Goodbye!")
+}
+
+// runAgent chua vong lap thu thap heartbeat va thuc thi lenh.
+func runAgent(stopCh <-chan struct{}) {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("[FATAL] Loi cau hinh: %v", err)
@@ -83,7 +101,7 @@ func main() {
 	log.Printf("[CONFIG] Heartbeat moi  : %d giay", cfg.HeartbeatIntervalSeconds)
 	log.Printf("[CONFIG] Command poll   : %d giay", cfg.CommandPollIntervalSeconds)
 
-	// 2. Thu thap thong tin tinh (gui kem heartbeat lan dau)
+	// Thu thap thong tin tinh (gui kem heartbeat dau tien)
 	staticInfo, err := collector.CollectStaticInfo()
 	if err != nil {
 		log.Printf("[WARN] Khong lay duoc thong tin tinh: %v", err)
@@ -97,41 +115,30 @@ func main() {
 		}
 	}
 
-	// 3. Tao HTTP client
 	client := sender.NewClient(cfg)
 
-	// 4. Kenh tin hieu de dung graceful
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	// Heartbeat ticker
+	heartbeatTicker := time.NewTicker(time.Duration(cfg.HeartbeatIntervalSeconds) * time.Second)
+	defer heartbeatTicker.Stop()
 
-	// 5. Goroutine: Heartbeat Loop
-	go func() {
-		firstRun := true
-		ticker := time.NewTicker(time.Duration(cfg.HeartbeatIntervalSeconds) * time.Second)
-		defer ticker.Stop()
+	// Gui heartbeat dau tien ngay khi start
+	sendHeartbeat(client, cfg, staticInfo, true)
 
-		sendHeartbeat(client, cfg, staticInfo, firstRun)
-		firstRun = false
+	// Command poll ticker
+	pollTicker := time.NewTicker(time.Duration(cfg.CommandPollIntervalSeconds) * time.Second)
+	defer pollTicker.Stop()
 
-		for range ticker.C {
+	for {
+		select {
+		case <-stopCh:
+			log.Println("[INFO] Dung cac tien trinh thu thap Agent...")
+			return
+		case <-heartbeatTicker.C:
 			sendHeartbeat(client, cfg, nil, false)
-		}
-	}()
-
-	// 6. Goroutine: Command Poll Loop
-	go func() {
-		ticker := time.NewTicker(time.Duration(cfg.CommandPollIntervalSeconds) * time.Second)
-		defer ticker.Stop()
-
-		for range ticker.C {
+		case <-pollTicker.C:
 			pollCommands(client)
 		}
-	}()
-
-	// 7. Cho tin hieu dung
-	sig := <-quit
-	log.Printf("[INFO] Nhan tin hieu %v — Dang dung Agent...", sig)
-	log.Println("[INFO] Agent da dung. Goodbye!")
+	}
 }
 
 func sendHeartbeat(client *sender.Client, cfg *config.Config, staticInfo *collector.StaticInfo, isFirst bool) {
@@ -143,7 +150,7 @@ func sendHeartbeat(client *sender.Client, cfg *config.Config, staticInfo *collec
 		return
 	}
 
-	log.Printf("[HEARTBEAT] CPU: %.1f%% | RAM: %.1f%% (%d MB) | Disk chinh: %.1f%% | Net down %.1f up %.1f KB/s",
+	log.Printf("[HEARTBEAT] CPU: %.1f%% | RAM: %.1f%% (%d MB) | Disk: %.1f%% | Net down %.1f up %.1f KB/s",
 		metrics.CPUUsage, metrics.RAMUsage, metrics.RAMUsedMB,
 		metrics.DiskUsage, metrics.NetInKbps, metrics.NetOutKbps)
 	for _, d := range metrics.Disks {
@@ -195,7 +202,6 @@ func setupLogFile() {
 		return
 	}
 
-	// Ghi log ra ca file va stdout (neu co)
 	multiWriter := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(multiWriter)
 }
@@ -206,7 +212,6 @@ func installService() error {
 	if err != nil {
 		return fmt.Errorf("khong lay duoc duong dan exe: %w", err)
 	}
-	// Giai phong absolute path
 	exePath, err = filepath.Abs(exePath)
 	if err != nil {
 		return err
@@ -214,28 +219,31 @@ func installService() error {
 
 	log.Printf("[SERVICE] Cai service '%s' tu: %s", serviceName, exePath)
 
-	// sc create DMS-Agent binPath= "C:\path\dms-agent.exe -service" start= auto
 	cmd := exec.Command("sc", "create", serviceName,
-		"binPath=", fmt.Sprintf(`"%s" -service`, exePath),
+		"binPath=", fmt.Sprintf(`"%s"`, exePath),
 		"DisplayName=", serviceDisplayName,
 		"start=", "auto",
 		"obj=", "LocalSystem",
 	)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("sc create that bai: %s — %w", string(out), err)
 	}
 
-	// sc description
 	descCmd := exec.Command("sc", "description", serviceName, serviceDesc)
+	descCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	_ = descCmd.Run()
 
-	// sc start
+	failCmd := exec.Command("sc", "failure", serviceName, "reset=", "86400", "actions=", "restart/5000/restart/5000/restart/5000")
+	failCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	_ = failCmd.Run()
+
 	startCmd := exec.Command("sc", "start", serviceName)
+	startCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	startOut, startErr := startCmd.CombinedOutput()
 	if startErr != nil {
 		log.Printf("[SERVICE] Canh bao: Khong the khoi dong ngay: %s", string(startOut))
-		log.Printf("[SERVICE] Service da cai, se tu dong chay khi reboot.")
 	} else {
 		log.Printf("[SERVICE] Service da khoi dong: %s", string(startOut))
 	}
@@ -247,11 +255,13 @@ func installService() error {
 func uninstallService() error {
 	log.Printf("[SERVICE] Dung service '%s'...", serviceName)
 	stopCmd := exec.Command("sc", "stop", serviceName)
+	stopCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	_ = stopCmd.Run()
 	time.Sleep(2 * time.Second)
 
 	log.Printf("[SERVICE] Xoa service '%s'...", serviceName)
 	cmd := exec.Command("sc", "delete", serviceName)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("sc delete that bai: %s — %w", string(out), err)
