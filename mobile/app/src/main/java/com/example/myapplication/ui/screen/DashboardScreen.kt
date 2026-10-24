@@ -143,7 +143,7 @@ fun DashboardScreen(
         val secretToken = created.secretToken
         val serverUrl = com.example.myapplication.data.api.RetrofitClient.getBaseUrl().replace("/api/v1/", "").trimEnd('/')
 
-        val winCommand = "powershell -ExecutionPolicy Bypass -Command curl.exe -H Bypass-Tunnel-Reminder:true -sLO $serverUrl/static/dms-agent.exe; .\\dms-agent.exe -server $serverUrl -token $secretToken -id ${created.id}"
+        val winCommand = created.installCommand?.takeIf { it.isNotBlank() } ?: "& ([scriptblock]::Create((irm '$serverUrl/static/install.ps1'))) -Server $serverUrl -Token $secretToken -DeviceId ${created.id}"
         val linuxCommand = "curl -fsSL $serverUrl/static/dms-agent-linux -o dms-agent && chmod +x dms-agent && ./dms-agent -server '$serverUrl' -token '$secretToken' -id ${created.id}"
         val configJson = """{
   "backend_url": "$serverUrl/api/v1",

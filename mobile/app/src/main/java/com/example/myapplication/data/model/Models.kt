@@ -188,7 +188,8 @@ data class CreateDeviceRequest(
 data class CreateDeviceResponse(
     @SerializedName("device_id", alternate = ["id"]) val id: String = "",
     @SerializedName("device_name", alternate = ["name"]) val name: String = "",
-    @SerializedName("secret_token") val secretToken: String = ""
+    @SerializedName("secret_token") val secretToken: String = "",
+    @SerializedName("install_command") val installCommand: String? = null
 )
 
 // === Metrics ===
