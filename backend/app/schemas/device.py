@@ -108,7 +108,7 @@ class MetricHourlyOut(BaseModel):
 
 
 class DeviceCommandCreate(BaseModel):
-    command_type: str = Field(pattern=r"^(REBOOT|RESTART_SERVICE|KILL_PROCESS)$")
+    command_type: str = Field(pattern=r"^(REBOOT|RESTART_SERVICE|KILL_PROCESS|PAUSE_MONITORING|RESUME_MONITORING|UNINSTALL)$")
     parameters: dict[str, Any] | None = None
     reason: str = Field(min_length=1)
 

@@ -20,25 +20,21 @@ logger = logging.getLogger(__name__)
 
 
 async def _ensure_db_schema() -> None:
-    try:
-        async with engine.begin() as conn:
-            await conn.execute(
-                text(
-                    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_monitoring BOOLEAN NOT NULL DEFAULT TRUE;"
-                )
-            )
-            await conn.execute(
-                text(
-                    "ALTER TABLE devices DROP CONSTRAINT IF EXISTS chk_device_status;"
-                )
-            )
-            await conn.execute(
-                text(
-                    "ALTER TABLE devices ADD CONSTRAINT chk_device_status CHECK (status IN ('Online', 'Offline', 'Warning', 'Archived', 'Paused'));"
-                )
-            )
-    except Exception:
-        logger.warning("Could not auto-migrate schema", exc_info=True)
+    migration_statements = [
+        "ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_monitoring BOOLEAN NOT NULL DEFAULT TRUE;",
+        "ALTER TABLE devices DROP CONSTRAINT IF EXISTS chk_device_status;",
+        "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_status_check;",
+        "ALTER TABLE devices ADD CONSTRAINT chk_device_status CHECK (status IN ('Online', 'Offline', 'Warning', 'Archived', 'Paused'));",
+        "ALTER TABLE device_commands DROP CONSTRAINT IF EXISTS chk_cmd_type;",
+        "ALTER TABLE device_commands DROP CONSTRAINT IF EXISTS device_commands_command_type_check;",
+        "ALTER TABLE device_commands ADD CONSTRAINT chk_cmd_type CHECK (command_type IN ('REBOOT', 'RESTART_SERVICE', 'KILL_PROCESS', 'PAUSE_MONITORING', 'RESUME_MONITORING', 'UNINSTALL'));",
+    ]
+    for stmt in migration_statements:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(stmt))
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Could not execute migration statement '%s': %s", stmt, e)
 
 
 @asynccontextmanager

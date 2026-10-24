@@ -147,7 +147,7 @@ CREATE TABLE devices (
     created_by                INT REFERENCES users(user_id),
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_device_status CHECK (status IN ('Online', 'Offline', 'Warning', 'Archived'))
+    CONSTRAINT chk_device_status CHECK (status IN ('Online', 'Offline', 'Warning', 'Archived', 'Paused'))
 );
 
 CREATE INDEX idx_devices_org       ON devices(org_id);
@@ -275,7 +275,7 @@ CREATE TABLE device_commands (
     output          TEXT,                               -- log hoặc lỗi trả về từ Agent
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at    TIMESTAMP,
-    CONSTRAINT chk_cmd_type   CHECK (command_type IN ('REBOOT', 'RESTART_SERVICE', 'KILL_PROCESS')),
+    CONSTRAINT chk_cmd_type   CHECK (command_type IN ('REBOOT', 'RESTART_SERVICE', 'KILL_PROCESS', 'PAUSE_MONITORING', 'RESUME_MONITORING', 'UNINSTALL')),
     CONSTRAINT chk_cmd_status CHECK (status IN ('PENDING', 'EXECUTING', 'SUCCESS', 'FAILED', 'TIMEOUT'))
 );
 
