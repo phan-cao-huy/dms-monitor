@@ -6,7 +6,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
@@ -30,8 +29,6 @@ import com.example.myapplication.ui.viewmodel.AuthUiState
 @Composable
 fun LoginScreen(
     uiState: AuthUiState,
-    serverUrl: String = "",
-    onUpdateServerUrl: (String) -> Unit = {},
     onLogin: (String, String) -> Unit,
     onNavigateToRegister: () -> Unit,
     onClearError: () -> Unit
@@ -39,66 +36,8 @@ fun LoginScreen(
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var showServerDialog by remember { mutableStateOf(false) }
-    var tempServerUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
-
-    // Dialog cấu hình Server URL
-    if (showServerDialog) {
-        AlertDialog(
-            onDismissRequest = { showServerDialog = false },
-            title = { Text("🌐 Cấu hình Server Backend") },
-            text = {
-                Column {
-                    Text(
-                        text = "Nhập địa chỉ máy chủ chạy Docker (bao gồm cổng :8000):",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = tempServerUrl,
-                        onValueChange = { tempServerUrl = it },
-                        label = { Text("Server URL") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("Gợi ý chọn nhanh:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(
-                            selected = tempServerUrl.contains("10.37.9.0"),
-                            onClick = { tempServerUrl = "http://10.37.9.0:8000/api/v1/" },
-                            label = { Text("Mạng hiện tại (10.37.9.0)", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(
-                            selected = tempServerUrl.contains("10.0.2.2"),
-                            onClick = { tempServerUrl = "http://10.0.2.2:8000/api/v1/" },
-                            label = { Text("Emulator (10.0.2.2)", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    onUpdateServerUrl(tempServerUrl)
-                    showServerDialog = false
-                }) {
-                    Text("Lưu & Áp dụng")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showServerDialog = false }) {
-                    Text("Hủy")
-                }
-            }
-        )
-    }
 
     Column(
         modifier = Modifier
@@ -126,28 +65,6 @@ fun LoginScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(8.dp))
-
-        // Chip hiển thị & đổi Server URL
-        AssistChip(
-            onClick = {
-                tempServerUrl = serverUrl
-                showServerDialog = true
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Dns,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            },
-            label = {
-                Text(
-                    text = "Server: ${if (serverUrl.length > 25) serverUrl.take(25) + "..." else serverUrl}",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-        )
 
         Spacer(modifier = Modifier.height(24.dp))
 

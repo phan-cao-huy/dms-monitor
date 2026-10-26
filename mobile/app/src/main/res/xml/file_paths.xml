@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <external-cache-path name="external_cache" path="." />
-    <cache-path name="internal_cache" path="." />
-    <external-files-path name="external_files" path="." />
+    <cache-path name="app_updates" path="updates/" />
 </paths>

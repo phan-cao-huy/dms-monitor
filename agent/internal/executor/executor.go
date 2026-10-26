@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/phan-cao-huy/dms-monitor/agent/internal/sender"
 )
@@ -45,6 +44,7 @@ func Execute(cmd sender.Command) sender.CommandResult {
 
 	var output string
 	var err error
+	var afterReport func() error
 
 	switch strings.ToUpper(cmd.CommandType) {
 	case "REBOOT":
@@ -60,7 +60,7 @@ func Execute(cmd sender.Command) sender.CommandResult {
 		SetMonitoringPaused(false)
 		output = "Da kich hoat lai theo doi may tinh thanh cong"
 	case "UNINSTALL":
-		output, err = execUninstall(cmd.Parameters)
+		output, afterReport, err = execUninstall(cmd.Parameters)
 	default:
 		err = fmt.Errorf("lenh khong duoc ho tro: %s", cmd.CommandType)
 	}
@@ -70,6 +70,7 @@ func Execute(cmd sender.Command) sender.CommandResult {
 		result.ErrorMessage = err.Error()
 		log.Printf("[EXEC] FAIL Lenh %s that bai: %v", cmd.CommandType, err)
 	} else {
+		result.AfterReport = afterReport
 		result.Output = output
 		log.Printf("[EXEC] OK Lenh %s thanh cong: %s", cmd.CommandType, output)
 	}
@@ -214,19 +215,19 @@ func execKillProcess(params map[string]interface{}) (string, error) {
 }
 
 // execUninstall go cai Windows Service / Service va tu huy file tren PC.
-func execUninstall(params map[string]interface{}) (string, error) {
+func execUninstall(params map[string]interface{}) (string, func() error, error) {
 	log.Println("[EXEC] Nhan lenh UNINSTALL — Bat dau quy trinh go cai dat va xoa sach file...")
 
 	exePath, err := os.Executable()
 	if err != nil {
-		exePath = "C:\\DMS-Agent\\dms-agent.exe"
+		return "", nil, fmt.Errorf("cannot determine executable path: %w", err)
 	}
-	exeDir := filepath.Dir(exePath)
+	exeDir, err := validateUninstallDir(exePath)
+	if err != nil {
+		return "", nil, err
+	}
 
 	if runtime.GOOS == "windows" {
-		tempDir := os.TempDir()
-		scriptPath := filepath.Join(tempDir, "dms-agent-uninstall.bat")
-
 		batchContent := fmt.Sprintf(`@echo off
 timeout /t 3 /nobreak > NUL
 sc.exe stop DMS-Agent > NUL 2>&1
@@ -235,31 +236,20 @@ taskkill /F /IM dms-agent.exe > NUL 2>&1
 taskkill /F /IM dms-agent-debug.exe > NUL 2>&1
 reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "DMSAgent" /f > NUL 2>&1
 if exist "%s" rmdir /S /Q "%s" > NUL 2>&1
-if exist "C:\DMS-Agent" rmdir /S /Q "C:\DMS-Agent" > NUL 2>&1
 del "%%~f0" > NUL 2>&1
 `, exeDir, exeDir)
 
-		if err := os.WriteFile(scriptPath, []byte(batchContent), 0755); err != nil {
-			return "", fmt.Errorf("khong the tao script go cai dat: %w", err)
+		scriptPath, err := writeUninstallScript(".bat", batchContent)
+		if err != nil {
+			return "", nil, fmt.Errorf("khong the tao script go cai dat: %w", err)
 		}
 
-		cmd := hw("cmd.exe", "/c", scriptPath)
-		if err := cmd.Start(); err != nil {
-			return "", fmt.Errorf("khong the khoi dong script go bo: %w", err)
-		}
-
-		// Cho 2 giay de HTTP response gui ve backend truoc khi tien trinh thoat
-		go func() {
-			time.Sleep(2 * time.Second)
-			log.Println("[EXEC] Tien trinh Agent ket thuc de script xoa sach file.")
-			os.Exit(0)
-		}()
-
-		return fmt.Sprintf("Da kich hoat go bo service DMS-Agent va xoa toan bo file tai %s", exeDir), nil
+		return fmt.Sprintf("Uninstall scheduled for %s after result acknowledgement", exeDir), func() error {
+			return hw("cmd.exe", "/c", scriptPath).Start()
+		}, nil
 	}
 
 	// Fallback Linux
-	scriptPath := "/tmp/dms-agent-uninstall.sh"
 	shContent := fmt.Sprintf(`#!/bin/bash
 sleep 3
 systemctl stop dms-agent > /dev/null 2>&1
@@ -269,14 +259,46 @@ systemctl daemon-reload > /dev/null 2>&1
 rm -rf "%s" > /dev/null 2>&1
 rm -f "$0"
 `, exeDir)
-	_ = os.WriteFile(scriptPath, []byte(shContent), 0755)
-	cmd := hw("bash", scriptPath)
-	_ = cmd.Start()
+	scriptPath, err := writeUninstallScript(".sh", shContent)
+	if err != nil {
+		return "", nil, err
+	}
+	return fmt.Sprintf("Uninstall scheduled for %s after result acknowledgement", exeDir), func() error {
+		return hw("bash", scriptPath).Start()
+	}, nil
+}
 
-	go func() {
-		time.Sleep(2 * time.Second)
-		os.Exit(0)
-	}()
+func validateUninstallDir(exePath string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(exePath)
+	if err != nil {
+		return "", fmt.Errorf("resolve agent path: %w", err)
+	}
+	dir := filepath.Clean(filepath.Dir(resolved))
+	expected := "/opt/dms-agent"
+	if runtime.GOOS == "windows" {
+		expected = `C:\DMS-Agent`
+	}
+	if dir != filepath.Clean(expected) && (runtime.GOOS != "windows" || !strings.EqualFold(dir, filepath.Clean(expected))) {
+		return "", fmt.Errorf("refusing recursive uninstall outside dedicated directory: %s", dir)
+	}
+	return dir, nil
+}
 
-	return fmt.Sprintf("Da kich hoat go cai dat va xoa file tai %s", exeDir), nil
+func writeUninstallScript(extension, content string) (string, error) {
+	file, err := os.CreateTemp("", "dms-agent-uninstall-*"+extension)
+	if err != nil {
+		return "", err
+	}
+	name := file.Name()
+	_, writeErr := file.WriteString(content)
+	closeErr := file.Close()
+	if writeErr != nil {
+		_ = os.Remove(name)
+		return "", writeErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(name)
+		return "", closeErr
+	}
+	return name, nil
 }

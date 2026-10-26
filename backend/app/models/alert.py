@@ -95,3 +95,12 @@ class MaintenanceWindow(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class AlertRuleState(Base):
+    __tablename__ = "alert_rule_states"
+
+    rule_id: Mapped[int] = mapped_column(ForeignKey("alert_rules.rule_id", ondelete="CASCADE"), primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.device_id", ondelete="CASCADE"), primary_key=True)
+    active_since: Mapped[datetime | None] = mapped_column(DateTime)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime)

@@ -452,6 +452,7 @@ fun ProfileScreen(
                             context = context,
                             apkRelativeUrl = info.apkUrl,
                             versionCode = info.versionCode.toLong(),
+                            expectedSizeBytes = info.apkSizeBytes,
                             onProgress = { progress, downloaded, total ->
                                 updateProgress = progress
                                 val downMB = String.format("%.1f", downloaded / (1024f * 1024f))
@@ -482,8 +483,8 @@ fun ProfileScreen(
         }
 
         val directDownloadUrl = remember {
-            val base = com.example.myapplication.data.api.RetrofitClient.getBaseUrl().substringBefore("/api/v1").trimEnd('/')
-            "$base/static/dms-app.apk"
+            com.example.myapplication.util.UpdateLink.resolve(
+                com.example.myapplication.data.api.RetrofitClient.getBaseUrl(), "/static/dms-app.apk")
         }
 
         AlertDialog(

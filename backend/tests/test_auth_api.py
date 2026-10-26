@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 from fastapi.testclient import TestClient
 
 from app.core.deps import get_current_user
@@ -58,9 +60,7 @@ def test_get_current_user_detail_returns_full_profile():
     assert "password_hash" not in data
 
 
-def test_get_all_users_returns_list():
-    from unittest.mock import AsyncMock, patch
-
+def test_users_endpoint_only_returns_current_user():
     from app.db.session import get_db
 
     async def current_user_override() -> User:
@@ -78,42 +78,19 @@ def test_get_all_users_returns_list():
     app.dependency_overrides[get_current_user] = current_user_override
     app.dependency_overrides[get_db] = fake_db
 
-    mock_users = [
-        User(
-            user_id=1,
-            username="admin",
-            email="admin@example.com",
-            password_hash="secret-hash",
-            full_name="Admin User",
-        ),
-        User(
-            user_id=2,
-            username="linh",
-            email="linh@example.com",
-            password_hash="secret-hash",
-            full_name="Linh Nguyen",
-        ),
-    ]
-
-    with patch("app.api.v1.routers.auth.list_all_users", new=AsyncMock(return_value=mock_users)):
-        try:
-            response = TestClient(app).get("/api/v1/auth/users")
-        finally:
-            app.dependency_overrides.pop(get_current_user, None)
-            app.dependency_overrides.pop(get_db, None)
-
+    try:
+        response = TestClient(app).get("/api/v1/auth/users")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
     assert response.status_code == 200
     users = response.json()
-    assert len(users) == 2
-    assert users[0]["username"] == "admin"
-    assert users[1]["username"] == "linh"
+    assert len(users) == 1
+    assert users[0]["user_id"] == 7
     assert "password_hash" not in users[0]
-    assert "password_hash" not in users[1]
 
 
 def test_fcm_token_is_saved_to_the_matching_refresh_session():
-    from unittest.mock import AsyncMock, patch
-
     from app.db.session import get_db
 
     async def current_user_override() -> User:

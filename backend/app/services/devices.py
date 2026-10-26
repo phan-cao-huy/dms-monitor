@@ -4,12 +4,12 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 
-from sqlalchemy import select, text
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-from app.models.alert import AlertHistory
+from app.models.alert import AlertHistory, AlertRule
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
 from app.models.organization import (
     DeviceGroup,
@@ -61,7 +61,13 @@ async def verify_device_credentials(
     token_hash = hash_token(token)
     stmt = select(Device).where(
         Device.secret_token_hash == token_hash,
-        Device.archived_at.is_(None),
+        or_(Device.archived_at.is_(None), select(DeviceCommand.command_id).where(
+            DeviceCommand.device_id == Device.device_id,
+            DeviceCommand.command_type == "UNINSTALL",
+            or_(DeviceCommand.status.in_(("PENDING", "EXECUTING")),
+                and_(DeviceCommand.status == "SUCCESS",
+                     DeviceCommand.completed_at >= _utc_naive() - timedelta(minutes=5))),
+        ).exists()),
     )
     if device_id is not None:
         stmt = stmt.where(Device.device_id == device_id)
@@ -372,6 +378,16 @@ async def regenerate_device_token(
     return device, raw_token
 
 
+def _set_monitoring_state(device: Device, enabled: bool) -> None:
+    device.is_monitoring = enabled
+    device.updated_at = _utc_naive()
+    heartbeat = _as_utc_naive(device.last_heartbeat)
+    cutoff = _utc_naive() - timedelta(minutes=device.offline_threshold_minutes or 5)
+    device.status = "Paused" if not enabled else (
+        "Online" if heartbeat is not None and heartbeat >= cutoff else "Offline"
+    )
+
+
 async def toggle_device_monitoring(
     db: AsyncSession,
     device_id: int,
@@ -381,20 +397,11 @@ async def toggle_device_monitoring(
     device, _ = await check_user_device_access(
         db, device_id, user_id, required_roles=["Owner", "Admin", "Manager"]
     )
-    current_state = getattr(device, "is_monitoring", True)
+    if device.archived_at is not None:
+        _fail(409, "Cannot change monitoring for an archived device")
+    current_state = getattr(device, "is_monitoring", None) is not False
     new_state = is_monitoring if is_monitoring is not None else not current_state
-
-    device.is_monitoring = new_state
-    threshold = device.offline_threshold_minutes or 5
-    cutoff = _utc_naive() - timedelta(minutes=threshold)
-    if not new_state:
-        device.status = "Paused"
-    else:
-        if device.last_heartbeat and device.last_heartbeat >= cutoff:
-            device.status = "Online"
-        else:
-            device.status = "Offline"
-    device.updated_at = _utc_naive()
+    _set_monitoring_state(device, new_state)
 
     cmd_type = "RESUME_MONITORING" if new_state else "PAUSE_MONITORING"
     reason = (
@@ -413,57 +420,7 @@ async def toggle_device_monitoring(
     )
     db.add(toggle_cmd)
 
-    try:
-        await db.commit()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "First commit of toggle command failed (%s), attempting auto-fix constraints and retry",
-            exc,
-        )
-        await db.rollback()
-        # Attempt to auto-fix constraints on-the-fly
-        try:
-            for stmt in [
-                "ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_monitoring BOOLEAN NOT NULL DEFAULT TRUE;",
-                "ALTER TABLE devices DROP CONSTRAINT IF EXISTS chk_device_status;",
-                "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_status_check;",
-                "ALTER TABLE devices ADD CONSTRAINT chk_device_status CHECK (status IN ('Online', 'Offline', 'Warning', 'Archived', 'Paused'));",
-                "ALTER TABLE device_commands DROP CONSTRAINT IF EXISTS chk_cmd_type;",
-                "ALTER TABLE device_commands DROP CONSTRAINT IF EXISTS device_commands_command_type_check;",
-                "ALTER TABLE device_commands ADD CONSTRAINT chk_cmd_type CHECK (command_type IN ('REBOOT', 'RESTART_SERVICE', 'KILL_PROCESS', 'PAUSE_MONITORING', 'RESUME_MONITORING', 'UNINSTALL'));",
-            ]:
-                try:
-                    await db.execute(text(stmt))
-                except Exception:  # noqa: BLE001, S110
-                    pass
-            await db.commit()
-
-            # Now re-apply device and command changes
-            device.is_monitoring = new_state
-            device.status = "Paused" if not new_state else ("Online" if (device.last_heartbeat and device.last_heartbeat >= cutoff) else "Offline")
-            device.updated_at = _utc_naive()
-
-            retry_cmd = DeviceCommand(
-                device_id=device_id,
-                created_by=user_id,
-                command_type=cmd_type,
-                parameters={},
-                reason=reason,
-                status="PENDING",
-            )
-            db.add(retry_cmd)
-            await db.commit()
-        except Exception as retry_err:  # noqa: BLE001
-            logger.error(
-                "Auto-fix retry failed: %s, falling back to state update without command",
-                retry_err,
-            )
-            await db.rollback()
-            # Fallback: Just update device state, agent will synchronize on next heartbeat
-            device.is_monitoring = new_state
-            device.status = "Paused" if not new_state else "Online"
-            device.updated_at = _utc_naive()
-            await db.commit()
+    await db.commit()
 
     return {
         "device_id": device.device_id,
@@ -492,15 +449,7 @@ async def archive_device(
     device.archived_at = _utc_naive()
     device.status = "Archived"
 
-    try:
-        await db.commit()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Error committing archive with UNINSTALL command: %s, falling back", exc)
-        await db.rollback()
-        # Fallback: archive device without failing command
-        device.archived_at = _utc_naive()
-        device.status = "Archived"
-        await db.commit()
+    await db.commit()
 
 
 async def record_heartbeat(
@@ -538,8 +487,7 @@ async def record_heartbeat(
     if processes is not None:
         device.top_processes = processes[:15]
 
-    if payload.watch_status is not None:
-        device.watch_status = payload.watch_status
+    device.watch_status = payload.watch_status
 
     metric = DeviceMetric(
         device_id=device.device_id,
@@ -556,6 +504,16 @@ async def record_heartbeat(
     ram_usage = payload.ram_usage
     RAM_ALERT_THRESHOLD = 90.0
     RAM_ALERT_MESSAGE_PREFIX = "RAM vượt ngưỡng 90%"
+
+    if hasattr(db, "execute"):
+        custom_ram = (await db.execute(select(AlertRule.rule_id).where(
+            AlertRule.is_active.is_(True), AlertRule.metric_type == "RAM",
+            or_(AlertRule.device_id == device.device_id,
+                AlertRule.group_id == device.group_id if device.group_id is not None else False),
+        ).limit(1))).scalar_one_or_none()
+        if custom_ram is not None:
+            # Explicit rules replace the built-in RAM threshold for this device.
+            ram_usage = -1
 
     if ram_usage >= RAM_ALERT_THRESHOLD:
         device.status = "Warning"
@@ -671,9 +629,12 @@ async def create_device_command(
     user_id: int,
     payload: DeviceCommandCreate,
 ) -> DeviceCommand:
-    await check_user_device_access(
+    device, _ = await check_user_device_access(
         db, device_id, user_id, required_roles=["Owner", "Admin", "Manager"]
     )
+
+    if device.archived_at is not None:
+        _fail(409, "Cannot send commands to an archived device")
 
     # Validate parameters per command_type
     cmd_type = payload.command_type.upper()
@@ -684,6 +645,12 @@ async def create_device_command(
             _fail(422, "KILL_PROCESS requires 'pid' or 'process_name' in parameters")
     elif cmd_type == "RESTART_SERVICE" and "service_name" not in params:
         _fail(422, "RESTART_SERVICE requires 'service_name' in parameters")
+
+    if cmd_type in ("PAUSE_MONITORING", "RESUME_MONITORING"):
+        _set_monitoring_state(device, cmd_type == "RESUME_MONITORING")
+    elif cmd_type == "UNINSTALL":
+        device.archived_at = _utc_naive()
+        device.status = "Archived"
 
     cmd = DeviceCommand(
         device_id=device_id,
@@ -720,7 +687,12 @@ async def fetch_pending_commands(
         select(DeviceCommand)
         .where(
             DeviceCommand.device_id == device.device_id,
-            DeviceCommand.status == "PENDING",
+            or_(DeviceCommand.status == "PENDING",
+                and_(DeviceCommand.command_type == "UNINSTALL", or_(
+                    DeviceCommand.status == "EXECUTING",
+                    and_(DeviceCommand.status == "SUCCESS",
+                         DeviceCommand.completed_at >= _utc_naive() - timedelta(minutes=5))))),
+            *([DeviceCommand.command_type == "UNINSTALL"] if device.archived_at else []),
         )
         .order_by(DeviceCommand.created_at.asc())
         .with_for_update()
@@ -729,7 +701,8 @@ async def fetch_pending_commands(
     commands = list(res.scalars().all())
 
     for cmd in commands:
-        cmd.status = "EXECUTING"
+        if cmd.status == "PENDING":
+            cmd.status = "EXECUTING"
 
     if commands:
         await db.commit()
@@ -751,10 +724,34 @@ async def record_command_result(
     if cmd is None:
         _fail(404, "Command not found for this device")
 
+    if device.archived_at is not None and cmd.command_type != "UNINSTALL":
+        _fail(403, "Archived devices may only report uninstall results")
+    if payload.status.upper() not in ("SUCCESS", "FAILED"):
+        _fail(422, "Invalid command result status")
+    previous_status = cmd.status
     cmd.status = payload.status.upper()
     cmd.output = payload.output or payload.error_message
-    cmd.completed_at = _utc_naive()
+    if previous_status != "SUCCESS" or cmd.completed_at is None:
+        cmd.completed_at = _utc_naive()
 
     await db.commit()
     await db.refresh(cmd)
     return cmd
+
+
+async def agent_watch_config(db: AsyncSession, device: Device) -> dict:
+    config = device.watch_config or {}
+    services = {item["name"] for item in config.get("services", [])
+                if isinstance(item, dict) and isinstance(item.get("name"), str)}
+    processes = {name for name in config.get("processes", []) if isinstance(name, str)}
+    rules = (await db.execute(select(AlertRule).where(
+        AlertRule.is_active.is_(True), AlertRule.metric_type.in_(("SERVICE", "PROCESS_MISSING")),
+        or_(AlertRule.device_id == device.device_id,
+            AlertRule.group_id == device.group_id if device.group_id is not None else False),
+    ))).scalars().all()
+    for rule in rules:
+        if rule.metric_type == "SERVICE" and rule.service_name:
+            services.add(rule.service_name)
+        elif rule.process_name:
+            processes.add(rule.process_name)
+    return {"services": [{"name": name} for name in sorted(services)], "processes": sorted(processes)}

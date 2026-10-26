@@ -269,20 +269,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     _uiState.value = _uiState.value.copy(alerts = updated)
                 } else {
-                    markAlertResolvedLocally(alertId)
+                    _uiState.value = _uiState.value.copy(error = "Không thể đóng cảnh báo (${response.code()})")
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                markAlertResolvedLocally(alertId)
+                _uiState.value = _uiState.value.copy(error = "Không thể kết nối server: ${e.message}")
             }
         }
-    }
-
-    private fun markAlertResolvedLocally(alertId: String) {
-        val updated = _uiState.value.alerts.map {
-            if (it.id == alertId) it.copy(resolved = true, resolvedAt = java.time.Instant.now().toString()) else it
-        }
-        _uiState.value = _uiState.value.copy(alerts = updated)
     }
 
     fun clearNewlyCreatedDevice() {

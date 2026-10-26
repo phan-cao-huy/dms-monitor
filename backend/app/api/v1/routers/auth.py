@@ -19,7 +19,6 @@ from app.schemas.auth import (
 from app.services.auth import (
     authenticate_user,
     issue_tokens,
-    list_all_users,
     register_user,
     revoke_refresh_token,
     rotate_refresh_token,
@@ -56,14 +55,14 @@ async def get_me_detail(
 @router.get(
     "/users",
     response_model=list[UserDetailOut],
-    summary="Lấy danh sách tất cả tài khoản",
+    summary="Lấy hồ sơ tài khoản hiện tại",
 )
 async def get_all_users(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> list[User]:
-    """Lấy danh sách tất cả các tài khoản hiện tại trong hệ thống."""
-    return await list_all_users(db)
+    """Giữ tương thích dạng danh sách, chỉ trả hồ sơ của chính người dùng."""
+    return [user]
 
 
 @router.post(

@@ -176,8 +176,3 @@ async def save_fcm_token(
     stored_token.device_info = device_info
     await db.commit()
     return True
-
-
-async def list_all_users(db: AsyncSession) -> list[User]:
-    result = await db.execute(select(User).order_by(User.user_id))
-    return list(result.scalars().all())

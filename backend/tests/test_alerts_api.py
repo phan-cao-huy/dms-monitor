@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.alert import AlertHistory, AlertRule
 from app.models.auth import User
+from app.models.device import Device
 from app.models.organization import OrganizationMember
 
 
@@ -142,7 +143,7 @@ def test_list_alerts_and_resolve_and_acknowledge():
                 class MockResult:
                     def scalar_one_or_none(self):
                         if "devices" in sql:
-                            return 10
+                            return Device(device_id=5, org_id=10, group_id=None)
                         if "alert_history" in sql:
                             return alert
                         return member

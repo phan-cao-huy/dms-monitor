@@ -67,6 +67,7 @@ class HeartbeatIn(BaseModel):
                 "uptime_seconds",
                 "agent_version",
                 "processes",
+                "watch_status",
                 "cpu_temp_c",
                 "gpu_name",
                 "gpu_usage_pct",

@@ -14,7 +14,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -209,6 +208,12 @@ func pollCommands(client *sender.Client) {
 		result := executor.Execute(cmd)
 		if err := client.ReportCommandResult(result); err != nil {
 			log.Printf("[CMD-POLL] FAIL Khong gui duoc ket qua lenh #%d: %v", cmd.CommandID, err)
+			continue
+		}
+		if result.AfterReport != nil {
+			if err := result.AfterReport(); err != nil {
+				log.Printf("[CMD-POLL] Uninstall launch failed: %v", err)
+			}
 		}
 	}
 }
@@ -229,67 +234,4 @@ func setupLogFile() {
 
 	multiWriter := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(multiWriter)
-}
-
-// installService cai DMS Agent lam Windows Service dung sc.exe.
-func installService() error {
-	exePath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("khong lay duoc duong dan exe: %w", err)
-	}
-	exePath, err = filepath.Abs(exePath)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("[SERVICE] Cai service '%s' tu: %s", serviceName, exePath)
-
-	cmd := exec.Command("sc", "create", serviceName,
-		"binPath=", fmt.Sprintf(`"%s"`, exePath),
-		"DisplayName=", serviceDisplayName,
-		"start=", "auto",
-		"obj=", "LocalSystem",
-	)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sc create that bai: %s — %w", string(out), err)
-	}
-
-	descCmd := exec.Command("sc", "description", serviceName, serviceDesc)
-	descCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	_ = descCmd.Run()
-
-	failCmd := exec.Command("sc", "failure", serviceName, "reset=", "86400", "actions=", "restart/5000/restart/5000/restart/5000")
-	failCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	_ = failCmd.Run()
-
-	startCmd := exec.Command("sc", "start", serviceName)
-	startCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	startOut, startErr := startCmd.CombinedOutput()
-	if startErr != nil {
-		log.Printf("[SERVICE] Canh bao: Khong the khoi dong ngay: %s", string(startOut))
-	} else {
-		log.Printf("[SERVICE] Service da khoi dong: %s", string(startOut))
-	}
-
-	return nil
-}
-
-// uninstallService go cai DMS Agent Windows Service.
-func uninstallService() error {
-	log.Printf("[SERVICE] Dung service '%s'...", serviceName)
-	stopCmd := exec.Command("sc", "stop", serviceName)
-	stopCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	_ = stopCmd.Run()
-	time.Sleep(2 * time.Second)
-
-	log.Printf("[SERVICE] Xoa service '%s'...", serviceName)
-	cmd := exec.Command("sc", "delete", serviceName)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sc delete that bai: %s — %w", string(out), err)
-	}
-	return nil
 }

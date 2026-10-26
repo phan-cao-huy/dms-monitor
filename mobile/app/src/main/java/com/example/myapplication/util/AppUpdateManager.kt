@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.content.pm.PackageManager
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.example.myapplication.data.api.RetrofitClient
@@ -79,13 +82,14 @@ object AppUpdateManager {
             if (expectedSizeBytes > 0L && file.length() != expectedSizeBytes) {
                 return false
             }
-            val pkgInfo = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-            if (pkgInfo != null) {
-                val code = PackageInfoCompat.getLongVersionCode(pkgInfo)
-                code == expectedVersionCode
-            } else {
-                expectedSizeBytes > 0L && file.length() == expectedSizeBytes
-            }
+            val flags = PackageManager.GET_SIGNING_CERTIFICATES
+            val pkgInfo = context.packageManager.getPackageArchiveInfo(file.absolutePath, flags) ?: return false
+            if (pkgInfo.packageName != context.packageName ||
+                PackageInfoCompat.getLongVersionCode(pkgInfo) != expectedVersionCode) return false
+            val installed = context.packageManager.getPackageInfo(context.packageName, flags)
+            val expected = installed.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
+            val actual = pkgInfo.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
+            !expected.isNullOrEmpty() && expected == actual
         } catch (_: Exception) {
             false
         }
@@ -99,17 +103,8 @@ object AppUpdateManager {
         expectedVersionCode: Long,
         expectedSizeBytes: Long = 0L
     ): File? {
-        val dirs = listOfNotNull(context.externalCacheDir, context.cacheDir)
-        for (dir in dirs) {
-            val fileNamed = File(dir, "dms-update-v$expectedVersionCode.apk")
-            if (isApkMatchingVersion(context, fileNamed, expectedVersionCode, expectedSizeBytes)) {
-                return fileNamed
-            }
-            val legacy = File(dir, "dms-update.apk")
-            if (isApkMatchingVersion(context, legacy, expectedVersionCode, expectedSizeBytes)) {
-                return legacy
-            }
-        }
+        val file = File(File(context.cacheDir, "updates"), "dms-update-v$expectedVersionCode.apk")
+        if (isApkMatchingVersion(context, file, expectedVersionCode, expectedSizeBytes)) return file
         return null
     }
 
@@ -144,21 +139,21 @@ object AppUpdateManager {
         context: Context,
         apkRelativeUrl: String,
         versionCode: Long,
+        expectedSizeBytes: Long = 0L,
         onProgress: (Float, Long, Long) -> Unit
     ): Result<File> {
         return withContext(Dispatchers.IO) {
             try {
-                val targetDir = context.externalCacheDir ?: context.cacheDir
+                val targetDir = File(context.cacheDir, "updates").apply { mkdirs() }
                 val targetFile = File(targetDir, "dms-update-v$versionCode.apk")
-                val tempFile = File(targetDir, "dms-update-v$versionCode.tmp")
+                val tempFile = File(targetDir, "dms-update-v$versionCode.pending.apk")
 
                 if (tempFile.exists()) tempFile.delete()
 
-                val base = RetrofitClient.getBaseUrl().substringBefore("/api/v1").trimEnd('/')
-                val path = apkRelativeUrl.trimStart('/')
-                val fullUrl = if (apkRelativeUrl.startsWith("http")) apkRelativeUrl else "$base/$path"
+                val fullUrl = UpdateLink.resolve(RetrofitClient.getBaseUrl(), apkRelativeUrl)
 
                 val client = OkHttpClient.Builder()
+                    .followRedirects(false)
                     .connectTimeout(30, TimeUnit.SECONDS)
                     .readTimeout(180, TimeUnit.SECONDS)
                     .build()
@@ -169,48 +164,50 @@ object AppUpdateManager {
                     .header("User-Agent", "DMS-App-Updater/1.0")
                     .build()
 
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("HTTP ${response.code}: Không thể tải APK"))
-                }
-
-                val body = response.body ?: return@withContext Result.failure(Exception("Phản hồi rỗng"))
-                val totalBytes = body.contentLength()
-
-                body.byteStream().use { input ->
-                    FileOutputStream(tempFile).use { output ->
-                        val buffer = ByteArray(16 * 1024)
-                        var bytesRead: Int
-                        var downloadedBytes: Long = 0
-
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            downloadedBytes += bytesRead
-                            val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
-                            onProgress(progress, downloadedBytes, totalBytes)
-                        }
-                        output.flush()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        return@withContext Result.failure(Exception("HTTP ${response.code}: Không thể tải APK"))
                     }
+
+                    val body = response.body ?: return@withContext Result.failure(Exception("Phản hồi rỗng"))
+                    val totalBytes = body.contentLength()
+
+                    body.byteStream().use { input ->
+                        FileOutputStream(tempFile).use { output ->
+                            val buffer = ByteArray(16 * 1024)
+                            var bytesRead: Int
+                            var downloadedBytes: Long = 0
+
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                coroutineContext.ensureActive()
+                                output.write(buffer, 0, bytesRead)
+                                downloadedBytes += bytesRead
+                                val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
+                                onProgress(progress, downloadedBytes, totalBytes)
+                            }
+                            output.flush()
+                        }
+                    }
+
+                    if (!tempFile.exists() || tempFile.length() == 0L) {
+                        return@withContext Result.failure(Exception("File APK tải về không hợp lệ hoặc bị rỗng"))
+                    }
+
+                    if (!isApkMatchingVersion(context, tempFile, versionCode, expectedSizeBytes)) {
+                        tempFile.delete()
+                        return@withContext Result.failure(Exception("APK không khớp phiên bản, ứng dụng hoặc chữ ký phát hành"))
+                    }
+
+                    if (targetFile.exists()) targetFile.delete()
+                    if (!tempFile.renameTo(targetFile)) {
+                        tempFile.copyTo(targetFile, overwrite = true)
+                        tempFile.delete()
+                    }
+
+                    Result.success(targetFile)
                 }
-
-                if (!tempFile.exists() || tempFile.length() == 0L) {
-                    return@withContext Result.failure(Exception("File APK tải về không hợp lệ hoặc bị rỗng"))
-                }
-
-                if (targetFile.exists()) targetFile.delete()
-                if (!tempFile.renameTo(targetFile)) {
-                    tempFile.copyTo(targetFile, overwrite = true)
-                    tempFile.delete()
-                }
-
-                // Cập nhật thêm file legacy nếu cần
-                val legacyFile = File(targetDir, "dms-update.apk")
-                try {
-                    targetFile.copyTo(legacyFile, overwrite = true)
-                } catch (_: Exception) {}
-
-                Result.success(targetFile)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Result.failure(e)
             }
         }
@@ -223,6 +220,14 @@ object AppUpdateManager {
         return try {
             if (!apkFile.exists() || apkFile.length() == 0L) {
                 return Result.failure(Exception("File APK không tồn tại hoặc bị lỗi khi tải về."))
+            }
+
+            val pkgInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+                ?: return Result.failure(Exception("APK không hợp lệ"))
+            val versionCode = PackageInfoCompat.getLongVersionCode(pkgInfo)
+            if (versionCode < getCurrentVersionCode(context) ||
+                !isApkMatchingVersion(context, apkFile, versionCode)) {
+                return Result.failure(Exception("APK không khớp ứng dụng hoặc chữ ký phát hành"))
             }
 
             // Kiểm tra quyền cài ứng dụng từ nguồn không xác định trên Android 8.0+
@@ -242,13 +247,6 @@ object AppUpdateManager {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-            }
-
-            val resInfoList = context.packageManager.queryIntentActivities(installIntent, 0)
-            for (resolveInfo in resInfoList) {
-                val packageName = resolveInfo.activityInfo.packageName
-                context.grantUriPermission(packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
             context.startActivity(installIntent)

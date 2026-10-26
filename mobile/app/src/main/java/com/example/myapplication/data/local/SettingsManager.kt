@@ -27,7 +27,6 @@ class SettingsManager(private val context: Context) {
         private val ALERT_CPU_KEY = booleanPreferencesKey("alert_cpu")
         private val ALERT_RAM_KEY = booleanPreferencesKey("alert_ram")
         private val ALERT_OFFLINE_KEY = booleanPreferencesKey("alert_offline")
-        private val SERVER_URL_KEY = stringPreferencesKey("server_url")
     }
 
     // Đọc một lần toàn bộ preferences snapshot → tránh mở file nhiều lần
@@ -44,16 +43,6 @@ class SettingsManager(private val context: Context) {
     val alertRam: Flow<Boolean> = prefsFlow.map { it[ALERT_RAM_KEY] ?: true }.distinctUntilChanged()
 
     val alertOffline: Flow<Boolean> = prefsFlow.map { it[ALERT_OFFLINE_KEY] ?: true }.distinctUntilChanged()
-
-    val serverUrl: Flow<String> = prefsFlow.map {
-        it[SERVER_URL_KEY] ?: com.example.myapplication.data.api.RetrofitClient.DEFAULT_BASE_URL
-    }.distinctUntilChanged()
-
-    suspend fun setServerUrl(url: String) {
-        context.settingsDataStore.edit { prefs ->
-            prefs[SERVER_URL_KEY] = url
-        }
-    }
 
     suspend fun setThemeMode(mode: String) {
         context.settingsDataStore.edit { prefs ->

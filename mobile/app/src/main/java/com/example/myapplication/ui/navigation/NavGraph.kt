@@ -43,7 +43,6 @@ fun NavGraph(
     onNotificationConfigChange: (Boolean, Boolean, Boolean, Boolean) -> Unit = { _, _, _, _ -> }
 ) {
     val authState by authViewModel.uiState.collectAsState()
-    val serverUrl by authViewModel.serverUrl.collectAsState()
 
     val dashboardViewModel: DashboardViewModel = viewModel()
     val orgViewModel: OrganizationViewModel = viewModel()
@@ -91,8 +90,6 @@ fun NavGraph(
         composable(Screen.Login.route) {
             LoginScreen(
                 uiState = authState,
-                serverUrl = serverUrl,
-                onUpdateServerUrl = { authViewModel.updateServerUrl(it) },
                 onLogin = { identifier, password ->
                     authViewModel.login(identifier, password)
                 },

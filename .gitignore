@@ -23,3 +23,9 @@ mobile/**/local.properties
 !backend/static/dms-app.apk
 !backend/static/*.exe
 
+
+# Private Android release signing material
+mobile/keystore.properties
+*.jks
+*.keystore
+*.p12

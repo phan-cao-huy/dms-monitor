@@ -16,10 +16,10 @@ import (
 
 // HeartbeatPayload la JSON body gui len Backend POST /agent/heartbeat.
 type HeartbeatPayload struct {
-	DeviceID    int                    `json:"device_id"`
-	SecretToken string                 `json:"secret_token"`
-	Metrics     *collector.Metrics     `json:"metrics"`
-	StaticInfo  *collector.StaticInfo  `json:"static_info,omitempty"`
+	DeviceID    int                   `json:"device_id"`
+	SecretToken string                `json:"secret_token"`
+	Metrics     *collector.Metrics    `json:"metrics"`
+	StaticInfo  *collector.StaticInfo `json:"static_info,omitempty"`
 }
 
 // CommandResponse la JSON tra ve tu Backend GET /agent/commands.
@@ -36,10 +36,11 @@ type Command struct {
 
 // CommandResult la ket qua sau khi thuc thi lenh, gui lai Backend.
 type CommandResult struct {
-	CommandID    int    `json:"command_id"`
-	Status       string `json:"status"`
-	Output       string `json:"output,omitempty"`
-	ErrorMessage string `json:"error_message,omitempty"`
+	AfterReport  func() error `json:"-"`
+	CommandID    int          `json:"command_id"`
+	Status       string       `json:"status"`
+	Output       string       `json:"output,omitempty"`
+	ErrorMessage string       `json:"error_message,omitempty"`
 }
 
 // Client la HTTP client de giao tiep voi Backend.
@@ -58,6 +59,7 @@ func NewClient(cfg *config.Config) *Client {
 
 func (c *Client) prepareRequest(req *http.Request) {
 	req.Header.Set("X-Device-Token", c.cfg.SecretToken)
+	req.Header.Set("X-Agent-Watch-Config", "true")
 	req.Header.Set("Bypass-Tunnel-Reminder", "true")
 	req.Header.Set("User-Agent", "DMS-Agent/1.0")
 }
@@ -66,8 +68,9 @@ func (c *Client) prepareRequest(req *http.Request) {
 // Tu dong retry toi da 3 lan voi exponential backoff.
 // HeartbeatResponse chua thong tin phan hoi tu backend sau khi nhan heartbeat.
 type HeartbeatResponse struct {
-	Accepted          bool  `json:"accepted"`
-	MonitoringEnabled *bool `json:"monitoring_enabled,omitempty"`
+	WatchConfig       *collector.WatchConfig `json:"watch_config,omitempty"`
+	Accepted          bool                   `json:"accepted"`
+	MonitoringEnabled *bool                  `json:"monitoring_enabled,omitempty"`
 }
 
 // SendHeartbeat gui du lieu metric len Backend.
@@ -118,6 +121,9 @@ func (c *Client) SendHeartbeat(metrics *collector.Metrics, staticInfo *collector
 			log.Printf("[SENDER] OK Heartbeat gui thanh cong (HTTP %d)", resp.StatusCode)
 			var hr HeartbeatResponse
 			if err := json.Unmarshal(respBody, &hr); err == nil {
+				if hr.WatchConfig != nil {
+					collector.SetWatchConfig(*hr.WatchConfig)
+				}
 				return &hr, nil
 			}
 			return &HeartbeatResponse{Accepted: true}, nil

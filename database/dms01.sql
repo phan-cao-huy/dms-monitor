@@ -304,15 +304,23 @@ CREATE TRIGGER trg_devices_updated_at       BEFORE UPDATE ON devices       FOR E
 CREATE OR REPLACE FUNCTION create_metrics_partition(week_start DATE)
 RETURNS TEXT AS $$
 DECLARE
-    partition_name TEXT := 'device_metrics_' || TO_CHAR(week_start, 'YYYY_WW');
-    week_end       DATE := week_start + 7;
+    start_day DATE := week_start - (EXTRACT(ISODOW FROM week_start)::INT - 1);
+    end_day DATE := start_day + 7;
+    partition_name TEXT := 'device_metrics_' || TO_CHAR(start_day, 'YYYYMMDD');
 BEGIN
+    -- Serialize creation with inserts and keep moving DEFAULT rows atomic.
+    LOCK TABLE device_metrics IN ACCESS EXCLUSIVE MODE;
     IF to_regclass(partition_name) IS NOT NULL THEN
-        RETURN 'SKIPPED: ' || partition_name || ' already exists';
+        RETURN 'SKIPPED: ' || partition_name;
     END IF;
-
+    CREATE TEMP TABLE dms_partition_rows (LIKE device_metrics INCLUDING DEFAULTS) ON COMMIT DROP;
+    WITH moved AS (
+        DELETE FROM device_metrics_default WHERE created_at >= start_day AND created_at < end_day RETURNING *
+    ) INSERT INTO dms_partition_rows SELECT * FROM moved;
     EXECUTE FORMAT('CREATE TABLE %I PARTITION OF device_metrics FOR VALUES FROM (%L) TO (%L)',
-                   partition_name, week_start::TIMESTAMP, week_end::TIMESTAMP);
+                   partition_name, start_day::TIMESTAMP, end_day::TIMESTAMP);
+    INSERT INTO device_metrics SELECT * FROM dms_partition_rows;
+    DROP TABLE dms_partition_rows;
     RETURN 'CREATED: ' || partition_name;
 END;
 $$ LANGUAGE plpgsql;
@@ -326,3 +334,11 @@ $$ LANGUAGE plpgsql;
 --   invite_default_expiry_days = 7       max_orgs_per_user = 10
 --   max_devices_per_org = 5000           max_devices_system = 50000
 -- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS alert_rule_states (
+    rule_id INT REFERENCES alert_rules(rule_id) ON DELETE CASCADE,
+    device_id INT REFERENCES devices(device_id) ON DELETE CASCADE,
+    active_since TIMESTAMP,
+    last_seen TIMESTAMP,
+    PRIMARY KEY (rule_id, device_id)
+);

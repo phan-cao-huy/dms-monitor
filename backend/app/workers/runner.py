@@ -9,13 +9,16 @@ Các tác vụ định kỳ:
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text, tuple_
 
-from app.db.session import SessionLocal
-from app.models.alert import AlertHistory
+from app.core.config import settings
+from app.db.session import SessionLocal, engine
+from app.models.alert import AlertHistory, AlertRuleState
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
 
 logging.basicConfig(
@@ -149,6 +152,7 @@ async def check_command_timeouts() -> None:
             stmt = select(DeviceCommand).where(
                 DeviceCommand.status.in_(("PENDING", "EXECUTING")),
                 DeviceCommand.created_at < timeout_threshold,
+                DeviceCommand.command_type != "UNINSTALL",
             )
             res = await db.execute(stmt)
             timed_out = list(res.scalars().all())
@@ -220,37 +224,100 @@ async def aggregate_hourly_metrics() -> None:
 
 
 async def manage_partitions() -> None:
-    async with SessionLocal() as db:
+    # Each week is atomic, including rows already in the DEFAULT partition.
+    for offset in (0, 7):
+        async with engine.begin() as conn:
+            await conn.execute(text("SET LOCAL lock_timeout = '5s'"))
+            await conn.execute(text("SET LOCAL statement_timeout = '60s'"))
+            await conn.execute(text(Path(__file__).resolve().parents[1].joinpath("db/partition_function.sql").read_text()))
+            await conn.execute(text("SELECT create_metrics_partition(:d)"), {"d": _utc_naive().date() + timedelta(days=offset)})
+
+
+async def cleanup_metrics() -> None:
+    # Bound each transaction; composite keys are unique across partitions.
+    targets = [
+        (DeviceMetric, (DeviceMetric.metric_id, DeviceMetric.created_at), DeviceMetric.created_at, settings.METRICS_RETENTION_DAYS),
+        (DeviceMetricHourly, (DeviceMetricHourly.device_id, DeviceMetricHourly.hour_bucket), DeviceMetricHourly.hour_bucket, settings.HOURLY_RETENTION_DAYS),
+    ]
+    for model, keys, timestamp, days in targets:
+        cutoff = _utc_naive() - timedelta(days=days)
+        for _ in range(100):
+            async with SessionLocal() as db:
+                batch = select(*keys).where(timestamp < cutoff).limit(10000)
+                result = await db.execute(delete(model).where(tuple_(*keys).in_(batch)))
+                await db.commit()
+                if result.rowcount < 10000:
+                    break
+
+
+def build_scheduler() -> AsyncIOScheduler:
+    from app.workers.notifications import send_pending_notifications
+    from app.workers.rules import evaluate_alert_rules
+
+    scheduler = AsyncIOScheduler(timezone="UTC", job_defaults={"max_instances": 1, "coalesce": True})
+    scheduler.add_job(check_offline_devices, "interval", minutes=1)
+    scheduler.add_job(check_command_timeouts, "interval", minutes=1)
+    scheduler.add_job(evaluate_alert_rules, "interval", minutes=1)
+    scheduler.add_job(send_pending_notifications, "interval", minutes=1)
+    scheduler.add_job(aggregate_hourly_metrics, "cron", minute=5)
+    scheduler.add_job(manage_partitions, "cron", hour=0, minute=0)
+    scheduler.add_job(cleanup_metrics, "cron", hour=1, minute=0)
+    return scheduler
+
+
+@asynccontextmanager
+async def worker_lifespan():
+    # Session lock is shared by embedded mode and dedicated workers.
+    async with engine.connect() as conn:
+        acquired = (await conn.execute(text("SELECT pg_try_advisory_lock(70412026)"))).scalar()
+        await conn.commit()
+        if not acquired:
+            logger.info("Another DMS worker owns the scheduler lock")
+            yield None
+            return
+        scheduler = None
         try:
-            today = _utc_naive().date()
-            res = await db.execute(
-                text("SELECT create_metrics_partition(:d);"), {"d": today}
-            )
-            msg = res.scalar()
-            logger.info(f"Partition manager: {msg}")
-        except Exception:
-            logger.exception("Lỗi partition manager")
+            async with engine.begin() as migration:
+                await migration.run_sync(lambda c: AlertRuleState.__table__.create(c, checkfirst=True))
+            try:
+                await manage_partitions()
+            except Exception:
+                logger.exception("Partition initialization failed; daily job will retry")
+            scheduler = build_scheduler()
+            scheduler.start()
+            async def monitor_connection():
+                try:
+                    while True:
+                        await asyncio.sleep(10)
+                        await conn.execute(text("SELECT 1"))
+                        await conn.commit()
+                except Exception:
+                    logger.exception("Worker lost its database leadership connection")
+                    if scheduler.running:
+                        scheduler.shutdown(wait=False)
+            monitor = asyncio.create_task(monitor_connection())
+            try:
+                yield scheduler
+            finally:
+                monitor.cancel()
+                with suppress(asyncio.CancelledError):
+                    await monitor
+        finally:
+            if scheduler is not None and scheduler.running:
+                scheduler.shutdown(wait=False)
+            await conn.execute(text("SELECT pg_advisory_unlock(70412026)"))
+            await conn.commit()
 
 
 async def main() -> None:
-    logger.info("Khởi động DMS Background Workers...")
-    scheduler = AsyncIOScheduler()
-
-    scheduler.add_job(check_offline_devices, "interval", minutes=1)
-    scheduler.add_job(check_high_ram_devices, "interval", minutes=1)
-    scheduler.add_job(check_command_timeouts, "interval", minutes=1)
-    scheduler.add_job(aggregate_hourly_metrics, "cron", minute=5)
-    scheduler.add_job(manage_partitions, "cron", day_of_week="sun", hour=0, minute=0)
-
-    scheduler.start()
-    logger.info("DMS Background Workers đã sẵn sàng.")
-
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    except (KeyboardInterrupt, SystemExit):
-        scheduler.shutdown()
-        logger.info("DMS Background Workers đã dừng.")
+    while True:
+        async with worker_lifespan() as scheduler:
+            if scheduler is not None:
+                logger.info("DMS worker ready")
+                while scheduler.running:
+                    await asyncio.sleep(10)
+            else:
+                await asyncio.sleep(30)
 
 
 if __name__ == "__main__":

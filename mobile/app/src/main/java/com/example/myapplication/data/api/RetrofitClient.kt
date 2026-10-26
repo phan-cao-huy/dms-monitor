@@ -1,5 +1,6 @@
 package com.example.myapplication.data.api
 
+import com.example.myapplication.BuildConfig
 import com.example.myapplication.data.local.TokenManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
@@ -17,30 +18,15 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    // Mặc định dùng IP thật của máy (10.37.9.0) hoặc có thể đổi động qua UI
-    const val DEFAULT_BASE_URL = "http://10.37.9.0:8000/api/v1/"
-    private var currentBaseUrl = DEFAULT_BASE_URL
-
+    const val DEFAULT_BASE_URL = "https://dms.ky215.io.vn/api/v1/"
+    private val currentBaseUrl = DEFAULT_BASE_URL
     private var tokenManager: TokenManager? = null
     private val tokenRefreshLock = Any()
 
-    fun getBaseUrl(): String = currentBaseUrl
+    fun getBaseUrl(): String = DEFAULT_BASE_URL
 
-    fun init(tokenManager: TokenManager, savedUrl: String? = null) {
+    fun init(tokenManager: TokenManager) {
         this.tokenManager = tokenManager
-        if (!savedUrl.isNullOrBlank()) {
-            setBaseUrl(savedUrl)
-        }
-    }
-
-    fun setBaseUrl(newUrl: String) {
-        var url = newUrl.trim()
-        if (!url.endsWith("/")) url = "$url/"
-        if (!url.contains("/api/v1/")) {
-            url = if (url.endsWith("api/v1/")) url else "${url}api/v1/"
-        }
-        currentBaseUrl = url
-        _apiService = createApiService(currentBaseUrl)
     }
 
     private val authInterceptor = Interceptor { chain ->
@@ -56,7 +42,7 @@ object RetrofitClient {
     }
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BASIC
+        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
     }
 
     private val tokenAuthenticator = Authenticator { _, response ->

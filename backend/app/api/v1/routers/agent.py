@@ -14,6 +14,7 @@ from app.schemas.agent import (
 )
 from app.services.devices import (
     DeviceError,
+    agent_watch_config,
     fetch_pending_commands,
     record_command_result,
     record_heartbeat,
@@ -33,7 +34,7 @@ async def heartbeat(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     device: Annotated[Device | None, Depends(get_optional_agent_device)],
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     """Nhận heartbeat định kỳ từ Agent, cập nhật trạng thái thiết bị và lưu metrics."""
     if device is None:
         if payload.secret_token:
@@ -52,13 +53,18 @@ async def heartbeat(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+    if device.archived_at is not None:
+        raise HTTPException(status_code=403, detail="Device is archived")
     await record_heartbeat(db, device, payload)
-    is_mon = getattr(device, "is_monitoring", None)
-    if is_mon is False:
-        return {"accepted": True, "monitoring_enabled": False}
-    if payload.processes is None and payload.cpu_usage == 0 and payload.ram_usage == 0:
-        return {"accepted": True, "monitoring_enabled": True}
-    return {"accepted": True}
+    response: dict[str, Any] = {"accepted": True}
+    if getattr(device, "is_monitoring", None) is False:
+        response["monitoring_enabled"] = False
+    elif payload.processes is None and payload.cpu_usage == 0 and payload.ram_usage == 0:
+        response["monitoring_enabled"] = True
+    if request.headers.get("X-Agent-Watch-Config") == "true":
+        response["watch_config"] = await agent_watch_config(db, device)
+    return response
+
 
 
 @router.get(

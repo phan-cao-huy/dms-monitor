@@ -31,29 +31,12 @@ data class AuthUiState(
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val tokenManager = TokenManager(application)
-    private val settingsManager = com.example.myapplication.data.local.SettingsManager(application)
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _serverUrl = MutableStateFlow(RetrofitClient.DEFAULT_BASE_URL)
-    val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
-
     init {
-        viewModelScope.launch {
-            val savedUrl = settingsManager.serverUrl.first()
-            RetrofitClient.init(tokenManager, savedUrl)
-            _serverUrl.value = RetrofitClient.getBaseUrl()
-            checkLoginStatus()
-        }
-    }
-
-    fun updateServerUrl(url: String) {
-        viewModelScope.launch {
-            RetrofitClient.setBaseUrl(url)
-            val finalUrl = RetrofitClient.getBaseUrl()
-            settingsManager.setServerUrl(finalUrl)
-            _serverUrl.value = finalUrl
-        }
+        RetrofitClient.init(tokenManager)
+        checkLoginStatus()
     }
 
     private fun checkLoginStatus() {

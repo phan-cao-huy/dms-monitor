@@ -2,19 +2,15 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
 from app.api.v1.api import api_router
+from app.core.config import settings
 from app.db.session import engine
-from app.workers.runner import (
-    check_command_timeouts,
-    check_high_ram_devices,
-    check_offline_devices,
-)
+from app.workers.runner import worker_lifespan
 
 logger = logging.getLogger(__name__)
 
@@ -29,32 +25,21 @@ async def _ensure_db_schema() -> None:
         "ALTER TABLE device_commands DROP CONSTRAINT IF EXISTS device_commands_command_type_check;",
         "ALTER TABLE device_commands ADD CONSTRAINT chk_cmd_type CHECK (command_type IN ('REBOOT', 'RESTART_SERVICE', 'KILL_PROCESS', 'PAUSE_MONITORING', 'RESUME_MONITORING', 'UNINSTALL'));",
     ]
-    for stmt in migration_statements:
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text(stmt))
-        except Exception as e:  # noqa: BLE001
-            logger.warning("Could not execute migration statement '%s': %s", stmt, e)
+    async with engine.begin() as conn:
+        for stmt in migration_statements:
+            await conn.execute(text(stmt))
+
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler = None
     if os.getenv("TESTING") != "1":
         await _ensure_db_schema()
-        try:
-            scheduler = AsyncIOScheduler()
-            scheduler.add_job(check_offline_devices, "interval", minutes=1)
-            scheduler.add_job(check_high_ram_devices, "interval", minutes=1)
-            scheduler.add_job(check_command_timeouts, "interval", minutes=1)
-            scheduler.start()
-        except Exception:
-            logger.warning("Could not start scheduler", exc_info=True)
-    try:
+    if settings.EMBEDDED_WORKER and os.getenv("TESTING") != "1":
+        async with worker_lifespan():
+            yield
+    else:
         yield
-    finally:
-        if scheduler is not None and scheduler.running:
-            scheduler.shutdown()
 
 
 app = FastAPI(
@@ -101,10 +86,10 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "version_code": 8,
-        "version_name": "1.0.7",
+        "version_code": 11,
+        "version_name": "1.0.10",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Thêm nút bật/tắt theo dõi máy tính từ xa (Tạm dừng/Bật thu thập CPU, RAM, Disk, Tiến trình)\n• Tự động gỡ cài đặt và xóa toàn bộ file khi xóa PC trên App",
+        "release_notes": "• Khôi phục tải và cài bản cập nhật từ server HTTPS\n• Kiểm tra phiên bản, package và chữ ký APK trước khi cài\n• Sử dụng server cố định, bản ký release và các bản sửa độ ổn định",
         "force_update": False
     }

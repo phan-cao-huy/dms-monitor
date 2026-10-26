@@ -1,4 +1,4 @@
-from app.models.alert import AlertHistory, AlertRule, MaintenanceWindow
+from app.models.alert import AlertHistory, AlertRule, AlertRuleState, MaintenanceWindow
 from app.models.auth import AuthToken, User
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
 from app.models.organization import (
@@ -12,6 +12,7 @@ from app.models.organization import (
 __all__ = [
     "AlertHistory",
     "AlertRule",
+    "AlertRuleState",
     "AuthToken",
     "Device",
     "DeviceCommand",

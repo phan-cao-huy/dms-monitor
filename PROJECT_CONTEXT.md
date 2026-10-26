@@ -1,4 +1,8 @@
 # DMS MONITOR — PROJECT COMPREHENSIVE CONTEXT & SPECIFICATION
+
+> **Release hiện tại: v1.0.10 (Build 11)** — server HTTPS cố định, ký release, đã khôi phục cập nhật APK qua server. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
+
+> **26/10/2026 — đối chiếu và bản sửa:** Xem [docs/RELIABILITY_FIXES.md](docs/RELIABILITY_FIXES.md) để biết hành vi mới, kết quả kiểm tra và phần chưa triển khai. Các mô tả cũ bên dưới có điểm đã lỗi thời.
 > **Tài liệu chuyển giao ngữ cảnh toàn diện dự án DMS (Device Monitoring System)**  
 > *Dành cho AI Assistant, Developer hoặc Team kế thừa tiếp tục phát triển trên bất kỳ nền tảng nào.*  
 > *Ngày cập nhật: 25/10/2026 | Phiên bản hệ thống: v1.0.7 (Build 8)*

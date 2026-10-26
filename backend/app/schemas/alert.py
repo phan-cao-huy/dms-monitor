@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AlertRuleCreate(BaseModel):
@@ -11,12 +11,24 @@ class AlertRuleCreate(BaseModel):
         pattern=r"^(CPU|RAM|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING)$"
     )
     condition: str = Field(default=">", pattern=r"^(>|>=|<|<=)$")
-    threshold: float | None = None
+    threshold: float | None = Field(default=None, allow_inf_nan=False)
     service_name: str | None = Field(default=None, max_length=100)
     process_name: str | None = Field(default=None, max_length=100)
     duration_minutes: int = Field(default=1, ge=1)
     severity: str = Field(default="WARNING", pattern=r"^(INFO|WARNING|CRITICAL)$")
     cooldown_minutes: int = Field(default=30, ge=1)
+
+    @model_validator(mode="after")
+    def validate_target(self):
+        if (self.device_id is None) == (self.group_id is None):
+            raise ValueError("Specify exactly one device_id or group_id")
+        if self.metric_type == "SERVICE" and not self.service_name:
+            raise ValueError("SERVICE requires service_name")
+        if self.metric_type == "PROCESS_MISSING" and not self.process_name:
+            raise ValueError("PROCESS_MISSING requires process_name")
+        if self.metric_type not in ("SERVICE", "PROCESS_MISSING") and self.threshold is None:
+            raise ValueError("Numeric rules require threshold")
+        return self
 
 
 class AlertRuleOut(BaseModel):

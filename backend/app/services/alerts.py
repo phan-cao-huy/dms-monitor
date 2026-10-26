@@ -1,13 +1,19 @@
 from datetime import UTC, datetime
 from typing import NoReturn
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import AlertHistory, AlertRule
 from app.models.device import Device
-from app.models.organization import DeviceGroup, Organization, OrganizationMember
+from app.models.organization import (
+    DeviceGroup,
+    Organization,
+    OrganizationMember,
+    UserGroupAccess,
+)
 from app.schemas.alert import AlertRuleCreate
+from app.services.devices import DeviceError, check_user_device_access
 
 
 class AlertError(Exception):
@@ -46,15 +52,16 @@ async def _get_org_member(
 async def list_alert_rules(
     db: AsyncSession, org_id: int, user_id: int
 ) -> list[AlertRule]:
-    await _get_org_member(db, org_id, user_id)
-
-    # Get all device IDs and group IDs in this org
-    dev_res = await db.execute(select(Device.device_id).where(Device.org_id == org_id))
+    member = await _get_org_member(db, org_id, user_id)
+    device_query = select(Device.device_id).where(Device.org_id == org_id)
+    group_query = select(DeviceGroup.group_id).where(DeviceGroup.org_id == org_id)
+    if member.role not in ("Owner", "Admin"):
+        assigned_groups = select(UserGroupAccess.group_id).where(UserGroupAccess.user_id == user_id)
+        device_query = device_query.where(or_(Device.group_id.is_(None), Device.group_id.in_(assigned_groups)))
+        group_query = group_query.where(DeviceGroup.group_id.in_(assigned_groups))
+    dev_res = await db.execute(device_query)
     device_ids = set(dev_res.scalars().all())
-
-    grp_res = await db.execute(
-        select(DeviceGroup.group_id).where(DeviceGroup.org_id == org_id)
-    )
+    grp_res = await db.execute(group_query)
     group_ids = set(grp_res.scalars().all())
 
     stmt = select(AlertRule).where(
@@ -151,9 +158,14 @@ async def list_org_alerts(
     resolved: bool | None = None,
     limit: int = 100,
 ) -> list[AlertHistory]:
-    await _get_org_member(db, org_id, user_id)
-
-    dev_res = await db.execute(select(Device.device_id).where(Device.org_id == org_id))
+    member = await _get_org_member(db, org_id, user_id)
+    devices_query = select(Device.device_id).where(Device.org_id == org_id)
+    if member.role not in ("Owner", "Admin"):
+        devices_query = devices_query.where(or_(
+            Device.group_id.is_(None),
+            Device.group_id.in_(select(UserGroupAccess.group_id).where(UserGroupAccess.user_id == user_id)),
+        ))
+    dev_res = await db.execute(devices_query)
     device_ids = set(dev_res.scalars().all())
 
     stmt = select(AlertHistory).where(AlertHistory.device_id.in_(device_ids))
@@ -177,12 +189,10 @@ async def resolve_alert(
     if alert is None:
         _fail(404, "Alert not found")
 
-    dev_res = await db.execute(
-        select(Device.org_id).where(Device.device_id == alert.device_id)
-    )
-    org_id = dev_res.scalar_one_or_none()
-    if org_id is not None:
-        await _get_org_member(db, org_id, user_id)
+    try:
+        await check_user_device_access(db, alert.device_id, user_id)
+    except DeviceError as exc:
+        _fail(exc.status_code, exc.detail)
 
     alert.resolved_at = _utc_naive()
     await db.commit()
@@ -200,12 +210,10 @@ async def acknowledge_alert(
     if alert is None:
         _fail(404, "Alert not found")
 
-    dev_res = await db.execute(
-        select(Device.org_id).where(Device.device_id == alert.device_id)
-    )
-    org_id = dev_res.scalar_one_or_none()
-    if org_id is not None:
-        await _get_org_member(db, org_id, user_id)
+    try:
+        await check_user_device_access(db, alert.device_id, user_id)
+    except DeviceError as exc:
+        _fail(exc.status_code, exc.detail)
 
     alert.acknowledged_by = user_id
     alert.acknowledged_at = _utc_naive()
