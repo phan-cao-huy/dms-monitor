@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +21,7 @@ async def _ensure_db_schema() -> None:
     migration_statements = [
         "ALTER TABLE alert_history ADD COLUMN IF NOT EXISTS message_en TEXT;",
         "ALTER TABLE alert_rules DROP CONSTRAINT IF EXISTS chk_rule_metric;",
-        "ALTER TABLE alert_rules ADD CONSTRAINT chk_rule_metric CHECK (metric_type IN ('CPU','RAM','GPU','DISK','NET_IN','NET_OUT','OFFLINE','SERVICE','PROCESS_MISSING'));",
+        "ALTER TABLE alert_rules ADD CONSTRAINT chk_rule_metric CHECK (metric_type IN ('CPU','RAM','GPU','DISK','NET_IN','NET_OUT','OFFLINE','SERVICE','PROCESS_MISSING','CPU_TEMP','DISK_HEALTH'));",
         "ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_monitoring BOOLEAN NOT NULL DEFAULT TRUE;",
         "ALTER TABLE devices DROP CONSTRAINT IF EXISTS chk_device_status;",
         "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_status_check;",
@@ -32,6 +33,10 @@ async def _ensure_db_schema() -> None:
     async with engine.begin() as conn:
         for stmt in migration_statements:
             await conn.execute(text(stmt))
+        migration = Path(__file__).resolve().parent / "db" / "t1_email.sql"
+        for stmt in migration.read_text(encoding="utf-8").split(";"):
+            if stmt.strip():
+                await conn.execute(text(stmt))
 
 
 
@@ -90,7 +95,7 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.20",
+        "web_version": "1.0.21",
         "version_code": 21,
         "version_name": "1.0.20",
         "apk_url": "/static/dms-app.apk",

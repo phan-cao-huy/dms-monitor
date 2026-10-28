@@ -65,7 +65,7 @@ async def list_alert_rules(
     group_ids = set(grp_res.scalars().all())
 
     stmt = select(AlertRule).where(
-        (AlertRule.device_id.in_(device_ids)) | (AlertRule.group_id.in_(group_ids))
+        (AlertRule.device_id.in_(device_ids)) | (AlertRule.group_id.in_(group_ids)) | (AlertRule.workspace_id == org_id if member.role in ("Owner", "Admin") else False)
     ).order_by(AlertRule.rule_id.desc())
 
     res = await db.execute(stmt)
@@ -131,15 +131,19 @@ async def update_alert_rule(
     rule = await db.get(AlertRule, rule_id)
     if rule is None:
         _fail(404, "Alert rule not found")
-    target = await db.get(Device, rule.device_id) if rule.device_id else await db.get(DeviceGroup, rule.group_id)
+    target = await db.get(Organization, rule.workspace_id) if rule.workspace_id else (await db.get(Device, rule.device_id) if rule.device_id else await db.get(DeviceGroup, rule.group_id))
     if target is None or target.org_id != org_id:
         _fail(404, "Alert rule not found in this organization")
     changes = payload.model_dump(exclude_unset=True)
+    if rule.default_key == "OFFLINE" and "threshold" in changes:
+        _fail(422, "Default offline rule uses each device offline threshold")
     if any(value is None for key, value in changes.items() if key not in ("rule_name",)):
         _fail(422, "Rule values cannot be null")
     merged = {key: getattr(rule, key) for key in AlertRuleCreate.model_fields}
     merged.update({key: value for key, value in changes.items() if key in merged})
     try:
+        if rule.workspace_id:
+            merged["device_id"] = 1  # validate numeric settings; workspace scope is immutable
         AlertRuleCreate.model_validate(merged)
     except ValueError as exc:
         _fail(422, str(exc))
@@ -161,7 +165,7 @@ async def delete_alert_rule(
         _fail(404, "Alert rule not found")
 
     # Find the org of the rule
-    org_id = None
+    org_id = rule.workspace_id
     if rule.device_id:
         dev_res = await db.execute(
             select(Device.org_id).where(Device.device_id == rule.device_id)
@@ -178,7 +182,10 @@ async def delete_alert_rule(
         if member.role not in ("Owner", "Admin"):
             _fail(403, "Only Owner or Admin can delete alert rules")
 
-    await db.delete(rule)
+    if rule.default_key:
+        rule.is_active = False
+    else:
+        await db.delete(rule)
     await db.commit()
 
 

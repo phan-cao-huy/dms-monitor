@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     EMBEDDED_WORKER: bool = False
     METRICS_RETENTION_DAYS: int = Field(default=7, ge=1)
     HOURLY_RETENTION_DAYS: int = Field(default=90, ge=1)
+    NOTIFICATION_ENCRYPTION_KEY: str | None = None
     FCM_ENABLED: bool = False
     FCM_CREDENTIALS_FILE: str | None = None
 

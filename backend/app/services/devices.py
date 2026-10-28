@@ -507,9 +507,10 @@ async def record_heartbeat(
 
     if hasattr(db, "execute"):
         custom_ram = (await db.execute(select(AlertRule.rule_id).where(
-            AlertRule.is_active.is_(True), AlertRule.metric_type == "RAM",
-            or_(AlertRule.device_id == device.device_id,
-                AlertRule.group_id == device.group_id if device.group_id is not None else False),
+            AlertRule.metric_type == "RAM",
+            or_(AlertRule.workspace_id == device.org_id,
+                and_(AlertRule.is_active.is_(True), or_(AlertRule.device_id == device.device_id,
+                    AlertRule.group_id == device.group_id if device.group_id is not None else False))),
         ).limit(1))).scalar_one_or_none()
         if custom_ram is not None:
             # Explicit rules replace the built-in RAM threshold for this device.

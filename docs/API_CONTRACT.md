@@ -77,3 +77,28 @@ Tất cả endpoint tổ chức yêu cầu `Authorization: Bearer <access_token>
 | POST | /alerts/{id}/resolve |
 
 `status` của thiết bị: `Online | Offline | Warning | Maintenance | Archived`
+
+
+## T1 — Email channels (web 1.0.21)
+
+All routes require a valid access token and Owner/Admin membership in `{org_id}`.
+- `GET /api/v1/orgs/{org_id}/email-channels`: list channels, config without password.
+- `POST /api/v1/orgs/{org_id}/email-channels`: create, returns 201.
+- `PUT /api/v1/orgs/{org_id}/email-channels/{channel_id}`: replace settings; omit/null password to retain the existing one.
+- `DELETE /api/v1/orgs/{org_id}/email-channels/{channel_id}`: delete channel and ledger, returns 204.
+- `POST /api/v1/orgs/{org_id}/email-channels/{channel_id}/test`: send a test, returns `{"status":"SENT"}` when SMTP accepts; 429 within 60 seconds, 502 on SMTP failure.
+- `GET /api/v1/orgs/{org_id}/email-channels/{channel_id}/deliveries`: latest 50 entries with `alert_id`, `status`, `attempts`, `last_error`, `sent_at`.
+
+Create/replace body:
+```json
+{"name":"Gmail alerts","enabled":true,"config":{"host":"smtp.gmail.com","port":587,"username":"sender@example.com","password":"APP_PASSWORD","from_email":"sender@example.com","recipients":["recipient@example.com"],"language":"vi"}}
+```
+Only 465/587 are accepted, with mandatory TLS. Recipients: 1–20; language: `vi`/`en`.
+Passwords are encrypted at rest and never returned. Missing encryption key returns 503.
+SMTP errors are safe codes: `SMTP_AUTH_FAILED`, `SMTP_CONNECTION_FAILED`, `SMTP_DELIVERY_FAILED`.
+
+Alert rules now accept `CPU_TEMP`. Default rules have nullable `workspace_id` and `default_key`
+in responses, and no device/group target. Only Owner/Admin can list workspace defaults.
+Existing create rules still require exactly one device/group target. Default OFFLINE uses the
+individual device setting and rejects a threshold PATCH. DELETE on a default disables it.
+See `docs/T1_EMAIL.md` for delivery and migration details.

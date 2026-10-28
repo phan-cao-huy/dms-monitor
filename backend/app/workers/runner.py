@@ -18,7 +18,7 @@ from sqlalchemy import delete, func, select, text, tuple_
 
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
-from app.models.alert import AlertHistory, AlertRuleState
+from app.models.alert import AlertHistory, AlertRule, AlertRuleState
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
 
 logging.basicConfig(
@@ -58,7 +58,12 @@ async def check_offline_devices() -> None:
                         threshold_value=float(d.offline_threshold_minutes),
                         notification_status="PENDING",
                     )
-                    db.add(alert)
+                    has_rule = (await db.execute(select(AlertRule.rule_id).where(
+                        AlertRule.metric_type == "OFFLINE",
+                        (AlertRule.workspace_id == d.org_id) | (AlertRule.device_id == d.device_id) | (AlertRule.group_id == d.group_id if d.group_id else False),
+                    ).limit(1))).scalar_one_or_none()
+                    if has_rule is None:
+                        db.add(alert)
                     logger.warning(
                         f"Thiết bị #{d.device_id} '{d.device_name}' chuyển sang Offline."
                     )
@@ -251,6 +256,7 @@ async def cleanup_metrics() -> None:
 
 
 def build_scheduler() -> AsyncIOScheduler:
+    from app.workers.email_notifications import send_pending_emails
     from app.workers.notifications import send_pending_notifications
     from app.workers.rules import evaluate_alert_rules
 
@@ -258,6 +264,7 @@ def build_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(check_offline_devices, "interval", minutes=1)
     scheduler.add_job(check_command_timeouts, "interval", minutes=1)
     scheduler.add_job(evaluate_alert_rules, "interval", minutes=1)
+    scheduler.add_job(send_pending_emails, "interval", minutes=1)
     scheduler.add_job(send_pending_notifications, "interval", minutes=1)
     scheduler.add_job(aggregate_hourly_metrics, "cron", minute=5)
     scheduler.add_job(manage_partitions, "cron", hour=0, minute=0)

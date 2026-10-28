@@ -1,6 +1,7 @@
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState, MaintenanceWindow
 from app.models.auth import AuthToken, User
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
+from app.models.email_channel import EmailChannel, EmailDelivery
 from app.models.organization import (
     DeviceGroup,
     Organization,
@@ -19,6 +20,8 @@ __all__ = [
     "DeviceGroup",
     "DeviceMetric",
     "DeviceMetricHourly",
+    "EmailChannel",
+    "EmailDelivery",
     "MaintenanceWindow",
     "Organization",
     "OrganizationInvitation",

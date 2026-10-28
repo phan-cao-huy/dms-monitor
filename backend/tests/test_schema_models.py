@@ -136,6 +136,8 @@ def test_auth_and_organization_models_match_dms01_tables():
             "completed_at",
         },
         AlertRule: {
+            "workspace_id",
+            "default_key",
             "rule_id",
             "group_id",
             "device_id",

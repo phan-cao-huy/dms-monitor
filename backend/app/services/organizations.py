@@ -113,6 +113,8 @@ async def create_organization(
         role="Owner",
     )
     db.add(member)
+    from app.services.default_rules import seed_default_rules
+    await seed_default_rules(db, organization.org_id)
     await db.commit()
     await db.refresh(organization)
     return {

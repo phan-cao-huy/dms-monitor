@@ -1,3 +1,5 @@
+> **T1 email (web 1.0.21):** web-first at user request; Android remains 1.0.20. See [docs/T1_EMAIL.md](docs/T1_EMAIL.md). SMTP channels, independent delivery ledger, workspace defaults; backend/worker deployed locally; 88 backend tests including PostgreSQL and 15 web tests passed. Real Gmail SMTP verification pending.
+
 # DMS MONITOR — PROJECT COMPREHENSIVE CONTEXT & SPECIFICATION
 
 > **Quy ước người dùng:** Mọi thay đổi tính năng/giao diện từ nay phải đồng bộ web và Android; dùng chung API/database.

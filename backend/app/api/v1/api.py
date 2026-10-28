@@ -5,11 +5,12 @@ from app.api.v1.routers import (
     alerts,
     auth,
     devices,
+    email_channels,
     groups,
     health,
     organizations,
 )
 
 api_router = APIRouter(prefix="/api/v1")
-for r in (health, auth, organizations, groups, devices, alerts, agent):
+for r in (health, auth, organizations, groups, devices, alerts, agent, email_channels):
     api_router.include_router(r.router)

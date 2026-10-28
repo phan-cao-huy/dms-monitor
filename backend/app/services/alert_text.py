@@ -4,7 +4,7 @@ def alert_text(kind, device_name, value=None, threshold=None, condition=">=", du
                service_name=None, process_name=None, processes=None):
     def num(v):
         return "—" if v is None else (f"{v:g}" if lang == "en" else f"{v:g}".replace(".", ","))
-    labels = {"CPU": ("CPU", "CPU"), "RAM": ("RAM", "RAM"), "GPU": ("GPU (VGA)", "GPU (graphics)"), "DISK": ("Ổ đĩa", "Disk"),
+    labels = {"CPU_TEMP": ("Nhiệt độ CPU", "CPU temperature"), "CPU": ("CPU", "CPU"), "RAM": ("RAM", "RAM"), "GPU": ("GPU (VGA)", "GPU (graphics)"), "DISK": ("Ổ đĩa", "Disk"),
               "NET_IN": ("Mạng tải xuống", "Download"), "NET_OUT": ("Mạng tải lên", "Upload")}
     result = {}
     for lang in ("vi", "en"):
@@ -21,7 +21,7 @@ def alert_text(kind, device_name, value=None, threshold=None, condition=">=", du
             body = f"{target}\nNot running for at least {duration} min." if en else f"{target}\nKhông hoạt động ít nhất {duration} phút."
         elif kind in labels:
             label = labels[kind][1 if en else 0]
-            unit = "%" if kind in ("CPU", "RAM", "DISK", "GPU") else " KB/s"
+            unit = "%" if kind in ("CPU", "RAM", "DISK", "GPU") else " °C" if kind == "CPU_TEMP" else " KB/s"
             title = f"{label} alert · {device_name}" if en else f"Cảnh báo {label} · {device_name}"
             relation_vi = {">": "vượt ngưỡng", ">=": "đã đạt ngưỡng cảnh báo", "<": "thấp hơn ngưỡng", "<=": "bằng/thấp hơn ngưỡng"}.get(condition,"đạt ngưỡng")
             relation_en = {">": "above", ">=": "at or above", "<": "below", "<=": "at or below"}.get(condition,"at")

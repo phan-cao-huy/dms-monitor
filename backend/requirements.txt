@@ -11,3 +11,5 @@ apscheduler>=3.10
 firebase-admin>=6.5
 pytest>=8.0
 httpx>=0.27
+
+cryptography>=42.0

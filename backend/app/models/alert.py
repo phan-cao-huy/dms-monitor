@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -18,8 +19,11 @@ from app.db.base import Base
 
 class AlertRule(Base):
     __tablename__ = "alert_rules"
+    __table_args__ = (UniqueConstraint("workspace_id", "default_key", name="uq_workspace_default_rule"),)
 
     rule_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.org_id", ondelete="CASCADE"))
+    default_key: Mapped[str | None] = mapped_column(String(30))
     group_id: Mapped[int | None] = mapped_column(
         ForeignKey("device_groups.group_id", ondelete="CASCADE")
     )

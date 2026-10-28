@@ -31,8 +31,12 @@ def rule_observation(rule, device, metric, now):
         seconds=120
     ):
         return None, None
-    elif rule.metric_type == "GPU":
-        value = (device.static_info or {}).get("gpu_usage_pct")
+    elif rule.metric_type in ("GPU", "CPU_TEMP"):
+        value = (device.static_info or {}).get("gpu_usage_pct" if rule.metric_type == "GPU" else "cpu_temp_c")
+        if rule.metric_type == "CPU_TEMP" and (value is None or value <= 0):
+            return None, None
+    elif rule.metric_type == "DISK_HEALTH":
+        return None, None  # reserved for T2; missing health never implies failure
     elif rule.metric_type in METRIC_FIELDS:
         if metric is None or now - metric.created_at > timedelta(seconds=120):
             return None, None
@@ -46,7 +50,8 @@ def rule_observation(rule, device, metric, now):
         return not observed, float(not observed)
     if value is None or rule.threshold is None:
         return None, None
-    return COMPARATORS[rule.condition](value, rule.threshold), float(value)
+    threshold = device.offline_threshold_minutes if getattr(rule, "default_key", None) == "OFFLINE" else rule.threshold
+    return COMPARATORS[rule.condition](value, threshold), float(value)
 
 
 def update_observation(state, breached, now):
@@ -117,12 +122,13 @@ async def evaluate_device_rules(db, device, rules, now):
             minutes=rule.duration_minutes
         ):
             continue
-        copy = alert_text(rule.metric_type,device.device_name,value,rule.threshold,rule.condition,
+        threshold = device.offline_threshold_minutes if rule.default_key == "OFFLINE" else rule.threshold
+        copy = alert_text(rule.metric_type,device.device_name,value,threshold,rule.condition,
                           rule.duration_minutes,rule.service_name,rule.process_name,device.top_processes)
         if latest is not None:
             if latest.resolved_at is None:
                 latest.metric_value = value
-                latest.threshold_value = rule.threshold
+                latest.threshold_value = threshold
                 latest.message = f"{copy['title_vi']}\n{copy['body_vi']}"
                 latest.message_en = f"{copy['title_en']}\n{copy['body_en']}"
                 continue
@@ -136,7 +142,7 @@ async def evaluate_device_rules(db, device, rules, now):
                 message=f"{copy['title_vi']}\n{copy['body_vi']}",
                 message_en=f"{copy['title_en']}\n{copy['body_en']}",
                 metric_value=value,
-                threshold_value=rule.threshold,
+                threshold_value=threshold,
                 notification_status="PENDING",
             )
         )
@@ -163,7 +169,10 @@ async def evaluate_alert_rules():
                 for r in rules
                 if r.device_id == device.device_id
                 or (r.group_id is not None and r.group_id == device.group_id)
+                or r.workspace_id == device.org_id
             ]
+            custom_metrics = {r.metric_type for r in matching if not r.default_key}
+            matching = [r for r in matching if not r.default_key or r.metric_type not in custom_metrics]
             if matching:
                 await evaluate_device_rules(db, device, matching, now)
         await db.commit()

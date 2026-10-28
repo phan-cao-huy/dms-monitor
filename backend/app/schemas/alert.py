@@ -8,7 +8,7 @@ class AlertRuleCreate(BaseModel):
     device_id: int | None = None
     rule_name: str | None = Field(default=None, max_length=150)
     metric_type: str = Field(
-        pattern=r"^(CPU|RAM|GPU|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING)$"
+        pattern=r"^(CPU|RAM|GPU|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING|CPU_TEMP)$"
     )
     condition: str = Field(default=">", pattern=r"^(>|>=|<|<=)$")
     threshold: float | None = Field(default=None, allow_inf_nan=False)
@@ -52,6 +52,8 @@ class AlertRuleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     rule_id: int
+    workspace_id: int | None = None
+    default_key: str | None = None
     group_id: int | None
     device_id: int | None
     rule_name: str | None
