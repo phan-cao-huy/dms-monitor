@@ -481,6 +481,11 @@ async def record_heartbeat(
     if payload.disks is not None and len(payload.disks) > 0:
         current_static["disks"] = payload.disks
 
+    for key in ("disks_health", "connections", "t2_collected_at", "event_log_status"):
+        if key in payload.model_fields_set:
+            value = getattr(payload, key)
+            current_static[key] = [item.model_dump() for item in value] if key in ("disks_health", "connections") and value is not None else value
+
     device.static_info = current_static
 
     processes = payload.top_processes or payload.processes

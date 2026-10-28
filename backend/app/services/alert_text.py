@@ -19,6 +19,9 @@ def alert_text(kind, device_name, value=None, threshold=None, condition=">=", du
             if kind == "PROCESS_MISSING":
                 title = f"Process missing · {device_name}" if en else f"Tiến trình ngừng chạy · {device_name}"
             body = f"{target}\nNot running for at least {duration} min." if en else f"{target}\nKhông hoạt động ít nhất {duration} phút."
+        elif kind == "DISK_HEALTH":
+            title = f"Disk health alert · {device_name}" if en else f"Cảnh báo sức khỏe ổ đĩa · {device_name}"
+            body = "Windows reports a disk warning or failure. Back up data and check the physical disk in DMS." if en else "Windows báo ổ đĩa có cảnh báo hoặc lỗi. Hãy sao lưu dữ liệu và kiểm tra ổ đĩa vật lý trong DMS."
         elif kind in labels:
             label = labels[kind][1 if en else 0]
             unit = "%" if kind in ("CPU", "RAM", "DISK", "GPU") else " °C" if kind == "CPU_TEMP" else " KB/s"

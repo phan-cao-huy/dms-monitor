@@ -36,7 +36,17 @@ def rule_observation(rule, device, metric, now):
         if rule.metric_type == "CPU_TEMP" and (value is None or value <= 0):
             return None, None
     elif rule.metric_type == "DISK_HEALTH":
-        return None, None  # reserved for T2; missing health never implies failure
+        info = device.static_info or {}
+        try:
+            sampled = datetime.fromisoformat(info.get("t2_collected_at", "")).astimezone(UTC).replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            return None, None
+        if now - sampled > timedelta(seconds=120) or sampled > now + timedelta(minutes=5):
+            return None, None
+        health = info.get("disks_health")
+        if not health or not any(d.get("healthy") is not None for d in health):
+            return None, None
+        value = float(any(d.get("healthy") is False for d in health))
     elif rule.metric_type in METRIC_FIELDS:
         if metric is None or now - metric.created_at > timedelta(seconds=120):
             return None, None

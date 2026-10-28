@@ -202,3 +202,27 @@ func (c *Client) ReportCommandResult(result CommandResult) error {
 	log.Printf("[SENDER] OK Da bao ket qua lenh #%d: %s", result.CommandID, result.Status)
 	return nil
 }
+
+// SendEvents acknowledges a bounded event batch only after the backend accepts it.
+func (c *Client) SendEvents(events []collector.DeviceEvent) error {
+	body, err := json.Marshal(map[string]interface{}{"events": events})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", c.cfg.BackendURL+"/agent/events", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.prepareRequest(req)
+	response, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("event batch HTTP %d", response.StatusCode)
+	}
+	return nil
+}

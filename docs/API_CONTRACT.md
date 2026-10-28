@@ -102,3 +102,41 @@ in responses, and no device/group target. Only Owner/Admin can list workspace de
 Existing create rules still require exactly one device/group target. Default OFFLINE uses the
 individual device setting and rejects a threshold PATCH. DELETE on a default disables it.
 See `docs/T1_EMAIL.md` for delivery and migration details.
+
+
+## T2 — Device monitoring and service checks (web 1.0.22 / Agent 1.3.0)
+
+Heartbeat flat/nested `metrics` now accepts optional:
+```json
+{"disks_health":[{"name":"Disk 0","healthy":true,"source":"Windows Storage HealthStatus"}],"connections":[{"pid":123,"process":"example.exe","laddr":"192.168.1.2:50000","raddr":"203.0.113.1:443","status":"ESTABLISHED"}],"t2_collected_at":"2026-10-28T00:00:00Z","event_log_status":{"System":"OK","Application":"OK","Security":"ACCESS_DENIED"}}
+```
+Data is exposed in device detail `static_info`. `healthy` is nullable. `temp_c`/`wear_pct` are optional;
+max 32 disks, 50 connections. Empty arrays clear a snapshot; null means unavailable.
+`DISK_HEALTH` alert rules always use threshold 1 / condition >=; threshold PATCH is rejected.
+
+- `POST /api/v1/agent/events`: device credentials as heartbeat (`X-Device-Token`, optional
+  `device_id` query). Body `{"events":[{"log_name":"System","record_id":42,"event_id":1000,
+  "level":"ERROR","source":"Provider","message":"Description","occurred_at":"2026-10-28T00:00:00Z"}]}`.
+  Returns 202 `{"accepted":true}`. Max 50; message <=1000 chars. Archived/paused device: 403.
+  Security only allows event 4625 / AUDIT_FAILURE. Dedup key: device/log/record/timestamp.
+  Events older than retention are acknowledged and discarded. Future >5 minutes is invalid.
+- `GET /api/v1/devices/{id}/events?level=ERROR&limit=50&before=123`: same workspace/group
+  access as device details; limit 1–100; optional ERROR/CRITICAL/AUDIT_FAILURE. Response
+  `{"items":[...],"next_before":123}`. Cursor is event_pk, not event time. Empty next cursor is null.
+
+Owner/Admin only, scoped to non-deleted workspace:
+- `GET|POST /api/v1/orgs/{org_id}/checks`: list/create; create returns 201.
+- `PUT|DELETE /api/v1/orgs/{org_id}/checks/{check_id}`: replace/delete; delete returns 204.
+- `POST /api/v1/orgs/{org_id}/checks/{check_id}/run`: shared evaluation now, 429 within 30s.
+- `GET /api/v1/orgs/{org_id}/checks/{check_id}/history`: latest 100 results and 50 incidents.
+
+Create/replace body:
+```json
+{"name":"Website","type":"HTTP","target":"https://example.com/health","interval_seconds":60,"timeout_seconds":5,"failure_threshold":3,"enabled":true}
+```
+Types HTTP/SSL/TCP/PING. Interval 30–86400 seconds, timeout 1–5 seconds, threshold 1–20;
+max 20/workspace. URL credentials, fragments and control characters are rejected. DNS/IP policy
+is enforced at run time and every redirect; private CIDRs are managed outside API by server admin.
+List responses include last result (`ok`, `latency_ms`, safe `detail`), failure streak and incident flag.
+No target response body is returned. Audit is recorded for writes/manual runs.
+See `docs/T2_MONITORING.md` for probe, notification, retention and Agent upgrade behaviour.

@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal, engine
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
+from app.models.monitoring import CheckAudit, CheckIncident, CheckResult, DeviceEvent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -241,6 +242,10 @@ async def manage_partitions() -> None:
 async def cleanup_metrics() -> None:
     # Bound each transaction; composite keys are unique across partitions.
     targets = [
+        (DeviceEvent, (DeviceEvent.event_pk,), DeviceEvent.occurred_at, settings.EVENTS_RETENTION_DAYS),
+        (CheckResult, (CheckResult.result_id,), CheckResult.checked_at, 7),
+        (CheckIncident, (CheckIncident.incident_id,), CheckIncident.resolved_at, 30),
+        (CheckAudit, (CheckAudit.audit_id,), CheckAudit.created_at, 90),
         (DeviceMetric, (DeviceMetric.metric_id, DeviceMetric.created_at), DeviceMetric.created_at, settings.METRICS_RETENTION_DAYS),
         (DeviceMetricHourly, (DeviceMetricHourly.device_id, DeviceMetricHourly.hour_bucket), DeviceMetricHourly.hour_bucket, settings.HOURLY_RETENTION_DAYS),
     ]
@@ -259,8 +264,11 @@ def build_scheduler() -> AsyncIOScheduler:
     from app.workers.email_notifications import send_pending_emails
     from app.workers.notifications import send_pending_notifications
     from app.workers.rules import evaluate_alert_rules
+    from app.workers.synthetic_checks import run_synthetic_checks, send_check_emails
 
     scheduler = AsyncIOScheduler(timezone="UTC", job_defaults={"max_instances": 1, "coalesce": True})
+    scheduler.add_job(run_synthetic_checks, "interval", seconds=10)
+    scheduler.add_job(send_check_emails, "interval", minutes=1)
     scheduler.add_job(check_offline_devices, "interval", minutes=1)
     scheduler.add_job(check_command_timeouts, "interval", minutes=1)
     scheduler.add_job(evaluate_alert_rules, "interval", minutes=1)

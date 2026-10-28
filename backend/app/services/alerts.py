@@ -135,6 +135,8 @@ async def update_alert_rule(
     if target is None or target.org_id != org_id:
         _fail(404, "Alert rule not found in this organization")
     changes = payload.model_dump(exclude_unset=True)
+    if rule.metric_type == "DISK_HEALTH" and "threshold" in changes:
+        _fail(422, "Disk health alerts have a fixed failure condition")
     if rule.default_key == "OFFLINE" and "threshold" in changes:
         _fail(422, "Default offline rule uses each device offline threshold")
     if any(value is None for key, value in changes.items() if key not in ("rule_name",)):

@@ -8,7 +8,7 @@ class AlertRuleCreate(BaseModel):
     device_id: int | None = None
     rule_name: str | None = Field(default=None, max_length=150)
     metric_type: str = Field(
-        pattern=r"^(CPU|RAM|GPU|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING|CPU_TEMP)$"
+        pattern=r"^(CPU|RAM|GPU|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING|CPU_TEMP|DISK_HEALTH)$"
     )
     condition: str = Field(default=">", pattern=r"^(>|>=|<|<=)$")
     threshold: float | None = Field(default=None, allow_inf_nan=False)
@@ -27,6 +27,8 @@ class AlertRuleCreate(BaseModel):
             raise ValueError("SERVICE requires service_name")
         if self.metric_type == "PROCESS_MISSING" and not self.process_name:
             raise ValueError("PROCESS_MISSING requires process_name")
+        if self.metric_type == "DISK_HEALTH":
+            self.threshold, self.condition = 1, ">="
         if self.metric_type not in ("SERVICE", "PROCESS_MISSING") and self.threshold is None:
             raise ValueError("Numeric rules require threshold")
         if self.threshold is not None and self.metric_type not in ("SERVICE", "PROCESS_MISSING"):

@@ -28,7 +28,7 @@ def test_migration_copies_stay_in_sync():
         pytest.skip("Repository-level copies are checked on host, outside backend-only image")
     migration = (root / "database/migrate_t1_email.sql").read_text(encoding="utf-8")
     assert migration == (root / "backend/app/db/t1_email.sql").read_text(encoding="utf-8")
-    assert (root / "database/dms01.sql").read_text(encoding="utf-8").endswith(migration)
+    assert migration in (root / "database/dms01.sql").read_text(encoding="utf-8")
 
 
 @pytest.mark.skipif(os.getenv("TEST_POSTGRES") != "1", reason="Requires PostgreSQL; private rollback schema")

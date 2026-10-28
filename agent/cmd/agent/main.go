@@ -1,11 +1,13 @@
 // DMS Agent - entrypoint.
 // Build an (khong co cua so console):
-//   go build -ldflags="-s -w -H=windowsgui" -o dms-agent.exe ./cmd/agent
+//
+//	go build -ldflags="-s -w -H=windowsgui" -o dms-agent.exe ./cmd/agent
 //
 // Dung qua CLI:
-//   dms-agent.exe -server http://IP:8000 -token dms_xxx -id 15
-//   dms-agent.exe -install    <- cai lam Windows Service (chay ngam trong Session 0, boot cung Windows)
-//   dms-agent.exe -uninstall  <- go cai Windows Service
+//
+//	dms-agent.exe -server http://IP:8000 -token dms_xxx -id 15
+//	dms-agent.exe -install    <- cai lam Windows Service (chay ngam trong Session 0, boot cung Windows)
+//	dms-agent.exe -uninstall  <- go cai Windows Service
 package main
 
 import (
@@ -27,7 +29,7 @@ import (
 
 const serviceName = "DMS-Agent"
 const serviceDisplayName = "DMS Monitor Agent"
-const serviceDesc = "He thong giam sat may tinh tu xa - DMS Monitor Agent v1.1.0"
+const serviceDesc = "He thong giam sat may tinh tu xa - DMS Monitor Agent v1.3.0"
 
 func main() {
 	// Ghi log ra file dms-agent.log cung thu muc voi exe
@@ -181,6 +183,11 @@ func sendHeartbeat(client *sender.Client, cfg *config.Config, staticInfo *collec
 		si = staticInfo
 	}
 
+	exe, _ := os.Executable()
+	cursorPath := filepath.Join(filepath.Dir(exe), "event-cursors.json")
+	cursors := collector.LoadEventCursors(cursorPath)
+	events, next, eventStatus := collector.CollectEvents(cursors)
+	metrics.EventLogStatus = eventStatus
 	resp, err := client.SendHeartbeat(metrics, si)
 	if err != nil {
 		log.Printf("[HEARTBEAT] FAIL Gui that bai: %v", err)
@@ -188,6 +195,16 @@ func sendHeartbeat(client *sender.Client, cfg *config.Config, staticInfo *collec
 	}
 	if resp != nil && resp.MonitoringEnabled != nil && !*resp.MonitoringEnabled {
 		executor.SetMonitoringPaused(true)
+		return
+	}
+	if len(events) > 0 {
+		if err := client.SendEvents(events); err != nil {
+			log.Printf("[EVENTS] Batch not accepted: %v", err)
+			return
+		}
+	}
+	if err := collector.SaveEventCursors(cursorPath, next); err != nil {
+		log.Printf("[EVENTS] Cannot save cursor: %v", err)
 	}
 }
 

@@ -33,10 +33,11 @@ async def _ensure_db_schema() -> None:
     async with engine.begin() as conn:
         for stmt in migration_statements:
             await conn.execute(text(stmt))
-        migration = Path(__file__).resolve().parent / "db" / "t1_email.sql"
-        for stmt in migration.read_text(encoding="utf-8").split(";"):
-            if stmt.strip():
-                await conn.execute(text(stmt))
+        for name in ("t1_email.sql", "t2_monitoring.sql"):
+            migration = Path(__file__).resolve().parent / "db" / name
+            for stmt in migration.read_text(encoding="utf-8").split(";"):
+                if stmt.strip():
+                    await conn.execute(text(stmt))
 
 
 
@@ -95,7 +96,9 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.21",
+        "web_version": "1.0.22",
+        "agent_version": "1.3.0",
+        "agent_url": "/static/dms-agent.exe",
         "version_code": 21,
         "version_name": "1.0.20",
         "apk_url": "/static/dms-app.apk",

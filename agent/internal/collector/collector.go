@@ -19,7 +19,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-const AgentVersion = "1.2.0"
+const AgentVersion = "1.3.0"
 
 // DiskInfo chua thong tin 1 o cung / partition.
 type DiskInfo struct {
@@ -33,21 +33,25 @@ type DiskInfo struct {
 
 // Metrics chua du lieu 1 lan heartbeat — map 1:1 voi bang device_metrics.
 type Metrics struct {
-	WatchStatus   map[string]map[string]bool `json:"watch_status,omitempty"`
-	CPUUsage      float64                    `json:"cpu_usage"`
-	CPULoad1m     float64                    `json:"cpu_load_1m"`
-	CPULoad5m     float64                    `json:"cpu_load_5m"`
-	RAMUsage      float64                    `json:"ram_usage"`
-	RAMUsedMB     int64                      `json:"ram_used_mb"`
-	DiskUsage     float64                    `json:"disk_usage"`   // o chinh (C:\ hoac /)
-	DiskUsedGB    float64                    `json:"disk_used_gb"` // o chinh
-	Disks         []DiskInfo                 `json:"disks"`        // tat ca o cung
-	NetInKbps     float64                    `json:"net_in_kbps"`
-	NetOutKbps    float64                    `json:"net_out_kbps"`
-	PingLatencyMs float64                    `json:"ping_latency_ms"`
-	UptimeSeconds int64                      `json:"uptime_seconds"`
-	AgentVersion  string                     `json:"agent_version"`
-	Processes     []ProcessInfo              `json:"processes"`
+	DisksHealth    []DiskHealth               `json:"disks_health"`
+	Connections    []Connection               `json:"connections"`
+	T2CollectedAt  string                     `json:"t2_collected_at,omitempty"`
+	EventLogStatus map[string]string          `json:"event_log_status,omitempty"`
+	WatchStatus    map[string]map[string]bool `json:"watch_status,omitempty"`
+	CPUUsage       float64                    `json:"cpu_usage"`
+	CPULoad1m      float64                    `json:"cpu_load_1m"`
+	CPULoad5m      float64                    `json:"cpu_load_5m"`
+	RAMUsage       float64                    `json:"ram_usage"`
+	RAMUsedMB      int64                      `json:"ram_used_mb"`
+	DiskUsage      float64                    `json:"disk_usage"`   // o chinh (C:\ hoac /)
+	DiskUsedGB     float64                    `json:"disk_used_gb"` // o chinh
+	Disks          []DiskInfo                 `json:"disks"`        // tat ca o cung
+	NetInKbps      float64                    `json:"net_in_kbps"`
+	NetOutKbps     float64                    `json:"net_out_kbps"`
+	PingLatencyMs  float64                    `json:"ping_latency_ms"`
+	UptimeSeconds  int64                      `json:"uptime_seconds"`
+	AgentVersion   string                     `json:"agent_version"`
+	Processes      []ProcessInfo              `json:"processes"`
 	// Nhiet do & GPU
 	CPUTempC       float64 `json:"cpu_temp_c,omitempty"`
 	GPUName        string  `json:"gpu_name,omitempty"`
@@ -143,6 +147,9 @@ func CollectMetrics(topN int) (*Metrics, error) {
 	// Nhiet do CPU & GPU
 	collectThermalGPU(m)
 
+	m.DisksHealth = collectDiskHealth()
+	m.Connections = collectConnections()
+	m.T2CollectedAt = time.Now().UTC().Format(time.RFC3339)
 	return m, nil
 }
 

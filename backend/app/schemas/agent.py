@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.monitoring import ConnectionIn, DiskHealthIn
+
 
 class HeartbeatIn(BaseModel):
     """Payload Agent gui moi 60s.
@@ -43,6 +45,11 @@ class HeartbeatIn(BaseModel):
     # Danh sach tat ca o cung (moi o la dict: mountpoint, total_gb, used_gb, free_gb, used_percent)
     disks: list[dict[str, Any]] | None = None
 
+    disks_health: list[DiskHealthIn] | None = Field(default=None, max_length=32)
+    connections: list[ConnectionIn] | None = Field(default=None, max_length=50)
+    t2_collected_at: str | None = Field(default=None, max_length=40)
+    event_log_status: dict[str, str] | None = None
+
     # Nested container from Go Agent
     metrics: dict[str, Any] | None = None
 
@@ -53,6 +60,7 @@ class HeartbeatIn(BaseModel):
             m = data["metrics"]
             merged = {**data}
             for k in [
+                "disks_health", "connections", "t2_collected_at", "event_log_status",
                 "cpu_usage",
                 "cpu_load_1m",
                 "cpu_load_5m",
