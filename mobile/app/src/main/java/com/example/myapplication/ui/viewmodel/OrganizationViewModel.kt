@@ -177,20 +177,20 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Đã tạo cụm thiết bị '$name' thành công!"
+                        successMessage = "Đã tạo nhóm thiết bị '$name' thành công!"
                     )
                     loadGroups()
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Tạo cụm thiết bị thất bại (${response.code()})"
+                        error = "Tạo nhóm thiết bị thất bại (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Không thể tạo cụm: ${e.message}"
+                    error = "Không thể tạo nhóm: ${e.message}"
                 )
             }
         }
@@ -204,20 +204,20 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Đã xóa cụm thiết bị thành công"
+                        successMessage = "Đã xóa nhóm thiết bị thành công"
                     )
                     loadGroups()
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Xóa cụm thất bại (${response.code()})"
+                        error = "Xóa nhóm thất bại (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Không thể xóa cụm: ${e.message}"
+                    error = "Không thể xóa nhóm: ${e.message}"
                 )
             }
         }
@@ -234,7 +234,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Đã cấp quyền $role cho thành viên trong cụm!"
+                        successMessage = "Đã cấp quyền $role cho thành viên trong nhóm!"
                     )
                     loadGroupMembers(groupId)
                 } else {
@@ -261,7 +261,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Đã xóa quyền thành viên khỏi cụm"
+                        successMessage = "Đã xóa quyền thành viên khỏi nhóm"
                     )
                     loadGroupMembers(groupId)
                 } else {
@@ -319,7 +319,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Đã xóa thành viên khỏi tổ chức"
+                        successMessage = "Đã xóa thành viên khỏi không gian làm việc"
                     )
                     loadMembers()
                 } else {
@@ -348,14 +348,14 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     tokenManager.saveOrgId("")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Bạn đã rời khỏi tổ chức thành công!"
+                        successMessage = "Bạn đã rời khỏi không gian làm việc thành công!"
                     )
                     loadData()
                     onLeft()
                 } else {
                     val errorMsg = when (response.code()) {
-                        403 -> "Chủ sở hữu (Owner) không thể rời tổ chức. Bạn cần chuyển quyền hoặc xóa tổ chức."
-                        else -> "Rời tổ chức thất bại (${response.code()})"
+                        403 -> "Chủ sở hữu (Owner) không thể rời không gian làm việc. Bạn cần chuyển quyền hoặc xóa không gian làm việc."
+                        else -> "Rời không gian thất bại (${response.code()})"
                     }
                     _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
                 }
@@ -363,7 +363,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Không thể rời tổ chức: ${e.message}"
+                    error = "Không thể rời không gian làm việc: ${e.message}"
                 )
             }
         }
@@ -412,14 +412,14 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         orgId = joinedOrgId,
-                        successMessage = "Đã tham gia tổ chức thành công!"
+                        successMessage = "Đã tham gia không gian làm việc thành công!"
                     )
                     loadData(targetOrgId = joinedOrgId)
                     onJoined(joinedOrgId)
                 } else {
                     val errorMsg = when (response.code()) {
                         404 -> "Mã mời không tồn tại hoặc đã hết hạn"
-                        409 -> "Bạn đã là thành viên của tổ chức này rồi"
+                        409 -> "Bạn đã là thành viên của không gian làm việc này rồi"
                         410 -> "Mã mời đã hết lượt sử dụng"
                         else -> "Tham gia thất bại (${response.code()})"
                     }
@@ -429,7 +429,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Không thể tham gia tổ chức: ${e.message}"
+                    error = "Không thể tham gia không gian làm việc: ${e.message}"
                 )
             }
         }
@@ -448,21 +448,21 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         orgId = created.id,
-                        successMessage = "Đã tạo tổ chức '$orgName' thành công!"
+                        successMessage = "Đã tạo không gian làm việc '$orgName' thành công!"
                     )
                     loadData(targetOrgId = created.id)
                     onCreated(created.id)
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Tạo tổ chức thất bại (${response.code()})"
+                        error = "Tạo không gian thất bại (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Không thể tạo tổ chức: ${e.message}"
+                    error = "Không thể tạo không gian làm việc: ${e.message}"
                 )
             }
         }

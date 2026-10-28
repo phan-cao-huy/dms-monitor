@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -18,7 +19,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-const AgentVersion = "1.1.0"
+const AgentVersion = "1.2.0"
 
 // DiskInfo chua thong tin 1 o cung / partition.
 type DiskInfo struct {
@@ -50,7 +51,7 @@ type Metrics struct {
 	// Nhiet do & GPU
 	CPUTempC       float64 `json:"cpu_temp_c,omitempty"`
 	GPUName        string  `json:"gpu_name,omitempty"`
-	GPUUsagePct    float64 `json:"gpu_usage_pct,omitempty"`
+	GPUUsagePct    float64 `json:"gpu_usage_pct"`
 	GPUTempC       float64 `json:"gpu_temp_c,omitempty"`
 	GPUVramTotalMB int64   `json:"gpu_vram_total_mb,omitempty"`
 	GPUVramUsedMB  int64   `json:"gpu_vram_used_mb,omitempty"`
@@ -58,12 +59,13 @@ type Metrics struct {
 
 // ProcessInfo chua thong tin 1 process.
 type ProcessInfo struct {
-	PID     int32   `json:"pid"`
-	Name    string  `json:"name"`
-	ExePath string  `json:"exe_path"`
-	CPUPct  float64 `json:"cpu_pct"`
-	RAMMB   float64 `json:"ram_mb"`
-	User    string  `json:"user"`
+	PID         int32    `json:"pid"`
+	Name        string   `json:"name"`
+	ExePath     string   `json:"exe_path"`
+	CPUPct      float64  `json:"cpu_pct"`
+	GPUUsagePct *float64 `json:"gpu_usage_pct"`
+	RAMMB       float64  `json:"ram_mb"`
+	User        string   `json:"user"`
 }
 
 // StaticInfo chua thong tin tinh cua may — chi gui 1 lan khi dang ky.
@@ -263,20 +265,58 @@ func collectNetSpeed() (inKbps, outKbps float64) {
 	return round2(float64(deltaIn) / 1024), round2(float64(deltaOut) / 1024)
 }
 
+type processSample struct {
+	created int64
+	total   float64
+}
+
+var processSamples = map[int32]processSample{}
+var processSampleTime time.Time
+var processSampleLock sync.Mutex
+
+func processCPUPercent(previous, current processSample, elapsed float64, logicalCPUs int) float64 {
+	if elapsed <= 0 || logicalCPUs <= 0 || previous.created != current.created || current.total < previous.total {
+		return 0
+	}
+	value := (current.total - previous.total) / elapsed / float64(logicalCPUs) * 100
+	if value > 100 {
+		return 100
+	}
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
 // collectTopProcesses lay top N process theo CPU%.
 func collectTopProcesses(topN int) []ProcessInfo {
+	processSampleLock.Lock()
+	defer processSampleLock.Unlock()
+	now := time.Now()
+	elapsed := now.Sub(processSampleTime).Seconds()
+	nextSamples := map[int32]processSample{}
 	procs, err := process.Processes()
 	if err != nil {
 		return nil
 	}
 
 	var infos []ProcessInfo
+	gpuUsage := getProcessGPUUsage()
 	for _, p := range procs {
 		name, _ := p.Name()
 		if name == "" {
 			continue
 		}
-		cpuPct, _ := p.CPUPercent()
+		cpuPct := 0.0
+		times, cpuErr := p.Times()
+		created, createErr := p.CreateTime()
+		if cpuErr == nil && createErr == nil {
+			current := processSample{created: created, total: times.Total()}
+			nextSamples[p.Pid] = current
+			if previous, ok := processSamples[p.Pid]; ok && !processSampleTime.IsZero() {
+				cpuPct = processCPUPercent(previous, current, elapsed, runtime.NumCPU())
+			}
+		}
 		memInfo, _ := p.MemoryInfo()
 		exePath, _ := p.Exe()
 		user, _ := p.Username()
@@ -288,14 +328,63 @@ func collectTopProcesses(topN int) []ProcessInfo {
 		infos = append(infos, ProcessInfo{
 			PID: p.Pid, Name: name, ExePath: exePath,
 			CPUPct: round2(cpuPct), RAMMB: ramMB, User: user,
+			GPUUsagePct: gpuValue(gpuUsage, p.Pid),
 		})
 	}
 
-	sort.Slice(infos, func(i, j int) bool { return infos[i].CPUPct > infos[j].CPUPct })
-	if len(infos) > topN {
-		infos = infos[:topN]
+	processSamples = nextSamples
+	processSampleTime = now
+	return selectTopProcesses(infos, topN)
+}
+
+func gpuValue(values map[int32]float64, pid int32) *float64 {
+	value, ok := values[pid]
+	if !ok {
+		return nil
 	}
-	return infos
+	return &value
+}
+
+// Union keeps memory/GPU-heavy processes even when they have low CPU usage.
+func selectTopProcesses(infos []ProcessInfo, topN int) []ProcessInfo {
+	if topN <= 0 {
+		return nil
+	}
+	selected := map[int32]ProcessInfo{}
+	rankings := []func(i, j int) bool{
+		func(i, j int) bool { return infos[i].CPUPct > infos[j].CPUPct },
+		func(i, j int) bool { return infos[i].RAMMB > infos[j].RAMMB },
+		func(i, j int) bool {
+			a, b := infos[i].GPUUsagePct, infos[j].GPUUsagePct
+			if a == nil {
+				return false
+			}
+			if b == nil {
+				return true
+			}
+			return *a > *b
+		},
+	}
+	for _, less := range rankings {
+		sort.SliceStable(infos, less)
+		for i, p := range infos {
+			if i >= topN {
+				break
+			}
+			selected[p.PID] = p
+		}
+	}
+	result := make([]ProcessInfo, 0, len(selected))
+	for _, p := range selected {
+		result = append(result, p)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].CPUPct == result[j].CPUPct {
+			return result[i].PID < result[j].PID
+		}
+		return result[i].CPUPct > result[j].CPUPct
+	})
+	return result
 }
 
 func round2(v float64) float64 { return float64(int(v*100)) / 100 }

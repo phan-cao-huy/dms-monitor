@@ -8,7 +8,7 @@ class AlertRuleCreate(BaseModel):
     device_id: int | None = None
     rule_name: str | None = Field(default=None, max_length=150)
     metric_type: str = Field(
-        pattern=r"^(CPU|RAM|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING)$"
+        pattern=r"^(CPU|RAM|GPU|DISK|NET_IN|NET_OUT|OFFLINE|SERVICE|PROCESS_MISSING)$"
     )
     condition: str = Field(default=">", pattern=r"^(>|>=|<|<=)$")
     threshold: float | None = Field(default=None, allow_inf_nan=False)
@@ -17,6 +17,7 @@ class AlertRuleCreate(BaseModel):
     duration_minutes: int = Field(default=1, ge=1)
     severity: str = Field(default="WARNING", pattern=r"^(INFO|WARNING|CRITICAL)$")
     cooldown_minutes: int = Field(default=30, ge=1)
+    is_active: bool = True
 
     @model_validator(mode="after")
     def validate_target(self):
@@ -28,7 +29,23 @@ class AlertRuleCreate(BaseModel):
             raise ValueError("PROCESS_MISSING requires process_name")
         if self.metric_type not in ("SERVICE", "PROCESS_MISSING") and self.threshold is None:
             raise ValueError("Numeric rules require threshold")
+        if self.threshold is not None and self.metric_type not in ("SERVICE", "PROCESS_MISSING"):
+            if self.threshold < 0:
+                raise ValueError("Threshold must be nonnegative")
+            if self.metric_type in ("CPU", "RAM", "GPU", "DISK") and self.threshold > 100:
+                raise ValueError("Percentage threshold must be between 0 and 100")
+            if self.metric_type == "OFFLINE" and self.threshold <= 0:
+                raise ValueError("Offline threshold must be positive")
         return self
+
+
+class AlertRuleUpdate(BaseModel):
+    rule_name: str | None = Field(default=None, max_length=150)
+    threshold: float | None = Field(default=None, allow_inf_nan=False)
+    duration_minutes: int | None = Field(default=None, ge=1)
+    cooldown_minutes: int | None = Field(default=None, ge=1)
+    severity: str | None = Field(default=None, pattern=r"^(INFO|WARNING|CRITICAL)$")
+    is_active: bool | None = None
 
 
 class AlertRuleOut(BaseModel):
@@ -58,6 +75,7 @@ class AlertHistoryOut(BaseModel):
     rule_id: int | None
     severity: str
     message: str
+    message_en: str | None = None
     metric_value: float | None
     threshold_value: float | None
     acknowledged_by: int | None

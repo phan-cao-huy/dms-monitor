@@ -13,3 +13,5 @@ func getWindowsWmiCPUTemp() (float64, error) {
 func hasNvidiaSmi() bool {
 	return false
 }
+
+func getProcessGPUUsage() map[int32]float64 { return nil }

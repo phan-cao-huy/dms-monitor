@@ -8,6 +8,7 @@ from sqlalchemy import or_, select
 from app.db.session import SessionLocal
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState, MaintenanceWindow
 from app.models.device import Device, DeviceMetric
+from app.services.alert_text import alert_text
 
 COMPARATORS = {">": operator.gt, ">=": operator.ge, "<": operator.lt, "<=": operator.le}
 METRIC_FIELDS = {
@@ -30,6 +31,8 @@ def rule_observation(rule, device, metric, now):
         seconds=120
     ):
         return None, None
+    elif rule.metric_type == "GPU":
+        value = (device.static_info or {}).get("gpu_usage_pct")
     elif rule.metric_type in METRIC_FIELDS:
         if metric is None or now - metric.created_at > timedelta(seconds=120):
             return None, None
@@ -114,9 +117,14 @@ async def evaluate_device_rules(db, device, rules, now):
             minutes=rule.duration_minutes
         ):
             continue
+        copy = alert_text(rule.metric_type,device.device_name,value,rule.threshold,rule.condition,
+                          rule.duration_minutes,rule.service_name,rule.process_name,device.top_processes)
         if latest is not None:
             if latest.resolved_at is None:
                 latest.metric_value = value
+                latest.threshold_value = rule.threshold
+                latest.message = f"{copy['title_vi']}\n{copy['body_vi']}"
+                latest.message_en = f"{copy['title_en']}\n{copy['body_en']}"
                 continue
             if now - latest.created_at < timedelta(minutes=rule.cooldown_minutes):
                 continue
@@ -125,7 +133,8 @@ async def evaluate_device_rules(db, device, rules, now):
                 device_id=device.device_id,
                 rule_id=rule.rule_id,
                 severity=rule.severity,
-                message=f"{rule.rule_name or rule.metric_type}: {device.device_name} ({value:.2f})",
+                message=f"{copy['title_vi']}\n{copy['body_vi']}",
+                message_en=f"{copy['title_en']}\n{copy['body_en']}",
                 metric_value=value,
                 threshold_value=rule.threshold,
                 notification_status="PENDING",

@@ -147,7 +147,7 @@ fun OrganizationScreen(
     onCreateOrg: (String, String?) -> Unit,
     onClearMessages: () -> Unit
 ) {
-    val tabs = listOf("Thành viên", "Cụm thiết bị", "Lời mời", "Tham gia")
+    val tabs = listOf("Thành viên", "Nhóm thiết bị", "Lời mời", "Tham gia")
     var selectedTab by remember { mutableIntStateOf(0) }
 
     var popupMessage by remember { mutableStateOf<String?>(null) }
@@ -191,11 +191,11 @@ fun OrganizationScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "🏢 Quản lý tổ chức",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Default.SpaceDashboard, contentDescription = null, modifier = Modifier.size(26.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("Quản lý không gian", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                     Box {
                         Surface(
@@ -212,14 +212,14 @@ fun OrganizationScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Default.Business,
+                                    Icons.Default.SpaceDashboard,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = uiState.orgName ?: "Chưa tham gia tổ chức nào",
+                                    text = uiState.orgName ?: "Chưa tham gia không gian làm việc nào",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -228,7 +228,7 @@ fun OrganizationScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Icon(
                                         Icons.Default.ArrowDropDown,
-                                        contentDescription = "Chuyển tổ chức",
+                                        contentDescription = "Chuyển không gian",
                                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -241,7 +241,7 @@ fun OrganizationScreen(
                             onDismissRequest = { showOrgMenu = false }
                         ) {
                             Text(
-                                text = "Chọn tổ chức quản lý",
+                                text = "Chọn không gian làm việc quản lý",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -316,7 +316,7 @@ fun OrganizationScreen(
                 0 -> MembersTab(
                     members = uiState.members,
                     currentUserId = currentUserId,
-                    orgName = uiState.orgName ?: "tổ chức",
+                    orgName = uiState.orgName ?: "không gian làm việc",
                     onUpdateRole = onUpdateRole,
                     onRemoveMember = onRemoveMember,
                     onLeaveOrg = onLeaveOrg
@@ -344,7 +344,7 @@ fun OrganizationScreen(
     }
 }
 
-// === Tab 0: Danh sách thành viên + Tự rời tổ chức ===
+// === Tab 0: Danh sách thành viên + Tự rời không gian làm việc ===
 @Composable
 fun MembersTab(
     members: List<OrgMember>,
@@ -386,7 +386,7 @@ fun MembersTab(
                                 Text(role, fontWeight = FontWeight.Medium)
                                 Text(
                                     text = when (role) {
-                                        "Admin" -> "Quản trị viên - toàn quyền trừ xóa tổ chức"
+                                        "Admin" -> "Quản trị viên - toàn quyền trừ xóa không gian làm việc"
                                         "Manager" -> "Quản lý - xem và điều khiển thiết bị"
                                         else -> "Người xem - chỉ xem thông tin"
                                     },
@@ -418,7 +418,7 @@ fun MembersTab(
         AlertDialog(
             onDismissRequest = { showRemoveDialog = null },
             title = { Text("Xóa thành viên") },
-            text = { Text("Bạn chắc chắn muốn xóa '${member.fullName ?: member.username}' khỏi tổ chức?") },
+            text = { Text("Bạn chắc chắn muốn xóa '${member.fullName ?: member.username}' khỏi không gian làm việc?") },
             confirmButton = {
                 Button(
                     onClick = { onRemoveMember(member.userId); showRemoveDialog = null },
@@ -435,9 +435,9 @@ fun MembersTab(
     if (showLeaveDialog) {
         AlertDialog(
             onDismissRequest = { showLeaveDialog = false },
-            title = { Text("Rời tổ chức") },
+            title = { Text("Rời không gian") },
             text = {
-                Text("Bạn có chắc chắn muốn rời khỏi '$orgName'?\nBạn sẽ không thể xem hoặc điều khiển các thiết bị trong tổ chức này nữa.")
+                Text("Bạn có chắc chắn muốn rời khỏi '$orgName'?\nBạn sẽ không thể xem hoặc điều khiển các thiết bị trong không gian làm việc này nữa.")
             },
             confirmButton = {
                 Button(
@@ -446,7 +446,7 @@ fun MembersTab(
                         onLeaveOrg()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Rời tổ chức") }
+                ) { Text("Rời không gian") }
             },
             dismissButton = {
                 TextButton(onClick = { showLeaveDialog = false }) { Text("Hủy") }
@@ -478,7 +478,7 @@ fun MembersTab(
                     fontWeight = FontWeight.Bold
                 )
 
-                // Nút tự rời tổ chức nếu không phải Owner
+                // Nút tự rời không gian làm việc nếu không phải Owner
                 if (myMember != null && myMember.role != "Owner") {
                     OutlinedButton(
                         onClick = { showLeaveDialog = true },
@@ -487,7 +487,7 @@ fun MembersTab(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Rời tổ chức", fontSize = 12.sp)
+                        Text("Rời không gian", fontSize = 12.sp)
                     }
                 }
             }
@@ -496,10 +496,10 @@ fun MembersTab(
         items(members) { member ->
             val isThisMe = member.userId == currentUserId
             val roleColor = when (member.role) {
-                "Owner" -> Color(0xFFD32F2F)
-                "Admin" -> Color(0xFFE65100)
-                "Manager" -> Color(0xFF1565C0)
-                else -> Color.Gray
+                "Owner" -> Color(0xFFAE5045)
+                "Admin" -> Color(0xFFA87836)
+                "Manager" -> Color(0xFF315C41)
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
             val roleIcon = when (member.role) {
                 "Owner" -> Icons.Default.Star
@@ -576,7 +576,7 @@ fun MembersTab(
     }
 }
 
-// === Tab 1: Phân cụm thiết bị & Phân quyền quản lý cụ thể ===
+// === Tab 1: Phân nhóm thiết bị & Quyền truy cập quản lý cụ thể ===
 @Composable
 fun GroupsTab(
     groups: List<DeviceGroup>,
@@ -596,19 +596,19 @@ fun GroupsTab(
     var selectedUserId by remember { mutableStateOf<Int?>(null) }
     var selectedGroupRole by remember { mutableStateOf("Viewer") }
 
-    // Dialog tạo cụm mới
+    // Dialog tạo nhóm mới
     if (showCreateGroupDialog) {
         AlertDialog(
             onDismissRequest = { showCreateGroupDialog = false },
-            title = { Text("Tạo cụm thiết bị mới") },
+            title = { Text("Tạo nhóm thiết bị mới") },
             text = {
                 Column {
-                    Text("Phân cụm giúp bạn nhóm các máy tính lại và ủy quyền cho người khác quản lý hoặc xem cụ thể:", style = MaterialTheme.typography.bodySmall)
+                    Text("Phân nhóm giúp bạn nhóm các máy tính lại và ủy quyền cho người khác quản lý hoặc xem cụ thể:", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = newGroupName,
                         onValueChange = { newGroupName = it },
-                        label = { Text("Tên cụm (VD: Phòng Kế Toán, Server Web)") },
+                        label = { Text("Tên nhóm (VD: Phòng Kế Toán, Server Web)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -630,7 +630,7 @@ fun GroupsTab(
                         newGroupDesc = ""
                     },
                     enabled = newGroupName.isNotBlank()
-                ) { Text("Tạo cụm") }
+                ) { Text("Tạo nhóm") }
             },
             dismissButton = {
                 TextButton(onClick = { showCreateGroupDialog = false }) { Text("Hủy") }
@@ -638,14 +638,14 @@ fun GroupsTab(
         )
     }
 
-    // Dialog cấp quyền người dùng vào cụm
+    // Dialog cấp quyền người dùng vào nhóm
     assigningGroupId?.let { grpId ->
         AlertDialog(
             onDismissRequest = { assigningGroupId = null; selectedUserId = null },
-            title = { Text("Cấp quyền thành viên vào cụm") },
+            title = { Text("Cấp quyền thành viên vào nhóm") },
             text = {
                 Column {
-                    Text("Chọn thành viên trong tổ chức:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("Chọn thành viên trong không gian làm việc:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     allOrgMembers.forEach { m ->
@@ -670,7 +670,7 @@ fun GroupsTab(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Quyền hạn trên các máy thuộc cụm này:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("Quyền hạn trên các máy thuộc nhóm này:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -729,7 +729,7 @@ fun GroupsTab(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tạo cụm thiết bị mới")
+                    Text("Tạo nhóm thiết bị mới")
                 }
             }
         }
@@ -740,10 +740,10 @@ fun GroupsTab(
                     Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Category, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Chưa có cụm thiết bị nào", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Chưa có nhóm thiết bị nào", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Tạo cụm thiết bị để nhóm các máy lại (VD: Server, Kế toán, Đồ họa) và phân quyền cho người khác chỉ quản lý hoặc chỉ xem các máy đó.",
+                            text = "Tạo nhóm thiết bị để nhóm các máy lại (VD: Server, Kế toán, Đồ họa) và cấp quyền cho thành viên chỉ quản lý hoặc chỉ xem các máy đó.",
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -779,18 +779,18 @@ fun GroupsTab(
 
                         if (isOwnerOrAdmin) {
                             IconButton(onClick = { onDeleteGroup(group.groupId) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Xóa cụm", tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.Delete, contentDescription = "Xóa nhóm", tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
-                    Text("Thành viên được phân quyền trong cụm:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("Thành viên được quyền truy cập trong nhóm:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     if (membersInGroup.isEmpty()) {
-                        Text("Chưa gán quyền cho ai (Chỉ Owner & Admin thấy các máy trong cụm này)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Chưa gán quyền cho ai (Chỉ Owner & Admin thấy các máy trong nhóm này)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         membersInGroup.forEach { gm ->
                             Row(
@@ -807,12 +807,12 @@ fun GroupsTab(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
-                                        color = if (gm.role == "Manager") Color(0xFF1565C0).copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.15f)
+                                        color = if (gm.role == "Manager") Color(0xFF315C41).copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
                                     ) {
                                         Text(
                                             text = if (gm.role == "Manager") "Quản lý (Xem & Lệnh)" else "Chỉ xem",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (gm.role == "Manager") Color(0xFF1565C0) else Color.DarkGray,
+                                            color = if (gm.role == "Manager") Color(0xFF315C41) else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
@@ -838,7 +838,7 @@ fun GroupsTab(
                         ) {
                             Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Cấp quyền cho thành viên vào cụm này")
+                            Text("Cấp quyền cho thành viên vào nhóm này")
                         }
                     }
                 }
@@ -1022,7 +1022,7 @@ fun InvitationsTab(
     }
 }
 
-// === Tab 3: Tham gia tổ chức ===
+// === Tab 3: Tham gia không gian ===
 @Composable
 fun JoinTab(
     onJoinOrg: (String) -> Unit,
@@ -1043,7 +1043,7 @@ fun JoinTab(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "🔑 Tham gia bằng mã mời",
+                    text = "Tham gia bằng mã mời",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -1074,7 +1074,7 @@ fun JoinTab(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "➕ Tạo tổ chức mới",
+                    text = "Tạo không gian mới",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -1082,8 +1082,8 @@ fun JoinTab(
                 OutlinedTextField(
                     value = orgName,
                     onValueChange = { orgName = it },
-                    label = { Text("Tên tổ chức") },
-                    leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                    label = { Text("Tên không gian làm việc") },
+                    leadingIcon = { Icon(Icons.Default.SpaceDashboard, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1107,7 +1107,7 @@ fun JoinTab(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tạo tổ chức")
+                    Text("Tạo không gian")
                 }
             }
         }

@@ -158,6 +158,7 @@ def test_auth_and_organization_models_match_dms01_tables():
             "rule_id",
             "severity",
             "message",
+            "message_en",
             "metric_value",
             "threshold_value",
             "acknowledged_by",

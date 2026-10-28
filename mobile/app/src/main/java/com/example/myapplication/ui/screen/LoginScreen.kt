@@ -43,30 +43,17 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(32.dp),
+            .imePadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo / Title
-        Text(
-            text = "🖥️",
-            fontSize = 64.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "DMS Monitor",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Giám sát máy tính từ xa",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Spacer(modifier = Modifier.height(24.dp))
+        AuthBrand("Một tầm nhìn. Mọi thiết bị.", "Theo dõi hệ thống của bạn ở bất cứ đâu.")
+        Spacer(Modifier.height(28.dp))
+        Text("Chào mừng trở lại", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        Text("Đăng nhập để mở không gian quản lý của bạn.", style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(24.dp))
 
         // Username / Email
         OutlinedTextField(
@@ -144,7 +131,7 @@ fun LoginScreen(
             onClick = { onLogin(identifier, password) },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(54.dp),
             enabled = identifier.isNotBlank() && password.isNotBlank() && !uiState.isLoading
         ) {
             if (uiState.isLoading) {

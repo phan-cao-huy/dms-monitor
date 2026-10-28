@@ -136,6 +136,15 @@ data class Device(
     @SerializedName("group_name") val groupName: String? = null
 )
 
+data class DiskInfo(
+    val mountpoint: String? = null,
+    val fstype: String? = null,
+    @SerializedName("total_gb") val totalGb: Float? = null,
+    @SerializedName("used_gb") val usedGb: Float? = null,
+    @SerializedName("free_gb") val freeGb: Float? = null,
+    @SerializedName("used_percent") val usedPercent: Float? = null
+)
+
 data class DeviceDetail(
     @SerializedName("device_id", alternate = ["id"]) val id: String = "",
     @SerializedName("device_name", alternate = ["name"]) val name: String = "",
@@ -144,6 +153,7 @@ data class DeviceDetail(
     @SerializedName("group_id") val groupId: String? = null,
     @SerializedName("group_name") val groupName: String? = null,
     val description: String? = null,
+    val disks: List<DiskInfo>? = null,
     @SerializedName("cpu_usage") val cpuUsage: Float? = null,
     @SerializedName("ram_usage") val ramUsage: Float? = null,
     @SerializedName("disk_usage") val diskUsage: Float? = null,
@@ -174,6 +184,7 @@ data class ToggleMonitoringResponse(
 
 data class StaticInfo(
     val hostname: String? = null,
+    @SerializedName("agent_version") val agentVersion: String? = null,
     @SerializedName("os_name") val osName: String? = null,
     @SerializedName("os_version") val osVersion: String? = null,
     @SerializedName("kernel_version") val kernelVersion: String? = null,
@@ -206,7 +217,7 @@ data class CreateDeviceResponse(
 
 // === Metrics ===
 data class Metric(
-    val timestamp: String,
+    @SerializedName("created_at", alternate = ["timestamp", "hour_bucket"]) val timestamp: String = "",
     @SerializedName("cpu_usage") val cpuUsage: Float,
     @SerializedName("ram_usage") val ramUsage: Float,
     @SerializedName("disk_usage") val diskUsage: Float? = null,
@@ -221,9 +232,12 @@ data class Metric(
 data class ProcessInfo(
     val pid: Int,
     val name: String,
-    @SerializedName("cpu_percent") val cpuPercent: Float,
+    @SerializedName("cpu_percent", alternate = ["cpu_pct"]) val cpuPercent: Float,
     @SerializedName("ram_mb") val ramMb: Float,
-    val status: String? = null
+    val status: String? = null,
+    @SerializedName("gpu_usage_pct") val gpuUsagePct: Float? = null,
+    @SerializedName("exe_path") val exePath: String? = null,
+    val user: String? = null
 )
 
 // === Command ===
@@ -234,7 +248,7 @@ data class CommandRequest(
 )
 
 data class Command(
-    val id: Int,
+    @SerializedName("command_id", alternate = ["id"]) val id: Int,
     @SerializedName("command_type") val commandType: String,
     val parameters: Map<String, Any>? = null,
     val reason: String? = null,
@@ -247,12 +261,30 @@ data class Command(
 
 // === Alert ===
 data class AlertRule(
-    val id: String? = null,
-    val metric: String,
-    val operator: String,
-    val threshold: Float,
-    @SerializedName("duration_seconds") val durationSeconds: Int? = null,
-    val enabled: Boolean = true
+    @SerializedName("rule_id") val ruleId: Int? = null,
+    @SerializedName("device_id") val deviceId: Int? = null,
+    @SerializedName("group_id") val groupId: Int? = null,
+    @SerializedName("rule_name") val ruleName: String? = null,
+    @SerializedName("metric_type") val metricType: String = "CPU",
+    val condition: String = ">=",
+    val threshold: Float? = 90f,
+    @SerializedName("duration_minutes") val durationMinutes: Int = 1,
+    @SerializedName("cooldown_minutes") val cooldownMinutes: Int = 30,
+    val severity: String = "WARNING",
+    @SerializedName("is_active") val isActive: Boolean = true
+)
+
+data class AlertRuleUpdate(
+    val threshold: Float? = null,
+    @SerializedName("duration_minutes") val durationMinutes: Int,
+    @SerializedName("cooldown_minutes") val cooldownMinutes: Int,
+    @SerializedName("is_active") val isActive: Boolean
+)
+
+data class FcmRegistration(
+    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("fcm_token") val fcmToken: String,
+    @SerializedName("device_info") val deviceInfo: String = android.os.Build.MODEL
 )
 
 data class Alert(
@@ -260,6 +292,7 @@ data class Alert(
     @SerializedName("device_id") val deviceId: String = "",
     @SerializedName("device_name") val deviceName: String? = null,
     val message: String = "",
+    @SerializedName("message_en") val messageEn: String? = null,
     val severity: String? = null,
     val resolved: Boolean = false,
     @SerializedName("created_at") val createdAt: String? = null,

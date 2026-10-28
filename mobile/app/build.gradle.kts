@@ -6,16 +6,19 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+if (file("google-services.json").isFile) apply(plugin = "com.google.gms.google-services")
+
 android {
     namespace = "com.example.myapplication"
     compileSdk = 36
 
     defaultConfig {
+        buildConfigField("boolean", "FIREBASE_CONFIGURED", file("google-services.json").isFile.toString())
         applicationId = "com.example.myapplication"
         minSdk = 29
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.0.10"
+        versionCode = 21
+        versionName = "1.0.20"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -60,6 +63,8 @@ android {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+    implementation("com.google.firebase:firebase-messaging")
     // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

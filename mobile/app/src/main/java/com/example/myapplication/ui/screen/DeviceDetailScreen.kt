@@ -2,6 +2,12 @@ package com.example.myapplication.ui.screen
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -34,6 +41,7 @@ import kotlin.math.roundToInt
 @Composable
 fun DeviceDetailScreen(
     uiState: DeviceDetailUiState,
+    alerts: List<Alert> = emptyList(),
     deviceId: String,
     groups: List<com.example.myapplication.data.model.DeviceGroup> = emptyList(),
     onBack: () -> Unit,
@@ -85,7 +93,7 @@ fun DeviceDetailScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -137,6 +145,10 @@ fun DeviceDetailScreen(
             when (uiState.selectedTab) {
                 0 -> OverviewTab(
                     device = uiState.device,
+                    metrics = uiState.metrics,
+                    alerts = alerts,
+                    onViewMetrics = { onTabSelect(1) },
+                    onViewProcesses = { onTabSelect(2) },
                     groups = groups,
                     onToggleMonitoring = { enable -> onToggleMonitoring?.invoke(deviceId, enable) },
                     onUpdateDeviceGroup = { grpId -> onUpdateDeviceGroup(deviceId, grpId) }
@@ -144,6 +156,7 @@ fun DeviceDetailScreen(
                 1 -> MetricsTab(uiState.metrics)
                 2 -> ProcessesTab(
                     processes = uiState.processes,
+                    totalRamMb = uiState.device?.staticInfo?.ramTotalMb,
                     deviceId = deviceId,
                     isMonitoring = uiState.device?.isMonitoring ?: true,
                     onSendCommand = onSendCommand
@@ -158,311 +171,11 @@ fun DeviceDetailScreen(
 // TAB 0: TỔNG QUAN
 // ============================================================
 @Composable
-fun OverviewTab(
-    device: DeviceDetail?,
-    groups: List<com.example.myapplication.data.model.DeviceGroup> = emptyList(),
-    onToggleMonitoring: ((Boolean?) -> Unit)? = null,
-    onUpdateDeviceGroup: (Int?) -> Unit = {}
-) {
-    if (device == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Đang tải...") }
-        return
-    }
-
-    val cpuTemp = device.cpuTempC ?: device.staticInfo?.cpuTempC
-    val gpuName = device.gpuName ?: device.staticInfo?.gpuName
-    val gpuUsage = device.gpuUsagePct ?: device.staticInfo?.gpuUsagePct
-    val gpuTemp = device.gpuTempC ?: device.staticInfo?.gpuTempC
-    val gpuVramTotal = device.gpuVramTotalMB ?: device.staticInfo?.gpuVramTotalMB
-    val gpuVramUsed = device.gpuVramUsedMB ?: device.staticInfo?.gpuVramUsedMB
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Status + uptime card
-        item {
-            val statusColor = when (device.status) {
-                "Online" -> Color(0xFF4CAF50)
-                "Warning" -> Color(0xFFFF9800)
-                "Paused" -> Color(0xFFFF9800)
-                else -> Color.Gray
-            }
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier.size(14.dp).background(statusColor, shape = RoundedCornerShape(7.dp))
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            if (device.status == "Paused") "Đang tạm dừng theo dõi" else device.status,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor
-                        )
-                        device.lastHeartbeat?.let {
-                            Text("Heartbeat: ${it.take(19).replace('T', ' ')}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    // Uptime
-                    device.uptimeSeconds?.let { uptime ->
-                        val d = uptime / 86400; val h = (uptime % 86400) / 3600; val m = (uptime % 3600) / 60
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("Uptime", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${if (d > 0) "${d}d " else ""}${h}h ${m}m", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Monitoring Control Card (Bật / Tắt theo dõi tiến trình máy tính)
-        item {
-            val isMonitoring = device.isMonitoring
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isMonitoring) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            if (isMonitoring) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = null,
-                            tint = if (isMonitoring) MaterialTheme.colorScheme.primary else Color.Gray,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                "Theo dõi máy tính",
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                if (isMonitoring)
-                                    "Đang bật: Thu thập tiến trình, CPU, RAM, Disk"
-                                else
-                                    "Đang tắt: Ngừng quét tiến trình & tài nguyên",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isMonitoring) Color(0xFF2E7D32) else Color(0xFFE65100)
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = isMonitoring,
-                        onCheckedChange = { checked ->
-                            onToggleMonitoring?.invoke(checked)
-                        }
-                    )
-                }
-            }
-        }
-
-        // Cụm thiết bị card
-        item {
-            var showGroupDialog by remember { mutableStateOf(false) }
-            var selectedGrpId by remember { mutableStateOf(device.groupId?.toIntOrNull()) }
-
-            if (showGroupDialog) {
-                AlertDialog(
-                    onDismissRequest = { showGroupDialog = false },
-                    title = { Text("Phân cụm thiết bị") },
-                    text = {
-                        Column {
-                            Text("Gán máy này vào cụm để phân quyền cụ thể cho thành viên:", style = MaterialTheme.typography.bodySmall)
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedGrpId = null }
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = selectedGrpId == null || selectedGrpId == 0,
-                                    onClick = { selectedGrpId = null }
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Chưa phân cụm (Mọi người đều thấy)")
-                            }
-                            groups.forEach { grp ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedGrpId = grp.groupId }
-                                        .padding(vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = selectedGrpId == grp.groupId,
-                                        onClick = { selectedGrpId = grp.groupId }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("🏷️ ${grp.groupName}")
-                                }
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            showGroupDialog = false
-                            onUpdateDeviceGroup(selectedGrpId)
-                        }) { Text("Lưu thay đổi") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showGroupDialog = false }) { Text("Hủy") }
-                    }
-                )
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Category, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text("Cụm thiết bị", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(device.groupName ?: "Chưa phân cụm", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-
-                    if (groups.isNotEmpty()) {
-                        OutlinedButton(
-                            onClick = {
-                                selectedGrpId = device.groupId?.toIntOrNull()
-                                showGroupDialog = true
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
-                        ) {
-                            Text("Đổi cụm", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Resource usage bars
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Tài nguyên hiện tại", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val cpuLabel = "CPU" + if (cpuTemp != null && cpuTemp > 0) " (${cpuTemp.roundToInt()}°C)" else ""
-                    ResourceBar(label = cpuLabel, value = device.cpuUsage ?: 0f)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    ResourceBar(label = "RAM", value = device.ramUsage ?: 0f)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    ResourceBar(label = "Disk (C:)", value = device.diskUsage ?: 0f)
-
-                    // GPU bar nếu có
-                    if (gpuUsage != null && gpuUsage > 0) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        val gpuLabel = "GPU" +
-                            (if (gpuTemp != null && gpuTemp > 0) " (${gpuTemp.roundToInt()}°C)" else "") +
-                            (if (gpuVramUsed != null && gpuVramTotal != null)
-                                " · VRAM $gpuVramUsed/$gpuVramTotal MB" else "")
-                        ResourceBar(label = gpuLabel, value = gpuUsage)
-                    }
-
-                    // Network
-                    if (device.netInKbps != null || device.netOutKbps != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        HorizontalDivider()
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.ArrowDownward, null, tint = Color(0xFF2196F3), modifier = Modifier.size(16.dp))
-                                Text("${device.netInKbps?.let { "%.1f".format(it) } ?: "--"} kbps", style = MaterialTheme.typography.bodySmall)
-                                Text("Download", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.ArrowUpward, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
-                                Text("${device.netOutKbps?.let { "%.1f".format(it) } ?: "--"} kbps", style = MaterialTheme.typography.bodySmall)
-                                Text("Upload", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // GPU info card
-        if (!gpuName.isNullOrBlank()) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Memory, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Card đồ họa (GPU)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        InfoRow("Tên GPU", gpuName)
-                        gpuUsage?.let { InfoRow("GPU Usage", "%.1f%%".format(it)) }
-                        gpuTemp?.let { if (it > 0) InfoRow("Nhiệt độ GPU", "${it.roundToInt()}°C") }
-                        if (gpuVramTotal != null) {
-                            val used = gpuVramUsed ?: 0
-                            InfoRow("VRAM", "$used MB / $gpuVramTotal MB")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Static hardware info
-        device.staticInfo?.let { info ->
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Computer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Thông tin phần cứng", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        InfoRow("Hostname", info.hostname ?: "--")
-                        InfoRow("Hệ điều hành", "${info.osName ?: "--"} ${info.osVersion ?: ""}".trim())
-                        info.kernelVersion?.let { InfoRow("Kernel", it) }
-                        InfoRow("CPU", "${info.cpuModel ?: "--"} (${info.cpuCores ?: 0} cores)")
-                        InfoRow("RAM", "${(info.ramTotalMb ?: 0) / 1024} GB (${info.ramTotalMb ?: 0} MB)")
-                        InfoRow("Disk", "${info.diskTotalGb ?: 0} GB")
-                        info.gpuName?.let { if (it.isNotBlank()) InfoRow("GPU", it) }
-                        InfoRow("IP nội bộ", info.ipPrivate ?: "--")
-                        InfoRow("IP công khai", info.ipPublic ?: "--")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun ResourceBar(label: String, value: Float) {
     val color = when {
-        value >= 90f -> Color(0xFFF44336)
-        value >= 70f -> Color(0xFFFF9800)
-        else -> Color(0xFF4CAF50)
+        value >= 90f -> Color(0xFFBD6254)
+        value >= 70f -> Color(0xFFB58B45)
+        else -> Color(0xFF6C9D61)
     }
     val animatedValue by animateFloatAsState(targetValue = value / 100f, animationSpec = tween(600), label = "bar")
 
@@ -520,7 +233,7 @@ fun MetricsTab(metrics: List<Metric>) {
                 title = "CPU Usage",
                 unit = "%",
                 values = metrics.map { it.cpuUsage },
-                color = Color(0xFF2196F3),
+                color = Color(0xFF608A84),
                 maxY = 100f
             )
         }
@@ -529,7 +242,7 @@ fun MetricsTab(metrics: List<Metric>) {
                 title = "RAM Usage",
                 unit = "%",
                 values = metrics.map { it.ramUsage },
-                color = Color(0xFF4CAF50),
+                color = Color(0xFF6C9D61),
                 maxY = 100f
             )
         }
@@ -538,7 +251,7 @@ fun MetricsTab(metrics: List<Metric>) {
                 title = "Disk Usage",
                 unit = "%",
                 values = metrics.mapNotNull { it.diskUsage },
-                color = Color(0xFFFF9800),
+                color = Color(0xFFB58B45),
                 maxY = 100f
             )
         }
@@ -547,7 +260,7 @@ fun MetricsTab(metrics: List<Metric>) {
                 title = "Network In",
                 unit = " kbps",
                 values = metrics.mapNotNull { it.netInKbps },
-                color = Color(0xFF9C27B0)
+                color = Color(0xFF8A7896)
             )
         }
         item {
@@ -555,7 +268,7 @@ fun MetricsTab(metrics: List<Metric>) {
                 title = "Network Out",
                 unit = " kbps",
                 values = metrics.mapNotNull { it.netOutKbps },
-                color = Color(0xFFE91E63)
+                color = Color(0xFFB47781)
             )
         }
         val cpuTemps = metrics.mapNotNull { it.cpuTempC }.filter { it > 0 }
@@ -565,7 +278,7 @@ fun MetricsTab(metrics: List<Metric>) {
                     title = "Nhiệt độ CPU",
                     unit = "°C",
                     values = cpuTemps,
-                    color = Color(0xFFF44336),
+                    color = Color(0xFFBD6254),
                     maxY = 105f
                 )
             }
@@ -577,7 +290,7 @@ fun MetricsTab(metrics: List<Metric>) {
                     title = "GPU Usage",
                     unit = "%",
                     values = gpuUsage,
-                    color = Color(0xFF009688),
+                    color = Color(0xFF608A84),
                     maxY = 100f
                 )
             }
@@ -600,6 +313,7 @@ fun LineChartCard(
     val maxVal = values.max()
     val avgVal = values.average().toFloat()
     val lastVal = values.last()
+    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -638,7 +352,7 @@ fun LineChartCard(
                 if (values.size < 2) return@Canvas
 
                 // Grid lines (3 horizontal dashed lines)
-                val gridColor = Color.Gray.copy(alpha = 0.2f)
+
                 for (i in 1..3) {
                     val y = padding + chartH * (1f - i / 4f)
                     drawLine(gridColor, Offset(padding, y), Offset(w - padding, y), strokeWidth = 1f)
@@ -681,9 +395,9 @@ fun LineChartCard(
 
             // Stats row
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                StatLabel("Min", "%.1f%s".format(minVal, unit), Color.Gray)
+                StatLabel("Min", "%.1f%s".format(minVal, unit), MaterialTheme.colorScheme.onSurfaceVariant)
                 StatLabel("TB", "%.1f%s".format(avgVal, unit), color)
-                StatLabel("Max", "%.1f%s".format(maxVal, unit), if (maxY != null && maxVal >= maxY * 0.9f) Color(0xFFF44336) else Color.Gray)
+                StatLabel("Max", "%.1f%s".format(maxVal, unit), if (maxY != null && maxVal >= maxY * 0.9f) Color(0xFFBD6254) else MaterialTheme.colorScheme.onSurfaceVariant)
                 StatLabel("Điểm", "${values.size}", MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -704,11 +418,18 @@ fun StatLabel(label: String, value: String, color: Color) {
 @Composable
 fun ProcessesTab(
     processes: List<ProcessInfo>,
+    totalRamMb: Int? = null,
     deviceId: String,
     isMonitoring: Boolean = true,
     onSendCommand: (String, String, Map<String, Any>?, String) -> Unit
 ) {
     var showKillDialog by remember { mutableStateOf<ProcessInfo?>(null) }
+    val en=com.example.myapplication.ui.i18n.LocalAppStrings.current.isEnglish
+    var sortBy by remember { mutableStateOf("CPU") }
+    var selectedPid by remember { mutableStateOf<Int?>(null) }
+    var stopWholeApplication by remember { mutableStateOf(false) }
+    val gpuAvailable=processes.any{it.gpuUsagePct!=null}
+
     val killPresets = listOf(
         "Chiếm dụng CPU quá cao (>80%)",
         "Tràn bộ nhớ RAM",
@@ -722,10 +443,10 @@ fun ProcessesTab(
     showKillDialog?.let { process ->
         val finalReason = if (selectedKillPreset == killPresets.last()) customKillReason.trim() else selectedKillPreset
         AlertDialog(
-            onDismissRequest = { showKillDialog = null; customKillReason = ""; selectedKillPreset = killPresets.first() },
+            onDismissRequest = { showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first() },
             title = { Text("Dừng tiến trình") },
             text = {
-                Column {
+                Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState())) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
@@ -737,6 +458,14 @@ fun ProcessesTab(
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(stopWholeApplication,{stopWholeApplication=it})
+                        Text(if(en)"Stop every ${process.name} process on this PC" else "Dừng tất cả tiến trình ${process.name} trên máy")
+                    }
+                    if(stopWholeApplication)Text(
+                        if(en)"This closes all matching processes and windows on this PC, including other sessions. Unsaved work may be lost."
+                        else "Đóng mọi tiến trình và cửa sổ cùng tên trên máy, kể cả phiên người dùng khác. Dữ liệu chưa lưu có thể bị mất.",
+                        color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                     Text("Chọn lý do:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
                     ReasonSelector(
@@ -751,21 +480,21 @@ fun ProcessesTab(
             confirmButton = {
                 Button(
                     onClick = {
-                        // FIX: Chỉ truyền PID (integer) — không truyền process_name để tránh kill nhầm
+                        // Keep PID scope by default; whole-app scope requires explicit selection.
                         onSendCommand(
                             deviceId,
                             "KILL_PROCESS",
-                            mapOf("pid" to process.pid.toLong()),
+                            if(stopWholeApplication)mapOf("process_name" to process.name) else mapOf("pid" to process.pid.toLong()),
                             finalReason
                         )
-                        showKillDialog = null; customKillReason = ""; selectedKillPreset = killPresets.first()
+                        showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first()
                     },
                     enabled = finalReason.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Dừng tiến trình") }
+                ) { Text(if(stopWholeApplication)if(en)"Stop entire application" else "Đóng toàn bộ ứng dụng" else if(en)"Stop selected PID" else "Dừng PID đã chọn") }
             },
             dismissButton = {
-                TextButton(onClick = { showKillDialog = null; customKillReason = ""; selectedKillPreset = killPresets.first() }) { Text("Hủy") }
+                TextButton(onClick = { showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first() }) { Text("Hủy") }
             }
         )
     }
@@ -776,7 +505,7 @@ fun ProcessesTab(
                 Icon(
                     if (!isMonitoring) Icons.Default.PauseCircle else Icons.Default.Info,
                     contentDescription = null,
-                    tint = if (!isMonitoring) Color(0xFFE65100) else Color.Gray,
+                    tint = if (!isMonitoring) Color(0xFFA87836) else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -794,48 +523,63 @@ fun ProcessesTab(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        item {
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 4.dp)) {
-                Text("PID", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.14f), fontWeight = FontWeight.Bold)
-                Text("Tên", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.38f), fontWeight = FontWeight.Bold)
-                Text("CPU%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.18f), fontWeight = FontWeight.Bold)
-                Text("RAM", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.2f), fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.weight(0.1f))
+    val sorted=processes.sortedWith(compareByDescending<ProcessInfo>{
+        when(sortBy){"RAM"->it.ramMb;"GPU"->it.gpuUsagePct?:-1f;else->it.cpuPercent}
+    }.thenBy{it.pid})
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+        item{
+            Text(if(en)"Resource usage ranking" else "Tiến trình dùng tài nguyên nhiều nhất",style=MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                listOf("CPU","RAM","GPU").forEach{key->
+                    FilterChip(selected=sortBy==key,onClick={sortBy=key},enabled=key!="GPU"||gpuAvailable,
+                        label={Text(key+if(sortBy==key)" ↓" else "")})
+                }
             }
-            HorizontalDivider()
+            Text(if(en)"Green: low · Amber: moderate · Red: high. Tap a row for details." else "Xanh: thấp · Vàng: vừa · Đỏ: cao. Chạm hàng để xem chi tiết.",style=MaterialTheme.typography.bodySmall)
+            if(!gpuAvailable)Text(if(en)"Per-process GPU requires the new Windows Agent and supported GPU counters." else "GPU theo tiến trình cần Agent Windows mới và bộ đếm GPU được hỗ trợ.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
-
-        items(processes.sortedByDescending { it.cpuPercent }) { process ->
-            val cpuHigh = process.cpuPercent > 50f
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = if (cpuHigh) Color(0xFFF44336).copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(process.pid.toString(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.14f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(process.name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.38f), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        "%.1f%%".format(process.cpuPercent),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(0.18f),
-                        color = if (cpuHigh) Color(0xFFF44336) else MaterialTheme.colorScheme.onSurface,
-                        fontWeight = if (cpuHigh) FontWeight.Bold else FontWeight.Normal
-                    )
-                    Text("%.0f MB".format(process.ramMb), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.2f))
-                    IconButton(onClick = { showKillDialog = process }, modifier = Modifier.weight(0.1f).size(32.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Dừng", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+        items(sorted,key={it.pid}){process->
+            val interaction=remember{MutableInteractionSource()}
+            val hovered by interaction.collectIsHoveredAsState()
+            val selected=selectedPid==process.pid
+            OutlinedCard(
+                modifier=Modifier.fillMaxWidth().hoverable(interaction).clickable{selectedPid=if(selected)null else process.pid},
+                border=BorderStroke(if(selected||hovered)2.dp else 1.dp,if(selected||hovered)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                colors=CardDefaults.outlinedCardColors(containerColor=if(selected||hovered)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)){
+                Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Column(Modifier.weight(1f)){
+                            Text(process.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text("PID ${process.pid}",style=MaterialTheme.typography.labelSmall)
+                        }
+                        if(isMonitoring)IconButton(onClick={stopWholeApplication=false;showKillDialog=process}){
+                            Icon(Icons.Default.Close,contentDescription=if(en)"Stop process" else "Dừng tiến trình",tint=MaterialTheme.colorScheme.error)}
+                    }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        ProcessHeat("CPU","%.1f%%".format(process.cpuPercent),process.cpuPercent,20f,50f,Modifier.weight(1f))
+                        val share=totalRamMb?.takeIf{it>0}?.let{process.ramMb/it*100}
+                        ProcessHeat("RAM","%.0f MB".format(process.ramMb),share,10f,25f,Modifier.weight(1f))
+                        ProcessHeat("GPU",process.gpuUsagePct?.let{"%.1f%%".format(it)}?:"—",process.gpuUsagePct,40f,80f,Modifier.weight(1f))
+                    }
+                    if(selected){
+                        Text((if(en)"User: " else "Người dùng: ")+(process.user?:"—"),style=MaterialTheme.typography.bodySmall)
+                        Text(process.exePath?:if(en)"Executable path unavailable" else "Chưa có đường dẫn chương trình",style=MaterialTheme.typography.bodySmall)
+                        if(totalRamMb!=null&&totalRamMb>0)Text((if(en)"Share of system RAM: " else "Chiếm RAM toàn máy: ")+"%.1f%%".format(process.ramMb/totalRamMb*100),style=MaterialTheme.typography.bodySmall)
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
+    }
+}
+
+@Composable
+private fun ProcessHeat(label:String,text:String,value:Float?,warm:Float,hot:Float,modifier:Modifier){
+    val dark=MaterialTheme.colorScheme.surface.luminance()<0.2f
+    val color=when{value==null->MaterialTheme.colorScheme.onSurfaceVariant;value>=hot->if(dark)Color(0xFFF1AAA0) else Color(0xFFB7473D);value>=warm->if(dark)Color(0xFFEFCE83) else Color(0xFFA57420);else->if(dark)Color(0xFFA4D6A0) else Color(0xFF35764B)}
+    Surface(modifier,shape=RoundedCornerShape(10.dp),color=color.copy(alpha=if(value==null).04f else .08f+value.coerceIn(0f,100f)/100*.20f)){
+        Column(Modifier.padding(9.dp)){
+            Text(label,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurface)
+            Text(text,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold,color=if(value!=null)color else MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -897,7 +641,7 @@ fun CommandsTab(
                         showRebootDialog = false; customRebootReason = ""; selectedRebootPreset = rebootPresets.first()
                     },
                     enabled = finalReason.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBD6254))
                 ) { Text("Khởi động lại") }
             },
             dismissButton = {
@@ -914,7 +658,7 @@ fun CommandsTab(
         item {
             Button(
                 onClick = { showRebootDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBD6254)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.RestartAlt, contentDescription = null)
@@ -937,10 +681,10 @@ fun CommandsTab(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Top) {
                     val (icon, iconColor) = when (cmd.status) {
-                        "SUCCESS" -> Icons.Default.CheckCircle to Color(0xFF4CAF50)
-                        "FAILED" -> Icons.Default.Cancel to Color(0xFFF44336)
-                        "PENDING" -> Icons.Default.HourglassTop to Color(0xFFFF9800)
-                        else -> Icons.AutoMirrored.Filled.HelpOutline to Color.Gray
+                        "SUCCESS" -> Icons.Default.CheckCircle to Color(0xFF6C9D61)
+                        "FAILED" -> Icons.Default.Cancel to Color(0xFFBD6254)
+                        "PENDING" -> Icons.Default.HourglassTop to Color(0xFFB58B45)
+                        else -> Icons.AutoMirrored.Filled.HelpOutline to MaterialTheme.colorScheme.onSurfaceVariant
                     }
                     Icon(icon, null, tint = iconColor)
                     Spacer(modifier = Modifier.width(12.dp))
@@ -948,8 +692,8 @@ fun CommandsTab(
                         Text(cmd.commandType, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         cmd.reason?.let { Text("Lý do: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         cmd.createdAt?.let { Text(it.take(19).replace('T', ' '), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        cmd.output?.let { if (it.isNotBlank()) Text("✓ $it", style = MaterialTheme.typography.bodySmall, color = Color(0xFF4CAF50), maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                        cmd.errorMessage?.let { Text("Lỗi: $it", style = MaterialTheme.typography.bodySmall, color = Color(0xFFF44336), maxLines = 2) }
+                        cmd.output?.let { if (it.isNotBlank()) Text("✓ $it", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6C9D61), maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                        cmd.errorMessage?.let { Text("Lỗi: $it", style = MaterialTheme.typography.bodySmall, color = Color(0xFFBD6254), maxLines = 2) }
                     }
                 }
             }

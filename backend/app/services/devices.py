@@ -468,7 +468,7 @@ async def record_heartbeat(
         current_static.update(payload.static_info)
 
     # Cap nhat thong so dynamic (Nhiet do, GPU) vao static_info de Android luon doc duoc
-    for f_name in ["cpu_temp_c", "gpu_name", "gpu_usage_pct", "gpu_temp_c", "gpu_vram_total_mb", "gpu_vram_used_mb"]:
+    for f_name in ["agent_version", "cpu_temp_c", "gpu_name", "gpu_usage_pct", "gpu_temp_c", "gpu_vram_total_mb", "gpu_vram_used_mb"]:
         val = getattr(payload, f_name, None)
         if val is not None:
             current_static[f_name] = val
@@ -485,7 +485,7 @@ async def record_heartbeat(
 
     processes = payload.top_processes or payload.processes
     if processes is not None:
-        device.top_processes = processes[:15]
+        device.top_processes = processes[:100]
 
     device.watch_status = payload.watch_status
 
@@ -643,6 +643,10 @@ async def create_device_command(
     if cmd_type == "KILL_PROCESS":
         if "pid" not in params and "process_name" not in params:
             _fail(422, "KILL_PROCESS requires 'pid' or 'process_name' in parameters")
+        if "process_name" in params:
+            name=params["process_name"]
+            if not isinstance(name,str) or not name.strip() or len(name)>255 or any(c in name for c in ("*", "?", "/", "\\")) or any(ord(c)<32 for c in name):
+                _fail(422, "process_name must be an exact executable name, without paths or wildcards")
     elif cmd_type == "RESTART_SERVICE" and "service_name" not in params:
         _fail(422, "RESTART_SERVICE requires 'service_name' in parameters")
 

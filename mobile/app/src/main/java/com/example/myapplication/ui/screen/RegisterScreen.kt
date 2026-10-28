@@ -57,17 +57,13 @@ fun RegisterScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 32.dp)
+                .imePadding().padding(horizontal = 24.dp)
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "Tạo tài khoản mới",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+            AuthBrand("Không gian của bạn.", "Tạo tài khoản để kết nối và theo dõi thiết bị.")
             Spacer(modifier = Modifier.height(24.dp))
 
             // Full Name

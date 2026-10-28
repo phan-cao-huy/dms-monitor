@@ -24,11 +24,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val permissionLauncher=registerForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+        val permissionPrefs=getSharedPreferences("notification_permission", MODE_PRIVATE)
+        if(android.os.Build.VERSION.SDK_INT>=33&&
+            androidx.core.content.ContextCompat.checkSelfPermission(this,android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED&&
+            !permissionPrefs.getBoolean("asked",false)){
+            permissionPrefs.edit().putBoolean("asked",true).apply()
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         val settingsManager = SettingsManager(applicationContext)
 
         setContent {
-            // NavController phải được tạo NGOÀI Theme để đổi theme không reset navigation
+            // NavController pháº£i Ä‘Æ°á»£c táº¡o NGOÃ€I Theme Ä‘á»ƒ Ä‘á»•i theme khÃ´ng reset navigation
             val navController = rememberNavController()
 
             val themeMode by settingsManager.themeMode.collectAsState(initial = "SYSTEM")
@@ -48,7 +57,7 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalAppStrings provides appStrings) {
                 DmsMonitorTheme(darkTheme = isDark) {
-                    Surface(modifier = Modifier.fillMaxSize()) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
                         val authViewModel: AuthViewModel = viewModel()
 
                         NavGraph(

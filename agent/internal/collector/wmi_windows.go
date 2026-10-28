@@ -6,6 +6,8 @@ package collector
 
 import (
 	"os/exec"
+	"regexp"
+	"strconv"
 
 	"github.com/yusufpapurcu/wmi"
 )
@@ -61,4 +63,36 @@ func hasNvidiaSmi() bool {
 		nvidiaSmiPathChecked = true
 	}
 	return nvidiaSmiPathFound
+}
+
+// getProcessGPUUsage uses Windows' per-engine GPU counters; unavailable counters stay unknown.
+// As in Task Manager, report the busiest engine for each process, not a sum of engines.
+func getProcessGPUUsage() map[int32]float64 {
+	var rows []struct {
+		Name                  string
+		UtilizationPercentage uint64
+	}
+	if err := wmi.Query("SELECT Name, UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine", &rows); err != nil {
+		return nil
+	}
+	result := map[int32]float64{}
+	pattern := regexp.MustCompile(`^pid_(\d+)_`)
+	for _, row := range rows {
+		match := pattern.FindStringSubmatch(row.Name)
+		if len(match) != 2 {
+			continue
+		}
+		pid, err := strconv.ParseInt(match[1], 10, 32)
+		if err != nil {
+			continue
+		}
+		value := float64(row.UtilizationPercentage)
+		if value > 100 {
+			value = 100
+		}
+		if prior, exists := result[int32(pid)]; !exists || value > prior {
+			result[int32(pid)] = value
+		}
+	}
+	return result
 }

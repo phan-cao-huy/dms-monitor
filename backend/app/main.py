@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.api.v1.api import api_router
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 async def _ensure_db_schema() -> None:
     migration_statements = [
+        "ALTER TABLE alert_history ADD COLUMN IF NOT EXISTS message_en TEXT;",
+        "ALTER TABLE alert_rules DROP CONSTRAINT IF EXISTS chk_rule_metric;",
+        "ALTER TABLE alert_rules ADD CONSTRAINT chk_rule_metric CHECK (metric_type IN ('CPU','RAM','GPU','DISK','NET_IN','NET_OUT','OFFLINE','SERVICE','PROCESS_MISSING'));",
         "ALTER TABLE devices ADD COLUMN IF NOT EXISTS is_monitoring BOOLEAN NOT NULL DEFAULT TRUE;",
         "ALTER TABLE devices DROP CONSTRAINT IF EXISTS chk_device_status;",
         "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_status_check;",
@@ -86,10 +90,17 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "version_code": 11,
-        "version_name": "1.0.10",
+        "web_version": "1.0.20",
+        "version_code": 21,
+        "version_name": "1.0.20",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Khôi phục tải và cài bản cập nhật từ server HTTPS\n• Kiểm tra phiên bản, package và chữ ký APK trước khi cài\n• Sử dụng server cố định, bản ký release và các bản sửa độ ổn định",
+        "release_notes": "• Khôi phục câu Đang thực thi lệnh...\n• Tách dừng một PID và đóng tất cả tiến trình cùng tên\n• Hiện rõ phạm vi và cảnh báo trước khi đóng toàn ứng dụng",
         "force_update": False
     }
+
+
+# Web uses hash-based routes, the existing JWT API and the same database.
+# Mount after API/docs/download routes so they keep their existing behaviour.
+WEB_DIR = os.path.join(STATIC_DIR, "web")
+app.mount("/", StaticFiles(directory=WEB_DIR, html=True, check_dir=False), name="dms-web")

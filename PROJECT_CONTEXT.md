@@ -1,6 +1,8 @@
 # DMS MONITOR — PROJECT COMPREHENSIVE CONTEXT & SPECIFICATION
 
-> **Release hiện tại: v1.0.10 (Build 11)** — server HTTPS cố định, ký release, đã khôi phục cập nhật APK qua server. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
+> **Quy ước người dùng:** Mọi thay đổi tính năng/giao diện từ nay phải đồng bộ web và Android; dùng chung API/database.
+
+> **Release hiện tại: v1.0.20 (Build 21)** — server HTTPS cố định, ký release, đã khôi phục cập nhật APK qua server. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
 
 > **26/10/2026 — đối chiếu và bản sửa:** Xem [docs/RELIABILITY_FIXES.md](docs/RELIABILITY_FIXES.md) để biết hành vi mới, kết quả kiểm tra và phần chưa triển khai. Các mô tả cũ bên dưới có điểm đã lỗi thời.
 > **Tài liệu chuyển giao ngữ cảnh toàn diện dự án DMS (Device Monitoring System)**  
@@ -485,3 +487,15 @@ Khi quản trị viên nhấn **Xóa thiết bị** trên App:
     2. CHECK constraint `chk_cmd_type` trong `database/dms01.sql` và migration `_ensure_db_schema()`.
     3. Whitelist switch-case trong `agent/internal/executor/executor.go`.
   - Mọi subprocess chạy trên Agent Windows **bắt buộc** phải sử dụng `hideWindow()` với cờ `CREATE_NO_WINDOW` để giữ trải nghiệm người dùng hoàn toàn tĩnh lặng.
+
+> Ngưỡng cảnh báo và phần chuẩn bị push Android: xem docs/ALERT_NOTIFICATIONS.md. Đã cấu hình Firebase Android + worker, dry-run FCM thành công; chưa xác nhận nhận push trên điện thoại thật.
+
+> Thuật ngữ giao diện: Tổ chức → Không gian làm việc (điều hướng: Không gian); Cụm thiết bị → Nhóm thiết bị; Phân quyền → Quyền truy cập. Dùng icon SpaceDashboard/workspace dạng vector, bỏ emoji ở tiêu đề quản lý không gian. API/database vẫn dùng org/group như cũ.
+
+> Tổng quan thiết bị (1.0.17): Android đọc disks đầy đủ; trạng thái/cảnh báo, CPU/RAM/GPU, phân vùng, mạng, top 5 tiến trình và phần cứng thu gọn đồng bộ web. Dữ liệu thiếu hiển thị —, GPU 0% vẫn hiện; RAM GB dùng được ước tính từ tỷ lệ và tổng RAM (~). Android map created_at và cpu_pct đúng hợp đồng API. Chi tiết tự làm mới khi hiển thị mỗi 15 giây. Không suy đoán SSD/HDD hoặc disk I/O.
+
+> 1.0.18: Hỏi quyền thông báo lần đầu mở Android; cảnh báo rõ tài nguyên/ngưỡng và top tiến trình, VI/EN. Tiến trình sắp CPU/RAM/GPU, heatmap, chọn/hover. Agent 1.2.0: CPU delta toàn máy, union top CPU/RAM/GPU, GPU per-process WMI busiest engine; cần cập nhật Agent trên PC. Backend tối đa 100 tiến trình, message_en và quy tắc GPU.
+
+> 1.0.19: phản hồi lệnh web/Android theo command_id thực, polling tuần tự 2 giây; SUCCESS mới báo dừng PID thành công, FAILED/TIMEOUT hiện lỗi. Android sửa alias command_id/id, không giữ mã giả 0; tải lại tiến trình sau kết quả kill. Không thực thi kill thật để kiểm thử.
+
+> 1.0.20: Giữ nguyên câu “Đang thực thi lệnh...” theo yêu cầu người dùng. Chrome có nhiều tiến trình: PID con bị kill không đồng nghĩa cửa sổ đóng. Dialog dừng cho chọn PID (mặc định) hoặc tất cả tiến trình cùng tên trên máy (chủ động chọn, cảnh báo mọi phiên và dữ liệu chưa lưu). Không tự mở rộng phạm vi dừng và không kill Chrome thật khi kiểm thử.

@@ -114,13 +114,14 @@ fun AlertScreen(
 
 @Composable
 fun AlertCard(alert: Alert, onResolve: () -> Unit) {
+    val alertMessage=if(com.example.myapplication.ui.i18n.LocalAppStrings.current.isEnglish)alert.messageEn?:alert.message else alert.message
     var showResolveDialog by remember { mutableStateOf(false) }
 
     if (showResolveDialog) {
         AlertDialog(
             onDismissRequest = { showResolveDialog = false },
             title = { Text("Xử lý cảnh báo") },
-            text = { Text("Đánh dấu cảnh báo '${alert.message}' đã được xử lý?") },
+            text = { Text("Đánh dấu cảnh báo '${alertMessage}' đã được xử lý?") },
             confirmButton = {
                 Button(onClick = {
                     onResolve()
@@ -134,11 +135,11 @@ fun AlertCard(alert: Alert, onResolve: () -> Unit) {
     }
 
     val severityColor = when (alert.severity?.uppercase()) {
-        "CRITICAL" -> Color(0xFFD32F2F)
-        "HIGH", "WARNING" -> Color(0xFFE65100)
-        "MEDIUM" -> Color(0xFFFF9800)
-        "LOW", "INFO" -> Color(0xFF4CAF50)
-        else -> Color.Gray
+        "CRITICAL" -> Color(0xFFAE5045)
+        "HIGH", "WARNING" -> Color(0xFFA87836)
+        "MEDIUM" -> Color(0xFFB58B45)
+        "LOW", "INFO" -> Color(0xFF6C9D61)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     val severityIcon = when (alert.severity?.uppercase()) {
@@ -161,7 +162,7 @@ fun AlertCard(alert: Alert, onResolve: () -> Unit) {
             Icon(
                 severityIcon,
                 contentDescription = null,
-                tint = if (!alert.isResolved) severityColor else Color.Gray,
+                tint = if (!alert.isResolved) severityColor else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -171,7 +172,7 @@ fun AlertCard(alert: Alert, onResolve: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = alert.message,
+                        text = alertMessage,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -204,7 +205,7 @@ fun AlertCard(alert: Alert, onResolve: () -> Unit) {
                     Text(
                         text = "\u2705 Đã xử lý: ${alert.resolvedAt.take(19).replace('T', ' ')}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF4CAF50)
+                        color = Color(0xFF6C9D61)
                     )
                 }
                 if (!alert.isResolved) {

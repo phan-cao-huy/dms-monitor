@@ -159,6 +159,16 @@ interface ApiService {
     @POST("alerts/{id}/resolve")
     suspend fun resolveAlert(@Path("id") alertId: String): Response<Unit>
 
+    @PATCH("orgs/{org_id}/alert-rules/{rule_id}")
+    suspend fun updateAlertRule(@Path("org_id") orgId: String, @Path("rule_id") ruleId: Int,
+        @Body request: AlertRuleUpdate): Response<AlertRule>
+
+    @DELETE("alert-rules/{rule_id}")
+    suspend fun deleteAlertRule(@Path("rule_id") ruleId: Int): Response<Unit>
+
+    @POST("auth/fcm-token")
+    suspend fun registerFcmToken(@Body request: FcmRegistration): Response<Unit>
+
     // === App Update ===
     @GET("app/version")
     suspend fun getAppVersion(): Response<AppVersionResponse>

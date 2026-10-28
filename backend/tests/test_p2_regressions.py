@@ -133,7 +133,7 @@ def test_fcm_delivery_respects_scope_and_records_result(failed, expected):
     )
     responses = [Mock(), Mock()]
     responses[0].scalars.return_value.all.return_value = [alert]
-    responses[1].scalars.return_value.all.return_value = ["test-token"]
+    responses[1].all.return_value = [("test-token", 1)]
     db = Mock(
         execute=AsyncMock(side_effect=responses),
         get=AsyncMock(return_value=Device(device_id=2, org_id=3, group_id=4)),
@@ -154,6 +154,13 @@ def test_fcm_delivery_respects_scope_and_records_result(failed, expected):
         config.FCM_CREDENTIALS_FILE = "unused-test-credential"
         asyncio.run(send_pending_notifications())
     send.assert_called_once()
+    message = send.call_args.args[0]
+    assert message.notification is None
+    assert message.android.priority == "high"
+    assert message.data["user_id"] == "1"
+    assert message.data["alert_id"] == "1"
+    assert "title_vi" in message.data and "title_en" in message.data
+    assert "body_vi" in message.data and "body_en" in message.data
     sql = str(
         db.execute.call_args_list[1]
         .args[0]

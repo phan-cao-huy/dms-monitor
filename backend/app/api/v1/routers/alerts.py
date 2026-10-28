@@ -8,7 +8,12 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.alert import AlertHistory, AlertRule
 from app.models.auth import User
-from app.schemas.alert import AlertHistoryOut, AlertRuleCreate, AlertRuleOut
+from app.schemas.alert import (
+    AlertHistoryOut,
+    AlertRuleCreate,
+    AlertRuleOut,
+    AlertRuleUpdate,
+)
 from app.services.alerts import (
     AlertError,
     acknowledge_alert,
@@ -17,6 +22,7 @@ from app.services.alerts import (
     list_alert_rules,
     list_org_alerts,
     resolve_alert,
+    update_alert_rule,
 )
 
 router = APIRouter(tags=["alerts"])
@@ -61,6 +67,17 @@ async def post_alert_rule(
 ) -> AlertRule:
     """Tạo quy tắc cảnh báo mới áp dụng cho một cụm hoặc một thiết bị."""
     return await _run(create_alert_rule(db, org_id, user.user_id, payload))
+
+
+@router.patch("/orgs/{org_id}/alert-rules/{rule_id}", response_model=AlertRuleOut)
+async def patch_alert_rule(
+    org_id: int,
+    rule_id: int,
+    payload: AlertRuleUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> AlertRule:
+    return await _run(update_alert_rule(db, org_id, rule_id, user.user_id, payload))
 
 
 @router.delete(

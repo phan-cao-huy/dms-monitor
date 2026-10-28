@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from typing import NoReturn
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.alert import AlertHistory, AlertRule
+from app.models.alert import AlertHistory, AlertRule, AlertRuleState
 from app.models.device import Device
 from app.models.organization import (
     DeviceGroup,
@@ -12,7 +12,7 @@ from app.models.organization import (
     OrganizationMember,
     UserGroupAccess,
 )
-from app.schemas.alert import AlertRuleCreate
+from app.schemas.alert import AlertRuleCreate, AlertRuleUpdate
 from app.services.devices import DeviceError, check_user_device_access
 
 
@@ -113,9 +113,40 @@ async def create_alert_rule(
         duration_minutes=payload.duration_minutes,
         severity=payload.severity,
         cooldown_minutes=payload.cooldown_minutes,
+        is_active=payload.is_active,
         created_by=user_id,
     )
     db.add(rule)
+    await db.commit()
+    await db.refresh(rule)
+    return rule
+
+
+async def update_alert_rule(
+    db: AsyncSession, org_id: int, rule_id: int, user_id: int, payload: AlertRuleUpdate
+) -> AlertRule:
+    member = await _get_org_member(db, org_id, user_id)
+    if member.role not in ("Owner", "Admin"):
+        _fail(403, "Only Owner or Admin can update alert rules")
+    rule = await db.get(AlertRule, rule_id)
+    if rule is None:
+        _fail(404, "Alert rule not found")
+    target = await db.get(Device, rule.device_id) if rule.device_id else await db.get(DeviceGroup, rule.group_id)
+    if target is None or target.org_id != org_id:
+        _fail(404, "Alert rule not found in this organization")
+    changes = payload.model_dump(exclude_unset=True)
+    if any(value is None for key, value in changes.items() if key not in ("rule_name",)):
+        _fail(422, "Rule values cannot be null")
+    merged = {key: getattr(rule, key) for key in AlertRuleCreate.model_fields}
+    merged.update({key: value for key, value in changes.items() if key in merged})
+    try:
+        AlertRuleCreate.model_validate(merged)
+    except ValueError as exc:
+        _fail(422, str(exc))
+    for key, value in changes.items():
+        setattr(rule, key, value)
+    # A changed threshold starts a fresh continuous evaluation window.
+    await db.execute(delete(AlertRuleState).where(AlertRuleState.rule_id == rule_id))
     await db.commit()
     await db.refresh(rule)
     return rule

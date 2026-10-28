@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12211f">
+  <meta name="description" content="DMS Monitor — Giám sát máy tính, quản lý thiết bị và cộng tác cùng đội ngũ trên một nền tảng.">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>DMS Monitor — Một tầm nhìn cho toàn bộ hệ thống</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=1.0.20">
+  <script type="module" src="./app.js?v=1.0.20"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Đến nội dung chính</a>
+  <div id="app"><main class="boot"><span class="brand-mark">d</span><p>Đang mở DMS Monitor…</p></main></div>
+  <div id="modal-root"></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <noscript><p>Hãy bật JavaScript và mở trang qua HTTP/HTTPS để sử dụng DMS Monitor.</p></noscript>
+  <script>
+    if (location.protocol === 'file:') {
+      document.getElementById('app').innerHTML = '<main class="boot"><span class="brand-mark">d</span><div><p>Hãy mở DMS Monitor qua server HTTP, thay vì mở trực tiếp file HTML.</p><p style="margin-top:12px"><a class="btn primary" href="http://127.0.0.1:4173/">Mở bản xem trước trên máy này →</a></p></div></main>';
+    }
+  </script>
+</body>
+</html>

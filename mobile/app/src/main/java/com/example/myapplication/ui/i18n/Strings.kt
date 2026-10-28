@@ -8,7 +8,7 @@ import androidx.compose.runtime.compositionLocalOf
 class AppStrings(val isEnglish: Boolean = false) {
     // Navigation
     val navDevices get() = if (isEnglish) "Devices" else "Thiết bị"
-    val navOrganization get() = if (isEnglish) "Organization" else "Tổ chức"
+    val navOrganization get() = if (isEnglish) "Workspace" else "Không gian"
     val navAlerts get() = if (isEnglish) "Alerts" else "Cảnh báo"
     val navAccount get() = if (isEnglish) "Account" else "Tài khoản"
 

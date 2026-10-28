@@ -103,6 +103,7 @@ object AppUpdateManager {
         expectedVersionCode: Long,
         expectedSizeBytes: Long = 0L
     ): File? {
+        if (expectedVersionCode <= getCurrentVersionCode(context)) return null
         val file = File(File(context.cacheDir, "updates"), "dms-update-v$expectedVersionCode.apk")
         if (isApkMatchingVersion(context, file, expectedVersionCode, expectedSizeBytes)) return file
         return null

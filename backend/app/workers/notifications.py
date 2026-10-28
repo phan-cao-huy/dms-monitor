@@ -2,16 +2,17 @@
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models.alert import AlertHistory
+from app.models.alert import AlertHistory, AlertRule
 from app.models.auth import AuthToken
 from app.models.device import Device
 from app.models.organization import OrganizationMember, UserGroupAccess
+from app.services.alert_text import alert_text
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,8 @@ async def send_pending_notifications():
                 await db.execute(
                     select(AlertHistory)
                     .where(
-                        AlertHistory.notification_status == "PENDING",
+                        AlertHistory.notification_status.in_(("PENDING", "FAILED")),
+                        AlertHistory.created_at >= now - timedelta(hours=24),
                         AlertHistory.resolved_at.is_(None),
                     )
                     .order_by(AlertHistory.created_at)
@@ -67,7 +69,7 @@ async def send_pending_notifications():
             tokens = (
                 (
                     await db.execute(
-                        select(AuthToken.fcm_token)
+                        select(AuthToken.fcm_token, AuthToken.user_id)
                         .join(
                             OrganizationMember,
                             OrganizationMember.user_id == AuthToken.user_id,
@@ -86,30 +88,47 @@ async def send_pending_notifications():
                         )
                     )
                 )
-                .scalars()
                 .all()
             )
-            tokens = sorted(set(tokens))
+            recipients = {}
+            for token, user_id in tokens:
+                recipients.setdefault(user_id, set()).add(token)
             if not tokens:
                 continue
             success = True
             try:
-                for start in range(0, len(tokens), 500):
-                    response = await asyncio.to_thread(
-                        messaging.send_each_for_multicast,
-                        messaging.MulticastMessage(
-                            tokens=tokens[start : start + 500],
-                            notification=messaging.Notification(
-                                title="DMS Monitor", body=alert.message
+                rule = await db.get(AlertRule, alert.rule_id) if alert.rule_id else None
+                metric_type = rule.metric_type if rule else ("RAM" if alert.message.startswith("RAM") else "OFFLINE")
+                copy = alert_text(metric_type, device.device_name, alert.metric_value, alert.threshold_value,
+                                  rule.condition if rule else ">=", rule.duration_minutes if rule else 1,
+                                  rule.service_name if rule else None, rule.process_name if rule else None,
+                                  processes=device.top_processes if device.last_heartbeat and now-device.last_heartbeat<timedelta(seconds=120) else None)
+                # FCM data has a 4 KB budget. Preserve the measurement at the start of each body.
+                for key, text in copy.items():
+                    limit = 180 if key.startswith("title_") else 850
+                    copy[key] = text.encode("utf-8")[:limit].decode("utf-8", errors="ignore")
+                for user_id, user_tokens in recipients.items():
+                    user_tokens = sorted(user_tokens)
+                    for start in range(0, len(user_tokens), 500):
+                        batch = user_tokens[start : start + 500]
+                        response = await asyncio.to_thread(
+                            messaging.send_each_for_multicast,
+                            messaging.MulticastMessage(
+                                tokens=batch,
+                                android=messaging.AndroidConfig(priority="high", ttl=300),
+                                data={
+                                    "title": copy["title_vi"],
+                                    "body": copy["body_vi"],
+                                    **copy,
+                                    "device_id": str(device.device_id),
+                                    "alert_id": str(alert.alert_id),
+                                    "user_id": str(user_id),
+                                    "metric_type": metric_type,
+                                },
                             ),
-                            data={
-                                "device_id": str(device.device_id),
-                                "alert_id": str(alert.alert_id),
-                            },
-                        ),
-                        app=app,
-                    )
-                    success = success and response.failure_count == 0
+                            app=app,
+                        )
+                        success = success and response.failure_count == 0
             except Exception:
                 logger.exception("FCM delivery failed for alert %s", alert.alert_id)
                 success = False

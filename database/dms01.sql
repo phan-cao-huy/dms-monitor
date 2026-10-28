@@ -213,7 +213,7 @@ CREATE TABLE alert_rules (
     created_by          INT REFERENCES users(user_id),
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_rule_scope    CHECK (group_id IS NOT NULL OR device_id IS NOT NULL),
-    CONSTRAINT chk_rule_metric   CHECK (metric_type IN ('CPU', 'RAM', 'DISK', 'NET_IN', 'NET_OUT', 'OFFLINE', 'SERVICE', 'PROCESS_MISSING')),
+    CONSTRAINT chk_rule_metric   CHECK (metric_type IN ('CPU', 'RAM', 'GPU', 'DISK', 'NET_IN', 'NET_OUT', 'OFFLINE', 'SERVICE', 'PROCESS_MISSING')),
     CONSTRAINT chk_rule_target   CHECK (
         (metric_type = 'SERVICE'         AND service_name IS NOT NULL) OR
         (metric_type = 'PROCESS_MISSING' AND process_name IS NOT NULL) OR
@@ -230,6 +230,7 @@ CREATE TABLE alert_history (
     rule_id             INT REFERENCES alert_rules(rule_id) ON DELETE SET NULL,
     severity            VARCHAR(20) NOT NULL,
     message             TEXT NOT NULL,
+    message_en          TEXT,
     metric_value        FLOAT,
     threshold_value     FLOAT,
     acknowledged_by     INT REFERENCES users(user_id),

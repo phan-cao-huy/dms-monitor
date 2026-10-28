@@ -26,7 +26,7 @@ data class DashboardUiState(
     val devices: List<Device> = emptyList(),
     val alerts: List<Alert> = emptyList(),
     val groups: List<DeviceGroup> = emptyList(),
-    val selectedGroupFilter: Int? = null, // null: Tất cả, 0: Chưa phân cụm, >0: Group ID
+    val selectedGroupFilter: Int? = null, // null: Tất cả, 0: Chưa phân nhóm, >0: Group ID
     val searchQuery: String = "",
     val error: String? = null,
     val successMessage: String? = null,
@@ -34,7 +34,7 @@ data class DashboardUiState(
 )
 
 /**
- * ViewModel quản lý danh sách tổ chức, thiết bị, cụm thiết bị và cảnh báo trên Dashboard
+ * ViewModel quản lý danh sách không gian làm việc, thiết bị, nhóm thiết bị và cảnh báo trên Dashboard
  */
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -87,7 +87,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Không thể tải danh sách tổ chức (${response.code()})"
+                        error = "Không thể tải danh sách không gian làm việc (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
@@ -168,6 +168,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun refreshAlerts() { _uiState.value.selectedOrg?.id?.let { loadAlerts(it) } }
+
     private fun loadAlerts(orgId: String) {
         viewModelScope.launch {
             try {
@@ -197,7 +199,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
             val matchesGroup = when (filterGroupId) {
                 null -> true // Tất cả
-                0 -> device.groupId == null // Chưa phân cụm
+                0 -> device.groupId == null // Chưa phân nhóm
                 else -> device.groupId == filterGroupId.toString()
             }
             matchesQuery && matchesGroup

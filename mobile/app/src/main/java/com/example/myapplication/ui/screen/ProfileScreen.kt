@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ProfileScreen(
     user: UserInfo?,
+    openUpdateOnLaunch: Boolean = false,
+    onUpdateOpened: () -> Unit = {},
     onLogout: () -> Unit,
     onSwitchAccount: () -> Unit = {},
     currentTheme: String = "SYSTEM",
@@ -53,6 +55,9 @@ fun ProfileScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showUpdateDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(openUpdateOnLaunch) {
+        if(openUpdateOnLaunch){showUpdateDialog=true;onUpdateOpened()}
+    }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var isDownloadingUpdate by remember { mutableStateOf(false) }
     var updateProgress by remember { mutableFloatStateOf(0f) }
@@ -62,7 +67,7 @@ fun ProfileScreen(
     var updateError by remember { mutableStateOf<String?>(null) }
     var downloadedApkFile by remember { mutableStateOf<java.io.File?>(null) }
     var waitingForInstallPermission by remember { mutableStateOf(false) }
-    val currentVersion = remember { AppUpdateManager.getCurrentVersionName(context) }
+    var currentVersion by remember { mutableStateOf(AppUpdateManager.getCurrentVersionName(context)) }
 
     val refreshApkCache: (AppVersionResponse?) -> Unit = { info ->
         if (info != null) {
@@ -83,6 +88,15 @@ fun ProfileScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                currentVersion=AppUpdateManager.getCurrentVersionName(context)
+                hasUpdateAvailable=(updateInfo?.versionCode?.toLong()?:0)>AppUpdateManager.getCurrentVersionCode(context)
+                if(!hasUpdateAvailable){downloadedApkFile=null;waitingForInstallPermission=false}
+                coroutineScope.launch {
+                    AppUpdateManager.checkForUpdate(context).onSuccess { (info,newer) ->
+                        updateInfo=info;hasUpdateAvailable=newer
+                        if(newer)refreshApkCache(info) else downloadedApkFile=null
+                    }
+                }
                 refreshApkCache(updateInfo)
                 if (waitingForInstallPermission) {
                     if (AppUpdateManager.canInstallPackages(context)) {
@@ -431,7 +445,7 @@ fun ProfileScreen(
     // 8. Dialog Cập nhật ứng dụng qua Server (OTA)
     if (showUpdateDialog) {
         val performDownloadAndInstall: (Boolean) -> Unit = { forceReDownload ->
-            if (!isDownloadingUpdate && updateInfo != null) {
+            if (!isDownloadingUpdate && updateInfo != null && updateInfo!!.versionCode > AppUpdateManager.getCurrentVersionCode(context)) {
                 val info = updateInfo!!
                 val existing = if (!forceReDownload) AppUpdateManager.getDownloadedApkFile(context, info.versionCode.toLong(), info.apkSizeBytes) else null
                 if (existing != null) {
@@ -498,7 +512,7 @@ fun ProfileScreen(
                         else if (hasUpdateAvailable) Icons.Default.SystemUpdate
                         else Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = if (hasUpdateAvailable) MaterialTheme.colorScheme.primary else Color(0xFF4CAF50)
+                        tint = if (hasUpdateAvailable) MaterialTheme.colorScheme.primary else Color(0xFF6C9D61)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

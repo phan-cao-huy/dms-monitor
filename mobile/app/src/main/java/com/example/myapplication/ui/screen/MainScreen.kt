@@ -1,9 +1,11 @@
 package com.example.myapplication.ui.screen
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.SpaceDashboard
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
@@ -67,20 +69,27 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showRules by remember { mutableStateOf(false) }
     val strings = LocalAppStrings.current
 
     val navItems = listOf(
         BottomNavItem(strings.navDevices, Icons.Default.Computer, Icons.Default.Computer),
-        BottomNavItem(strings.navOrganization, Icons.Default.Business, Icons.Default.Business),
+        BottomNavItem(strings.navOrganization, Icons.Default.SpaceDashboard, Icons.Default.SpaceDashboard),
         BottomNavItem(strings.navAlerts, Icons.Default.Notifications, Icons.Default.Notifications)
     )
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = androidx.compose.ui.graphics.Color(0xFF142B24)) {
                 navItems.forEachIndexed { index, item ->
                     val alertCount = if (index == 2) dashboardState.alerts.count { !it.isResolved } else 0
                     NavigationBarItem(
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = androidx.compose.ui.graphics.Color(0xFF142B24),
+                            selectedTextColor = androidx.compose.ui.graphics.Color(0xFFC8F28B),
+                            indicatorColor = androidx.compose.ui.graphics.Color(0xFFC8F28B),
+                            unselectedIconColor = androidx.compose.ui.graphics.Color(0xFFA2B7AA),
+                            unselectedTextColor = androidx.compose.ui.graphics.Color(0xFFA2B7AA)),
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         icon = {
@@ -138,12 +147,20 @@ fun MainScreen(
                     onCreateOrg = onCreateOrg,
                     onClearMessages = onClearOrgMessages
                 )
-                2 -> AlertScreen(
+                2 -> Column {
+                    NotificationPermissionCard()
+                    Row {
+                        TextButton(onClick={showRules=false}){Text("Lịch sử")}
+                        TextButton(onClick={showRules=true}){Text("Ngưỡng cảnh báo")}
+                    }
+                    if(showRules)key(dashboardState.selectedOrg?.id){AlertRulesScreen(dashboardState.selectedOrg,dashboardState.devices,dashboardState.groups)}
+                    else AlertScreen(
                     alerts = dashboardState.alerts,
                     isLoading = dashboardState.isLoading,
                     onResolveAlert = onResolveAlert,
                     onRefresh = onRefreshAlerts
                 )
+                }
             }
         }
     }

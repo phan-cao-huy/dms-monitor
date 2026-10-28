@@ -29,3 +29,9 @@ mobile/keystore.properties
 *.jks
 *.keystore
 *.p12
+
+# Firebase config supplied locally; service-account keys stay outside the repository.
+mobile/app/google-services.json
+
+# Local Firebase worker mount
+docker-compose.override.yml

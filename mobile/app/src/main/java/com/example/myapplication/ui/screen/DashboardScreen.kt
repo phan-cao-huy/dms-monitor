@@ -88,7 +88,7 @@ fun DashboardScreen(
 
                     if (uiState.groups.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Cụm thiết bị (phân quyền):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text("Nhóm thiết bị (quyền truy cập):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier
@@ -99,13 +99,13 @@ fun DashboardScreen(
                             FilterChip(
                                 selected = selectedNewDeviceGroupId == null,
                                 onClick = { selectedNewDeviceGroupId = null },
-                                label = { Text("Chưa phân cụm") }
+                                label = { Text("Chưa phân nhóm") }
                             )
                             uiState.groups.forEach { grp ->
                                 FilterChip(
                                     selected = selectedNewDeviceGroupId == grp.groupId,
                                     onClick = { selectedNewDeviceGroupId = grp.groupId },
-                                    label = { Text("🏷️ ${grp.groupName}") }
+                                    label = { Text("${grp.groupName}") }
                                 )
                             }
                         }
@@ -310,11 +310,13 @@ fun DashboardScreen(
                                 }
                                 .padding(vertical = 2.dp, horizontal = 4.dp)
                         ) {
+                            BrandMark(Modifier.size(34.dp))
+                            Spacer(Modifier.width(10.dp))
                             Column {
                                 Text("DMS Monitor", style = MaterialTheme.typography.titleMedium)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = uiState.selectedOrg?.orgName ?: "Chưa chọn tổ chức",
+                                        text = uiState.selectedOrg?.orgName ?: "Chưa chọn không gian làm việc",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
@@ -324,7 +326,7 @@ fun DashboardScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Icon(
                                             Icons.Default.ArrowDropDown,
-                                            contentDescription = "Chuyển tổ chức",
+                                            contentDescription = "Chuyển không gian",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -338,7 +340,7 @@ fun DashboardScreen(
                             onDismissRequest = { showOrgMenu = false }
                         ) {
                             Text(
-                                text = if (strings.isEnglish) "Switch Organization" else "Chuyển tổ chức",
+                                text = if (strings.isEnglish) "Switch Workspace" else "Chuyển không gian",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -400,7 +402,7 @@ fun DashboardScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -435,7 +437,7 @@ fun DashboardScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Trường hợp người dùng chưa có tổ chức nào
+                // Trường hợp người dùng chưa có không gian làm việc nào
                 if (uiState.organizations.isEmpty() && !uiState.isLoading) {
                     item {
                         Card(
@@ -449,7 +451,7 @@ fun DashboardScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Icon(
-                                    Icons.Default.Business,
+                                    Icons.Default.SpaceDashboard,
                                     contentDescription = null,
                                     modifier = Modifier.size(48.dp),
                                     tint = MaterialTheme.colorScheme.primary
@@ -462,7 +464,7 @@ fun DashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "Bạn chưa có tổ chức nào. Hãy chuyển sang mục 'Tổ chức' ở thanh dưới để tạo tổ chức mới hoặc tham gia bằng mã mời!",
+                                    text = "Bạn chưa có không gian làm việc nào. Hãy chuyển sang mục 'Không gian làm việc' ở thanh dưới để tạo không gian làm việc mới hoặc tham gia bằng mã mời!",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -472,6 +474,13 @@ fun DashboardScreen(
                     return@LazyColumn
                 }
 
+                item {
+                    Column(Modifier.padding(top = 12.dp, bottom = 8.dp)) {
+                        Text(if (strings.isEnglish) "System overview" else "Tổng quan hệ thống", style = MaterialTheme.typography.headlineMedium)
+                        Text(if (strings.isEnglish) "Device health at a glance" else "Nắm bắt tình trạng thiết bị trong một tầm nhìn",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 // Thống kê tổng quan
                 item {
                     StatusSummaryRow(devices = uiState.devices)
@@ -484,11 +493,11 @@ fun DashboardScreen(
                     }
                 }
 
-                // Cụm thiết bị Filter Chips
+                // Nhóm thiết bị Filter Chips
                 if (uiState.groups.isNotEmpty()) {
                     item {
                         Column {
-                            Text("Phân cụm thiết bị:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text("Phân nhóm thiết bị:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier
@@ -504,14 +513,14 @@ fun DashboardScreen(
                                 FilterChip(
                                     selected = uiState.selectedGroupFilter == 0,
                                     onClick = { onSelectGroupFilter(0) },
-                                    label = { Text("Chưa phân cụm") }
+                                    label = { Text("Chưa phân nhóm") }
                                 )
                                 uiState.groups.forEach { grp ->
                                     val countInGroup = uiState.devices.count { it.groupId == grp.groupId.toString() }
                                     FilterChip(
                                         selected = uiState.selectedGroupFilter == grp.groupId,
                                         onClick = { onSelectGroupFilter(grp.groupId) },
-                                        label = { Text("🏷️ ${grp.groupName} ($countInGroup)") }
+                                        label = { Text("${grp.groupName} ($countInGroup)") }
                                     )
                                 }
                             }
@@ -576,33 +585,29 @@ fun StatusSummaryRow(devices: List<Device>) {
     val offline = devices.count { it.status == "Offline" }
     val warning = devices.count { it.status == "Warning" }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        StatusChip(count = devices.size, label = strings.totalDevices, color = MaterialTheme.colorScheme.primary)
-        StatusChip(count = online, label = strings.online, color = Color(0xFF4CAF50))
-        StatusChip(count = offline, label = strings.offline, color = Color.Gray)
-        StatusChip(count = warning, label = strings.warning, color = Color(0xFFFF9800))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SummaryTile(devices.size, strings.totalDevices, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+            SummaryTile(online, strings.online, Color(0xFF6C9D61), Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SummaryTile(offline, strings.offline, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+            SummaryTile(warning, strings.warning, Color(0xFFB58B45), Modifier.weight(1f))
+        }
     }
 }
 
 @Composable
-fun StatusChip(count: Int, label: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+private fun SummaryTile(count: Int, label: String, color: Color, modifier: Modifier) {
+    OutlinedCard(modifier = modifier, colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Box(Modifier.size(7.dp).background(color, CircleShape))
+                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text(count.toString(), style = MaterialTheme.typography.headlineLarge)
+        }
     }
 }
 
@@ -650,12 +655,12 @@ fun AlertBanner(alerts: List<Alert>) {
 @Composable
 fun DeviceCard(device: Device, onClick: () -> Unit) {
     val statusColor = when (device.status) {
-        "Online" -> Color(0xFF4CAF50)
-        "Offline" -> Color.Gray
-        "Warning" -> Color(0xFFFF9800)
-        "Maintenance" -> Color(0xFF2196F3)
-        "Paused" -> Color(0xFFFF9800)
-        else -> Color.Gray
+        "Online" -> Color(0xFF6C9D61)
+        "Offline" -> MaterialTheme.colorScheme.onSurfaceVariant
+        "Warning" -> Color(0xFFB58B45)
+        "Maintenance" -> Color(0xFF608A84)
+        "Paused" -> Color(0xFFB58B45)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     val statusIcon = when (device.status) {
@@ -671,7 +676,9 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -680,12 +687,9 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Status indicator
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(statusColor)
-            )
+            Surface(shape = RoundedCornerShape(12.dp), color = statusColor.copy(alpha = 0.12f)) {
+                Icon(Icons.Default.Computer, null, tint = statusColor, modifier = Modifier.padding(10.dp).size(22.dp))
+            }
             Spacer(modifier = Modifier.width(12.dp))
 
             // Device info
@@ -723,7 +727,7 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
                             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
                         ) {
                             Text(
-                                text = "🏷️ $gName",
+                                text = "$gName",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -742,7 +746,7 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
                     Text(
                         text = "Tạm dừng",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFE65100),
+                        color = Color(0xFFA87836),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }

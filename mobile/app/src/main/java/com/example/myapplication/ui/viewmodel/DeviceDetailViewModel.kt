@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import com.example.myapplication.util.CommandFeedback
 
 /**
  * Trạng thái UI cho màn hình chi tiết thiết bị (Overview, Metrics, Processes, Commands)
@@ -32,9 +35,13 @@ class DeviceDetailViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(DeviceDetailUiState())
     val uiState: StateFlow<DeviceDetailUiState> = _uiState.asStateFlow()
 
-    fun loadDevice(deviceId: String) {
+    private var watchedCommandId:Int?=null
+    private var commandPollJob:Job?=null
+    private var commandEnglish=false
+
+    fun loadDevice(deviceId: String, silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(isLoading = !silent, error = null)
             try {
                 val response = RetrofitClient.apiService.getDeviceDetail(deviceId)
                 if (response.isSuccessful && response.body() != null) {
@@ -64,7 +71,7 @@ class DeviceDetailViewModel : ViewModel() {
     private fun loadMetrics(deviceId: String) {
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.apiService.getDeviceMetrics(deviceId)
+                val response = RetrofitClient.apiService.getDeviceMetrics(deviceId, from = java.time.Instant.now().minusSeconds(3600).toString(), to = java.time.Instant.now().toString())
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(metrics = response.body()!!)
                 }
@@ -89,25 +96,36 @@ class DeviceDetailViewModel : ViewModel() {
         }
     }
 
-    private fun loadCommands(deviceId: String) {
-        viewModelScope.launch {
-            try {
-                val response = RetrofitClient.apiService.getCommandHistory(deviceId)
-                if (response.isSuccessful && response.body() != null) {
-                    _uiState.value = _uiState.value.copy(commands = response.body()!!)
+    private fun loadCommands(deviceId:String) {
+        viewModelScope.launch { refreshCommands(deviceId) }
+    }
+
+    private suspend fun refreshCommands(deviceId:String) {
+        try {
+            val response=RetrofitClient.apiService.getCommandHistory(deviceId)
+            if(response.isSuccessful&&response.body()!=null){
+                val commands=response.body()!!
+                val watched=commands.find{it.id==watchedCommandId}
+                _uiState.value=_uiState.value.copy(commands=commands)
+                if(watched!=null){
+                    val failed=watched.status in listOf("FAILED","TIMEOUT")
+                    _uiState.value=_uiState.value.copy(
+                        commandSuccess=if(failed)null else CommandFeedback.text(watched,commandEnglish),
+                        error=if(failed)CommandFeedback.text(watched,commandEnglish) else null)
+                    if(CommandFeedback.terminal(watched.status)){
+                        watchedCommandId=null
+                        if(watched.commandType=="KILL_PROCESS")loadProcesses(deviceId)
+                    }
                 }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                // command history lỗi không hiển thị, giữ list rỗng
             }
-        }
+        }catch(e:Exception){if(e is CancellationException)throw e}
     }
 
     fun selectTab(tabIndex: Int) {
         _uiState.value = _uiState.value.copy(selectedTab = tabIndex)
     }
 
-    fun sendCommand(deviceId: String, commandType: String, parameters: Map<String, Any>?, reason: String) {
+    fun sendCommand(deviceId: String, commandType: String, parameters: Map<String, Any>?, reason: String, english:Boolean=false) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, commandSuccess = null, error = null)
             try {
@@ -120,30 +138,19 @@ class DeviceDetailViewModel : ViewModel() {
                     )
                 )
                 if (response.isSuccessful) {
-                    val actionName = when (commandType) {
-                        "KILL_PROCESS" -> "Dừng tiến trình"
-                        "REBOOT" -> "Khởi động lại máy"
-                        "RESTART_SERVICE" -> "Khởi động lại service"
-                        else -> commandType
-                    }
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        commandSuccess = "Đã gửi lệnh $actionName! Đang chờ máy tính thực thi..."
-                    )
-                    loadCommands(deviceId)
-
-                    // Polling kiểm tra kết quả sau 2.5s và 5s
-                    launch {
-                        kotlinx.coroutines.delay(2500)
-                        loadCommands(deviceId)
-                        if (commandType == "KILL_PROCESS") {
-                            loadProcesses(deviceId)
+                    val created=response.body() ?: throw IllegalStateException("Server did not return a command ID")
+                    commandPollJob?.cancel()
+                    commandEnglish=english
+                    watchedCommandId=created.id
+                    _uiState.value=_uiState.value.copy(isLoading=false,commandSuccess=CommandFeedback.text(created,english))
+                    commandPollJob=launch {
+                        // Poll this exact command; never infer completion from an HTTP 201.
+                        repeat(150){
+                            refreshCommands(deviceId)
+                            if(watchedCommandId!=created.id)return@launch
+                            delay(2000)
                         }
-                        kotlinx.coroutines.delay(3000)
-                        loadCommands(deviceId)
-                        if (commandType == "KILL_PROCESS") {
-                            loadProcesses(deviceId)
-                        }
+                        // The normal detail refresh continues checking server state.
                     }
                 } else {
                     _uiState.value = _uiState.value.copy(
@@ -212,21 +219,21 @@ class DeviceDetailViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        commandSuccess = "Đã cập nhật cụm thiết bị thành công!"
+                        commandSuccess = "Đã cập nhật nhóm thiết bị thành công!"
                     )
                     loadDevice(deviceId)
                     onUpdated()
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Cập nhật cụm thất bại (${response.code()})"
+                        error = "Cập nhật nhóm thất bại (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Không thể cập nhật cụm: ${e.message}"
+                    error = "Không thể cập nhật nhóm: ${e.message}"
                 )
             }
         }
@@ -257,6 +264,8 @@ class DeviceDetailViewModel : ViewModel() {
     }
 
     fun clearMessages() {
+        watchedCommandId=null
+        commandPollJob?.cancel()
         _uiState.value = _uiState.value.copy(error = null, commandSuccess = null)
     }
 }

@@ -1,0 +1,11 @@
+# Optional override, only after Firebase credentials exist outside Git.
+services:
+  worker:
+    environment:
+      FCM_ENABLED: "true"
+      FCM_CREDENTIALS_FILE: /run/secrets/firebase.json
+    volumes:
+      - type: bind
+        source: ${FIREBASE_CREDENTIALS_HOST:?Set an absolute path to the Firebase service-account JSON}
+        target: /run/secrets/firebase.json
+        read_only: true

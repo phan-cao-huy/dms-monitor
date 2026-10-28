@@ -64,6 +64,7 @@ class AlertHistory(Base):
     )
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    message_en: Mapped[str | None] = mapped_column(Text)
     metric_value: Mapped[float | None] = mapped_column(Float)
     threshold_value: Mapped[float | None] = mapped_column(Float)
     acknowledged_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"))

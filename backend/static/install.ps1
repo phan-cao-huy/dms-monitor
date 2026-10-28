@@ -128,7 +128,7 @@ Write-Host "[5/5] Dang ky Windows Service '$ServiceName'..." -ForegroundColor Gr
 
 $binPath = "`"$exePath`""
 & sc.exe create $ServiceName binPath= $binPath DisplayName= "DMS Monitor Agent" start= auto obj= LocalSystem | Out-Null
-& sc.exe description $ServiceName "He thong giam sat may tinh tu xa - DMS Monitor Agent v1.1.0" | Out-Null
+& sc.exe description $ServiceName "He thong giam sat may tinh tu xa - DMS Monitor Agent v1.2.0" | Out-Null
 & sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/5000/restart/5000 | Out-Null
 
 # Khoi dong service ngay

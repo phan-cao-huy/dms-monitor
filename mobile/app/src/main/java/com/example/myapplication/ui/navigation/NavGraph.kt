@@ -1,6 +1,12 @@
 package com.example.myapplication.ui.navigation
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.myapplication.ui.screen.AppUpdateNotice
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +49,13 @@ fun NavGraph(
     onNotificationConfigChange: (Boolean, Boolean, Boolean, Boolean) -> Unit = { _, _, _, _ -> }
 ) {
     val authState by authViewModel.uiState.collectAsState()
+    var openUpdateRequested by remember { mutableStateOf(false) }
+    val currentEntry by navController.currentBackStackEntryAsState()
+    AppUpdateNotice(authState.isLoggedIn&&currentEntry?.destination?.route!=Screen.Settings.route){
+        openUpdateRequested=true
+        navController.navigate(Screen.Settings.route){launchSingleTop=true}
+    }
+
 
     val dashboardViewModel: DashboardViewModel = viewModel()
     val orgViewModel: OrganizationViewModel = viewModel()
@@ -198,6 +211,8 @@ fun NavGraph(
         // Settings (ProfileScreen as separate screen)
         composable(Screen.Settings.route) {
             ProfileScreen(
+                openUpdateOnLaunch = openUpdateRequested,
+                onUpdateOpened = { openUpdateRequested=false },
                 user = authState.user,
                 onLogout = handleLogout,
                 onSwitchAccount = handleLogout,
@@ -219,18 +234,28 @@ fun NavGraph(
             val detailViewModel: DeviceDetailViewModel = viewModel()
             val detailState by detailViewModel.uiState.collectAsState()
 
-            LaunchedEffect(deviceId) {
-                detailViewModel.loadDevice(deviceId)
+            val detailLifecycle=LocalLifecycleOwner.current.lifecycle
+            LaunchedEffect(deviceId,detailLifecycle) {
+                detailLifecycle.repeatOnLifecycle(Lifecycle.State.STARTED){
+                    var first=true
+                    while(true){
+                        detailViewModel.loadDevice(deviceId,silent=!first)
+                        dashboardViewModel.refreshAlerts()
+                        first=false
+                        delay(15000)
+                    }
+                }
             }
 
             DeviceDetailScreen(
                 uiState = detailState,
+                alerts = dashboardState.alerts.filter { it.deviceId == deviceId },
                 deviceId = deviceId,
                 groups = dashboardState.groups,
                 onBack = { navController.popBackStack() },
                 onTabSelect = { detailViewModel.selectTab(it) },
                 onSendCommand = { id, type, params, reason ->
-                    detailViewModel.sendCommand(id, type, params, reason)
+                    detailViewModel.sendCommand(id, type, params, reason,english=currentLanguage=="EN")
                 },
                 onClearMessages = { detailViewModel.clearMessages() },
                 onToggleMonitoring = { devId, enable ->
