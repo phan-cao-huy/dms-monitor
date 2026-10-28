@@ -1,4 +1,4 @@
-import {esc, button, field, select, area, empty, date} from './ui.js?v=1.0.22';
+import {esc, button, field, select, area, empty, date} from './ui.js?v=1.0.23';
 
 export function emailView(state, panel){
   const t=(vi,en)=>state.alertLanguage==='en'?en:vi;

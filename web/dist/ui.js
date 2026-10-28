@@ -52,7 +52,7 @@ export function spark(points, color = '#79a46d') {
   const path = points.map((v,i)=>`${i?'L':'M'}${i*66/Math.max(1,points.length-1)},${23-Math.max(0,Math.min(100,v))*0.2}`).join(' ');
   return `<svg class="kpi-spark" viewBox="0 0 66 24" fill="none" aria-hidden="true"><path d="${path}" stroke="${color}" stroke-width="1.6"/></svg>`;
 }
-export function chart(rows, {hourly=false, cpu=true, ram=true, series=null, unit='%', ceiling=100} = {}) {
+export function chart(rows, {hourly=false, cpu=true, ram=true, series=null, unit='%', ceiling=100, resolution=null, stepSeconds=null, showSummary=true} = {}) {
   const configured=series||[[hourly?'cpu_avg':'cpu_usage','#27795c',cpu,'CPU'],[hourly?'ram_avg':'ram_usage','#6489c2',ram,'RAM']];
   const active=configured.filter(s=>s[2]);
   const valid=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v));
@@ -64,10 +64,14 @@ export function chart(rows, {hourly=false, cpu=true, ram=true, series=null, unit
   const max=ceiling??Math.max(1,...active.flatMap(([key])=>normalized.filter(r=>valid(r[key])).map(r=>Number(r[key]))))*1.15;
   const x=r=>end===start?(left+right)/2:left+(right-left)*(new Date(r.created_at||r.hour_bucket).getTime()-start)/(end-start);
   const y=v=>bottom-Math.max(0,Math.min(max,Number(v)))*(bottom-top)/max;
-  const stats=active.map(([key,color,,label])=>{
-    const vals=normalized.filter(r=>valid(r[key])).map(r=>Number(r[key]));
-    return vals.length?'<div class="chart-series-summary" style="--series:'+color+'"><strong>'+esc(label)+'</strong><span>Thấp nhất <b>'+number(Math.min(...vals))+esc(unit)+'</b></span><span>Trung bình <b>'+number(vals.reduce((a,b)=>a+b,0)/vals.length)+esc(unit)+'</b></span><span>Cao nhất <b>'+number(Math.max(...vals))+esc(unit)+'</b></span></div>':'';
-  }).join('');
+  const axisLong=hourly||resolution==='minute'||resolution==='hourly';
+  const stats=showSummary?active.map(([key,color,,label])=>{
+    const samples=normalized.filter(r=>valid(r[key]));
+    const vals=samples.map(r=>Number(r[key]));
+    const weighted=samples.length&&samples.every(r=>Number(r[key+'_samples'])>0);
+    const mean=weighted?samples.reduce((sum,r)=>sum+Number(r[key])*Number(r[key+'_samples']),0)/samples.reduce((sum,r)=>sum+Number(r[key+'_samples']),0):vals.reduce((a,b)=>a+b,0)/Math.max(vals.length,1);
+    return vals.length?'<div class="chart-series-summary" style="--series:'+color+'"><strong>'+esc(label)+'</strong><span>Thấp nhất (điểm) <b>'+number(Math.min(...vals))+esc(unit)+'</b></span><span>'+(weighted?'TB có trọng số':'TB các điểm')+' <b>'+number(mean)+esc(unit)+'</b></span><span>Cao nhất (điểm) <b>'+number(Math.max(...vals))+esc(unit)+'</b></span></div>':'';
+  }).join(''):'';
   const lines=active.map(([key,color,,label])=>{
     const segments=[];let segment=[];
     for(const r of normalized){if(valid(r[key]))segment.push(r);else if(segment.length){segments.push(segment);segment=[];}}
@@ -79,8 +83,8 @@ export function chart(rows, {hourly=false, cpu=true, ram=true, series=null, unit
   }).join('');
   return '<div class="chart-summaries">'+stats+'</div><svg class="telemetry-chart" viewBox="0 0 740 240" role="img" aria-label="'+esc(active.map(s=>s[3]).join(', '))+' theo thời gian">'+[0,.25,.5,.75,1].map(v=>'<line x1="'+left+'" x2="'+right+'" y1="'+y(v*max)+'" y2="'+y(v*max)+'" stroke="var(--border)" stroke-dasharray="4 6"/><text x="3" y="'+(y(v*max)+4)+'" fill="var(--muted)" font-size="11">'+number(v*max)+(unit==='%'?'%':'')+'</text>').join('')+lines+[0,.25,.5,.75,1].map((v)=>{
     const stamp=new Date(start+(end-start)*v).toISOString();
-    return '<text x="'+(left+(right-left)*v)+'" y="228" text-anchor="'+(v===0?'start':v===1?'end':'middle')+'" fill="var(--muted)" font-size="11">'+esc(date(stamp,{day:hourly?'2-digit':undefined,month:hourly?'2-digit':undefined}))+'</text>';
-  }).join('')+'</svg><div class="chart-caption">'+normalized.length+' mẫu dữ liệu · '+(hourly?'Trung bình theo giờ':'Mẫu gốc từ agent')+' · Di chuột vào điểm để xem chi tiết</div>';
+    return '<text x="'+(left+(right-left)*v)+'" y="228" text-anchor="'+(v===0?'start':v===1?'end':'middle')+'" fill="var(--muted)" font-size="11">'+esc(date(stamp,{day:axisLong?'2-digit':undefined,month:axisLong?'2-digit':undefined}))+'</text>';
+  }).join('')+'</svg><div class="chart-caption">'+normalized.length+' mẫu dữ liệu · '+(resolution?({raw:'Tầng mẫu gốc',minute:'Tầng phút',hourly:'Tầng giờ'}[resolution]||resolution)+(stepSeconds?' · Mỗi điểm '+stepSeconds+' giây':''):(hourly?'Trung bình theo giờ':'Mẫu gốc từ agent'))+' · Di chuột vào điểm để xem chi tiết</div>';
 }
 export function csvDownload(filename, rows) {
   const cell = v => {let s=String(v??'');if (/^[=+@\-\t\r]/.test(s)) s="'"+s;return '"'+s.replaceAll('"','""')+'"';};

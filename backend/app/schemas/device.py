@@ -37,6 +37,7 @@ class DeviceUpdate(BaseModel):
 
 
 class DeviceOut(BaseModel):
+    labels: dict[str, str] = Field(default_factory=dict)
     model_config = ConfigDict(from_attributes=True)
 
     device_id: int
@@ -82,6 +83,9 @@ class DeviceDetailOut(DeviceOut):
 class MetricOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    resolution: str = "raw"
+    gpu_usage_pct: float | None = None
+    cpu_temp_c: float | None = None
     metric_id: int | None = None
     device_id: int
     cpu_usage: float
@@ -93,6 +97,7 @@ class MetricOut(BaseModel):
 
 
 class MetricHourlyOut(BaseModel):
+    resolution: str = "hourly"
     model_config = ConfigDict(from_attributes=True)
 
     device_id: int

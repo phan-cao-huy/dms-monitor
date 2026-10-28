@@ -57,9 +57,10 @@ async def get_all_devices(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     org_id: int | None = Query(default=None, description="Lọc theo tổ chức"),
+    label: str | None = Query(default=None, max_length=100),
 ) -> list[dict[str, Any]]:
     """Lấy danh sách các thiết bị người dùng có quyền truy cập."""
-    return await _run(list_devices(db, user.user_id, org_id))
+    return await _run(list_devices(db, user.user_id, org_id, label))
 
 
 @router.get(
@@ -71,9 +72,10 @@ async def get_org_devices(
     org_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
+    label: str | None = Query(default=None, max_length=100),
 ) -> list[dict[str, Any]]:
     """Lấy danh sách thiết bị thuộc tổ chức cụ thể."""
-    return await _run(list_devices(db, user.user_id, org_id))
+    return await _run(list_devices(db, user.user_id, org_id, label))
 
 
 @router.post(
@@ -176,7 +178,7 @@ async def delete_device_endpoint(
 
 @router.get(
     "/devices/{device_id}/metrics",
-    response_model=list[MetricOut] | list[MetricHourlyOut],
+    response_model=None,
     summary="Lấy lịch sử metric thiết bị",
 )
 async def get_metrics(
@@ -185,15 +187,25 @@ async def get_metrics(
     user: Annotated[User, Depends(get_current_user)],
     from_time: Annotated[datetime | None, Query(alias="from")] = None,
     to_time: Annotated[datetime | None, Query(alias="to")] = None,
-    interval: Annotated[str, Query(pattern=r"^(raw|hourly)$")] = "raw",
+    interval: Annotated[str, Query(pattern=r"^(auto|raw|minute|hourly)$")] = "auto",
+    format: Annotated[str, Query(pattern=r"^(list|series)$")] = "list",
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
 ) -> Any:
     """Lấy dữ liệu hiệu năng CPU/RAM/Disk/Network theo chu kỳ raw (thô) hoặc hourly (tổng hợp theo giờ)."""
-    return await _run(
-        get_device_metrics(
-            db, device_id, user.user_id, from_time, to_time, interval, limit
-        )
-    )
+    from app.services.devices import check_user_device_access
+    from app.services.metric_history import device_series, resolution_for, window
+    await _run(check_user_device_access(db, device_id, user.user_id))
+    try:
+        start, end = window(from_time, to_time)
+    except DeviceError as exc:
+        raise HTTPException(exc.status_code, exc.detail) from exc
+    resolution = resolution_for(start, end) if interval == "auto" else interval
+    if format == "list" and interval in ("raw", "hourly"):
+        rows = await _run(get_device_metrics(db, device_id, user.user_id, from_time, to_time, interval, limit))
+        schema = MetricHourlyOut if interval == "hourly" else MetricOut
+        return [schema.model_validate(row) for row in rows]
+    result = await device_series(db, device_id, start, end, resolution, min(limit,500))
+    return result if format == "series" else result["items"]
 
 
 @router.get(

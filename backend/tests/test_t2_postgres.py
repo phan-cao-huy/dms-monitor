@@ -39,7 +39,7 @@ def test_t2_migration_copies_match():
         pytest.skip('Repository copies are checked on host')
     sql=(root/'database/migrate_t2_monitoring.sql').read_text(encoding='utf-8')
     assert sql==(root/'backend/app/db/t2_monitoring.sql').read_text(encoding='utf-8')
-    assert (root/'database/dms01.sql').read_text(encoding='utf-8').endswith(sql)
+    assert sql in (root/'database/dms01.sql').read_text(encoding='utf-8')
 
 
 @pytest.mark.skipif(os.getenv('TEST_POSTGRES')!='1',reason='Requires PostgreSQL; private rollback schema')

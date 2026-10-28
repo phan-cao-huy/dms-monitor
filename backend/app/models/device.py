@@ -66,6 +66,8 @@ class DeviceMetric(Base):
     device_id: Mapped[int] = mapped_column(
         ForeignKey("devices.device_id", ondelete="CASCADE"), nullable=False
     )
+    gpu_usage_pct: Mapped[float | None] = mapped_column(Float)
+    cpu_temp_c: Mapped[float | None] = mapped_column(Float)
     cpu_usage: Mapped[float] = mapped_column(Float, nullable=False)
     ram_usage: Mapped[float] = mapped_column(Float, nullable=False)
     disk_usage: Mapped[float] = mapped_column(Float, nullable=False)
@@ -82,6 +84,8 @@ class DeviceMetric(Base):
 
 class DeviceMetricHourly(Base):
     __tablename__ = "device_metrics_hourly"
+
+    metric_stats: Mapped[dict | None] = mapped_column(JSONB)
 
     device_id: Mapped[int] = mapped_column(
         ForeignKey("devices.device_id", ondelete="CASCADE"), primary_key=True

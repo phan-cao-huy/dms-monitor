@@ -195,6 +195,7 @@ def test_only_one_worker_starts_scheduler():
     with (
         patch("app.workers.runner.engine", engine),
         patch("app.workers.runner.manage_partitions", new=AsyncMock()) as partition,
+        patch("app.workers.metric_rollups.backfill_metrics",new=AsyncMock()),
         patch("app.workers.runner.build_scheduler", return_value=scheduler),
     ):
         asyncio.run(run())

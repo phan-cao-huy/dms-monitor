@@ -1,3 +1,5 @@
+> **T3 (web 1.0.23):** minute/hour statistics, auto-resolution history, labels and scoped analytics; deployed with 124 backend tests (PostgreSQL included) and 23 web tests passing; GPU/CPU-temperature history from new samples. Android/Agent unchanged. See [docs/T3_METRICS_LABELS.md](docs/T3_METRICS_LABELS.md).
+
 > **T2 (web 1.0.22 / Agent 1.3.0):** disk health, native Windows events, process connections, server service checks and incident emails. Deployed; 112 backend tests including PostgreSQL, 19 web tests, Go tests/vet passed. Android deferred. See [docs/T2_MONITORING.md](docs/T2_MONITORING.md).
 
 > **T1 email (web 1.0.21):** web-first at user request; Android remains 1.0.20. See [docs/T1_EMAIL.md](docs/T1_EMAIL.md). SMTP channels, independent delivery ledger, workspace defaults; backend/worker deployed locally; 88 backend tests including PostgreSQL and 15 web tests passed. Real Gmail SMTP verification pending.

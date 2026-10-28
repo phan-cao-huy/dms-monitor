@@ -102,6 +102,7 @@ def test_auth_and_organization_models_match_dms01_tables():
             "updated_at",
         },
         DeviceMetric: {
+            "gpu_usage_pct", "cpu_temp_c",
             "metric_id",
             "device_id",
             "cpu_usage",
@@ -112,6 +113,7 @@ def test_auth_and_organization_models_match_dms01_tables():
             "created_at",
         },
         DeviceMetricHourly: {
+            "metric_stats",
             "device_id",
             "hour_bucket",
             "cpu_avg",

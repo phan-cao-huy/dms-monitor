@@ -7,9 +7,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-
 from app.core.config import settings
 from app.db.base import Base
 from app.models.alert import AlertHistory, AlertRule
@@ -25,6 +22,8 @@ from app.services.devices import (
     verify_device_credentials,
 )
 from app.workers.rules import evaluate_device_rules
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 
 @pytest.mark.skipif(
@@ -56,6 +55,10 @@ async def check_postgres():
                     )
                 )
                 await conn.run_sync(Base.metadata.create_all)
+                migration = Path(__file__).resolve().parents[1].joinpath("app/db/t3_metrics.sql").read_text(encoding="utf-8")
+                for stmt in migration.split(";"):
+                    if stmt.strip():
+                        await conn.execute(text(stmt))
                 await conn.execute(
                     text(
                         Path(__file__)

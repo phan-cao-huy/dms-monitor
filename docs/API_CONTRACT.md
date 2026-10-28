@@ -140,3 +140,37 @@ is enforced at run time and every redirect; private CIDRs are managed outside AP
 List responses include last result (`ok`, `latency_ms`, safe `detail`), failure streak and incident flag.
 No target response body is returned. Audit is recorded for writes/manual runs.
 See `docs/T2_MONITORING.md` for probe, notification, retention and Agent upgrade behaviour.
+
+
+## T3 — Metric tiers, labels and Query API (web 1.0.23)
+
+- `GET /devices/{id}/labels`: object of key/value pairs; device read permission required.
+- `PUT /devices/{id}/labels/{key}`: `{"value":"production"}`; device Owner/Admin/authorized
+  Manager only. Max 20, key lowercase/number/underscore (starts with letter, <=32), value <=64.
+  Device-row locking protects the limit. An existing key may still be edited at the limit.
+- `DELETE /devices/{id}/labels/{key}`: same write permissions, returns 204 (idempotent).
+- `GET /orgs/{id}/devices?label=env:production`: filters visible devices; list/detail now
+  include `labels`. Global `/devices` also accepts the label filter.
+
+`GET /devices/{id}/metrics` now accepts `interval=auto|raw|minute|hourly`, default auto,
+plus `format=list|series`, default list. `from`/`to` have a max positive span of 90 days.
+Explicit raw/hourly list shapes remain compatible with old Android; each includes resolution.
+`format=series` returns `resolution`, `step_seconds`, UTC `from`/`to`, and normalized `items`:
+`device_id`, `created_at`, `resolution`, seven resource values, sample_count (CPU) and per-metric
+`<metric>_samples` counts. Missing GPU/sensor values remain null. Auto picks raw <=6h,
+minute <=3d, hourly for longer ranges. Series/auto data is binned to <=500 points.
+
+`GET /orgs/{id}/metrics/query` parameters:
+- `metric`: cpu_usage, ram_usage, disk_usage, net_in_kbps, net_out_kbps, gpu_usage_pct, cpu_temp_c.
+- `agg`: avg (default), min, max.
+- `group_by`: device (default), group, or label:<valid_key>.
+- `from`/`to`: UTC timestamps, positive span <=90 days; default last hour.
+- `step`: optional integer seconds, 1–86400; effective step may increase for tier/point limits.
+- `label`: optional key:value filter, split at the first colon.
+
+Returns metric/agg/group_by/resolution/step_seconds/from/to and `series` entries containing
+`key`, `name`, `points:[{"timestamp":"...","value":42,"sample_count":10}]`.
+Max 100 series / 500 points each; scope is restricted to the caller's visible devices before
+aggregation. Group and label membership are current, not historical. Avg is weighted by sample
+count, and historical extrema that cannot be reconstructed remain null. Invalid identifiers,
+range, labels or excessive series return 422. See `docs/T3_METRICS_LABELS.md` for rollout details.

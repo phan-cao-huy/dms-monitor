@@ -190,7 +190,7 @@ def _calculate_device_status(device: Device, now: datetime) -> str:
 
 
 async def list_devices(
-    db: AsyncSession, user_id: int, org_id: int | None = None
+    db: AsyncSession, user_id: int, org_id: int | None = None, label: str | None = None
 ) -> list[dict[str, Any]]:
     now = _utc_naive()
 
@@ -233,6 +233,11 @@ async def list_devices(
         Device.archived_at.is_(None),
     ).order_by(Device.device_id.desc())
 
+    from app.models.metrics import DeviceLabel
+    from app.services.device_labels import labels_for, parse_label
+    label_filter = parse_label(label)
+    if label_filter:
+        dev_stmt = dev_stmt.where(select(DeviceLabel.device_id).where(DeviceLabel.device_id == Device.device_id, DeviceLabel.key == label_filter[0], DeviceLabel.value == label_filter[1]).exists())
     dev_res = await db.execute(dev_stmt)
     all_devices = list(dev_res.scalars().all())
 
@@ -266,6 +271,9 @@ async def list_devices(
             }
         )
 
+    label_map = await labels_for(db, [r["device_id"] for r in result]) if result else {}
+    for item in result:
+        item["labels"] = label_map.get(item["device_id"], {})
     return result
 
 
@@ -285,6 +293,8 @@ async def get_device_detail(
     )
     latest_metric = latest_res.scalar_one_or_none()
 
+    from app.services.device_labels import labels_for
+    detail_labels = (await labels_for(db, [device_id])).get(device_id, {})
     static = device.static_info or {}
     group_name = None
     if device.group_id:
@@ -304,6 +314,7 @@ async def get_device_detail(
         "last_heartbeat": device.last_heartbeat,
         "offline_threshold_minutes": device.offline_threshold_minutes,
         "is_monitoring": getattr(device, "is_monitoring", None) is not False,
+        "labels": detail_labels,
         "static_info": device.static_info,
         "top_processes": device.top_processes,
         "watch_config": device.watch_config,
@@ -496,6 +507,8 @@ async def record_heartbeat(
 
     metric = DeviceMetric(
         device_id=device.device_id,
+        gpu_usage_pct=payload.gpu_usage_pct if current_static.get("gpu_name") else None,
+        cpu_temp_c=payload.cpu_temp_c if payload.cpu_temp_c and payload.cpu_temp_c > 0 else None,
         cpu_usage=payload.cpu_usage,
         ram_usage=payload.ram_usage,
         disk_usage=payload.disk_usage,

@@ -16,7 +16,7 @@ test('workspace routes render and demo mode cannot write to the real API',async(
   assert.match(nodes.get('#app').innerHTML,/Trong <em>một tầm nhìn/);
   const click=async(action,data={})=>events.get('click')({preventDefault(){},target:{closest:selector=>selector==='[data-action]'?{dataset:{action,...data},disabled:false}:null}});
   await click('demo');await windowEvents.get('hashchange')();
-  for(const [path,title] of [['/overview','Tổng quan hệ thống'],['/devices','Danh sách thiết bị'],['/devices/1','DESIGN-WS-01'],['/alerts','Lịch sử cảnh báo'],['/organizations','Nhóm thiết bị'],['/activity','Lịch sử lệnh'],['/settings','Cài đặt & tài khoản']]){
+  for(const [path,title] of [['/overview','Tổng quan hệ thống'],['/devices','Danh sách thiết bị'],['/analytics','Phân tích tài nguyên'],['/devices/1','DESIGN-WS-01'],['/alerts','Lịch sử cảnh báo'],['/organizations','Nhóm thiết bị'],['/activity','Lịch sử lệnh'],['/settings','Cài đặt & tài khoản']]){
     location.hash='#'+path;await windowEvents.get('hashchange')();
     const html=nodes.get('#app').innerHTML;
     assert.ok(html.includes(title),`Missing ${title} on ${path}`);

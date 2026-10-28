@@ -2,6 +2,7 @@ from app.models.alert import AlertHistory, AlertRule, AlertRuleState, Maintenanc
 from app.models.auth import AuthToken, User
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
 from app.models.email_channel import EmailChannel, EmailDelivery
+from app.models.metrics import DeviceLabel, DeviceMetricMinute
 from app.models.monitoring import (
     CheckAudit,
     CheckEmailDelivery,
@@ -31,8 +32,10 @@ __all__ = [
     "DeviceCommand",
     "DeviceEvent",
     "DeviceGroup",
+    "DeviceLabel",
     "DeviceMetric",
     "DeviceMetricHourly",
+    "DeviceMetricMinute",
     "EmailChannel",
     "EmailDelivery",
     "MaintenanceWindow",

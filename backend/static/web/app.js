@@ -1,23 +1,25 @@
-const WEB_VERSION='1.0.22';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.22';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.22';
-import {demoData} from './demo.js?v=1.0.22';
+const WEB_VERSION='1.0.23';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.23';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.23';
+import {demoData} from './demo.js?v=1.0.23';
 
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.22';
-import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.22';
+import {analyticsView,labelsPanel,labelForm,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.23';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.23';
+import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.23';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
 const modalRoot = $('#modal-root');
 const demo = demoData();
 const state = {
-  alertLanguage:localStorage.getItem("dms.alertLanguage")||"vi", demo:false, user:null, orgs:[], orgId:null, groups:[], devices:[], details:{}, alerts:[], rules:[], emailChannels:[],checks:[],deviceEvents:[],eventBefore:null,eventNext:null,eventLevel:'',eventDeviceId:null, members:[], invitations:[], metrics:[], commands:[],
+  alertLanguage:localStorage.getItem("dms.alertLanguage")||"vi", demo:false, user:null, orgs:[], orgId:null, groups:[], devices:[], details:{}, alerts:[], rules:[], emailChannels:[],checks:[],deviceEvents:[],eventBefore:null,eventNext:null,eventLevel:'',eventDeviceId:null, members:[], invitations:[], metrics:[],metricsResolution:'raw',metricsStep:null,labelFilter:'all',analysisFilter:{metric:'cpu_usage',agg:'avg',group_by:'device',range:'24h',label:'all',step:''},analysisData:null,analysisBusy:false, commands:[],
   selectedDevice:null, detailTab:'overview', range:'1h', search:'', statusFilter:'all', groupFilter:'all', page:1, alertFilter:'open', orgTab:'groups',
   loading:false, error:'', connection:null, lastUpdated:null, refreshBusy:false, version:null, theme:localStorage.getItem('dms.theme') || 'light', chartCpu:true, chartRam:true,
 };
 const pendingCommands=new Map();
 let loadGeneration=0;
 let chartGeneration=0;
+let analysisGeneration=0;
 let modalHandler=null;
 let pollTimer=null;
 let mobileNavOpen=false;
@@ -51,8 +53,8 @@ function preserveRender(html) {
 }
 function applyTheme(){ document.documentElement.dataset.theme = route()==='/'||route()==='/login'||route()==='/register'?'light':state.theme; }
 function goDemo(){ state.demo=true;Object.assign(state, structuredClone(demo));state.orgId=1;state.selectedDevice=1;state.details=Object.fromEntries(state.devices.map(d=>[d.device_id,d]));state.loading=false;state.error='';state.lastUpdated=new Date();state.connection=true;navigate('/overview'); }
-function resetWorkspace(){pendingCommands.clear();state.commandNotice=null;loadGeneration++;chartGeneration++;Object.assign(state,{orgs:[],orgId:null,groups:[],devices:[],details:{},alerts:[],rules:[],emailChannels:[],checks:[],deviceEvents:[],eventBefore:null,eventNext:null,eventLevel:'',eventDeviceId:null,members:[],invitations:[],metrics:[],commands:[],selectedDevice:null,error:'',page:1});}
-function resetOrgData(){pendingCommands.clear();state.commandNotice=null;loadGeneration++;chartGeneration++;Object.assign(state,{groups:[],devices:[],details:{},alerts:[],rules:[],emailChannels:[],checks:[],deviceEvents:[],eventBefore:null,eventNext:null,eventLevel:'',eventDeviceId:null,members:[],invitations:[],metrics:[],commands:[],selectedDevice:null,groupPermissions:{},search:'',page:1,groupFilter:'all',statusFilter:'all'});}
+function resetWorkspace(){analysisGeneration++;pendingCommands.clear();state.commandNotice=null;loadGeneration++;chartGeneration++;Object.assign(state,{orgs:[],orgId:null,groups:[],devices:[],details:{},alerts:[],rules:[],emailChannels:[],checks:[],deviceEvents:[],eventBefore:null,eventNext:null,eventLevel:'',eventDeviceId:null,members:[],invitations:[],metrics:[],metricsResolution:'raw',metricsStep:null,labelFilter:'all',analysisFilter:{metric:'cpu_usage',agg:'avg',group_by:'device',range:'24h',label:'all',step:''},analysisData:null,analysisBusy:false,commands:[],selectedDevice:null,error:'',page:1});}
+function resetOrgData(){analysisGeneration++;pendingCommands.clear();state.commandNotice=null;loadGeneration++;chartGeneration++;Object.assign(state,{groups:[],devices:[],details:{},alerts:[],rules:[],emailChannels:[],checks:[],deviceEvents:[],eventBefore:null,eventNext:null,eventLevel:'',eventDeviceId:null,members:[],invitations:[],metrics:[],metricsResolution:'raw',metricsStep:null,labelFilter:'all',analysisFilter:{metric:'cpu_usage',agg:'avg',group_by:'device',range:'24h',label:'all',step:''},analysisData:null,analysisBusy:false,commands:[],selectedDevice:null,groupPermissions:{},search:'',page:1,groupFilter:'all',statusFilter:'all'});}
 
 function preview() {
   const line1=demo.metrics.map(r=>r.cpu_usage);const line2=demo.metrics.map(r=>r.ram_usage);
@@ -65,7 +67,7 @@ function landing(){
 function authView(register=false){
   return `<div class="auth-layout"><aside class="auth-art">${brand(true)}<div class="auth-copy"><div class="eyebrow" style="color:#839e8a;margin-bottom:25px">YOUR DEVICES. ONE CLEAR VIEW.</div><h1>Hiểu hệ thống.<br><span>Làm chủ mỗi ngày.</span></h1><p>Một không gian cho thiết bị, đội ngũ và những quyết định kịp thời. Kết nối với dữ liệu DMS bạn đang sử dụng.</p><div class="row" style="margin-top:30px;color:#a8c28f;font-size:12px">${icon('shield')} Kết nối được bảo vệ bằng HTTPS</div></div><div class="auth-footer">DMS Monitor / Web workspace<br>Thiết bị của bạn. Dữ liệu của bạn.</div></aside><main id="main" class="auth-form-wrap"><div class="auth-form"><h2>${register?'Tạo tài khoản DMS':'Chào mừng trở lại.'}</h2><p>${register?'Bắt đầu với không gian làm việc dành cho bạn.':'Đăng nhập để tiếp tục quản lý hệ thống của bạn.'}</p><form id="auth-form" data-register="${register}" autocomplete="on"><div id="auth-error" role="alert"></div>${register?field('Tên đầy đủ','full_name','text','','autocomplete="name" maxlength="150"')+field('Tên đăng nhập','username','text','','required minlength="3" maxlength="50" pattern="[A-Za-z0-9_.\\-]+" autocomplete="username"')+field('Địa chỉ email','email','email','','required autocomplete="email"'):field('Email hoặc tên đăng nhập','identifier','text','','required autocomplete="username" maxlength="100"')}<label class="form-field">Mật khẩu<div class="password-wrap"><input name="password" type="password" required minlength="${register?8:1}" maxlength="72" autocomplete="${register?'new-password':'current-password'}"><button type="button" data-action="show-password" aria-label="Hiện hoặc ẩn mật khẩu">${icon('eye')}</button></div>${register?'<small>Tối thiểu 8 ký tự, tối đa 72 byte UTF-8.</small>':''}</label><button class="btn primary" type="submit">${register?'Tạo tài khoản':'Đăng nhập'} ${icon('arrow')}</button></form><div class="auth-switch">${register?'Đã có tài khoản? <a class="text-link" href="#/login">Đăng nhập</a>':'Chưa có tài khoản? <a class="text-link" href="#/register">Tạo tài khoản</a>'}</div><div class="auth-bottom"><a href="#/">${icon('home')} Về trang chủ</a><span style="margin:0 12px">·</span><button class="btn ghost sm" data-action="demo">Xem giao diện minh họa</button></div></div></main></div>`;
 }
-const navItems=[['/overview','grid','Tổng quan'],['/devices','monitor','Thiết bị'],['/alerts','bell','Cảnh báo'],['/checks','activity','Kiểm tra dịch vụ'],['/organizations','workspace','Không gian & thành viên'],['/activity','activity','Lịch sử lệnh'],['/settings','settings','Cài đặt']];
+const navItems=[['/overview','grid','Tổng quan'],['/devices','monitor','Thiết bị'],['/analytics','activity','Phân tích tài nguyên'],['/alerts','bell','Cảnh báo'],['/checks','activity','Kiểm tra dịch vụ'],['/organizations','workspace','Không gian & thành viên'],['/activity','activity','Lịch sử lệnh'],['/settings','settings','Cài đặt']];
 function shell(body){
   const path=route();const item=navItems.find(([r])=>r===path)||(path.startsWith('/devices/')?navItems[1]:navItems[0]);
   const openAlerts=state.alerts.filter(a=>!a.resolved_at).length;const name=state.user?.full_name||state.user?.username||'Tài khoản DMS';
@@ -77,7 +79,7 @@ function statCards(){
   return `<div class="kpi-grid">${cards.map(([label,value,ico,note,color],i)=>`<article class="kpi"><div class="kpi-top">${label}<span class="kpi-icon">${icon(ico)}</span></div><div class="kpi-value">${state.loading&&!state.lastUpdated?'—':String(value).padStart(2,'0')}</div><div class="kpi-bottom">${i===1?'<span style="color:#72965c">●</span>':''}${esc(note)}</div>${state.demo?spark([20,32,25,48,37,44,34,56,45,52],color):''}</article>`).join('')}</div>`;
 }
 function chartPanel(){
-  return panel('Hiệu năng thiết bị','Mức sử dụng CPU và bộ nhớ theo thời gian',`<div class="chart-controls"><select id="chart-device" aria-label="Thiết bị hiển thị biểu đồ">${state.devices.map(d=>`<option value="${d.device_id}" ${String(state.selectedDevice)===String(d.device_id)?'selected':''}>${esc(d.device_name)}</option>`).join('')||'<option>Chưa có thiết bị</option>'}</select><div class="chart-legend" style="margin:0 0 0 auto"><button class="btn ghost sm" data-action="chart-cpu" aria-pressed="${state.chartCpu}" style="opacity:${state.chartCpu?1:.4}"><i class="legend-line"></i>CPU</button><button class="btn ghost sm" data-action="chart-ram" aria-pressed="${state.chartRam}" style="opacity:${state.chartRam?1:.4}"><i class="legend-line blue"></i>RAM</button></div></div><div class="chart-wrap">${chart(state.metrics,{hourly:state.range!=='1h',cpu:state.chartCpu,ram:state.chartRam})}</div>`,`<div class="segmented">${[['1h','1 giờ'],['24h','24 giờ'],['7d','7 ngày']].map(([v,label])=>`<button data-action="range" data-value="${v}" class="${v===state.range?'active':''}">${label}</button>`).join('')}</div>`);
+  return panel('Hiệu năng thiết bị','Mức sử dụng CPU và bộ nhớ theo thời gian',`<div class="chart-controls"><select id="chart-device" aria-label="Thiết bị hiển thị biểu đồ">${state.devices.map(d=>`<option value="${d.device_id}" ${String(state.selectedDevice)===String(d.device_id)?'selected':''}>${esc(d.device_name)}</option>`).join('')||'<option>Chưa có thiết bị</option>'}</select><div class="chart-legend" style="margin:0 0 0 auto"><button class="btn ghost sm" data-action="chart-cpu" aria-pressed="${state.chartCpu}" style="opacity:${state.chartCpu?1:.4}"><i class="legend-line"></i>CPU</button><button class="btn ghost sm" data-action="chart-ram" aria-pressed="${state.chartRam}" style="opacity:${state.chartRam?1:.4}"><i class="legend-line blue"></i>RAM</button></div></div><div class="chart-wrap">${chart(state.metrics,{hourly:false,resolution:state.metricsResolution,stepSeconds:state.metricsStep,cpu:state.chartCpu,ram:state.chartRam})}</div>`,`<div class="segmented">${[['1h','1 giờ'],['24h','24 giờ'],['7d','7 ngày']].map(([v,label])=>`<button data-action="range" data-value="${v}" class="${v===state.range?'active':''}">${label}</button>`).join('')}</div>`);
 }
 function statusPanel(){
   const total=state.devices.length;const entries=[['Online','Trực tuyến','#83ad6c'],['Warning','Cảnh báo','#d9b46b'],['Offline','Ngoại tuyến','#c7d1d8'],['Paused','Tạm dừng','#8ca8ba']];let offset=0;
@@ -86,36 +88,37 @@ function statusPanel(){
 }
 function filteredDevices(){
   const query=state.search.toLocaleLowerCase('vi');
-  return state.devices.filter(d=>(!query||`${d.device_name} ${d.group_name||''} ${d.description||''}`.toLocaleLowerCase('vi').includes(query))&&(state.statusFilter==='all'||d.status===state.statusFilter)&&(state.groupFilter==='all'||(state.groupFilter==='none'?!d.group_id:String(d.group_id)===state.groupFilter)));
+  return state.devices.filter(d=>(!query||`${d.device_name} ${d.group_name||''} ${d.description||''}`.toLocaleLowerCase('vi').includes(query))&&(state.statusFilter==='all'||d.status===state.statusFilter)&&(state.groupFilter==='all'||(state.groupFilter==='none'?!d.group_id:String(d.group_id)===state.groupFilter))&&matchesLabel(d,state.labelFilter));
 }
 function deviceTable(compact=false){
   const devices=filteredDevices();const pages=Math.max(1,Math.ceil(devices.length/8));state.page=Math.min(state.page,pages);const visible=devices.slice((state.page-1)*8,state.page*8);
-  return panel(compact?'Thiết bị trong không gian':'Danh sách thiết bị',`${state.devices.length} thiết bị · ${state.groups.length} nhóm`,`${compact?'':`<div class="toolbar"><div class="toolbar-left"><div class="search-box">${icon('search')}<input id="device-search" placeholder="Tìm kiếm thiết bị…" aria-label="Tìm thiết bị" value="${esc(state.search)}"></div><select class="filter-select" id="status-filter" aria-label="Lọc trạng thái">${[['all','Mọi trạng thái'],['Online','Trực tuyến'],['Warning','Cảnh báo'],['Offline','Ngoại tuyến'],['Paused','Tạm dừng']].map(([v,l])=>`<option value="${v}" ${v===state.statusFilter?'selected':''}>${l}</option>`).join('')}</select><select class="filter-select" id="group-filter" aria-label="Lọc theo nhóm">${[['all','Tất cả các nhóm'],['none','Chưa phân nhóm'],...state.groups.map(g=>[String(g.group_id),g.group_name])].map(([v,l])=>`<option value="${v}" ${v===state.groupFilter?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${button('Xuất CSV','export-devices','sm','download')}</div>`}${state.loading&&!state.devices.length?loading():visible.length?`<div class="table-scroll"><table><thead><tr><th>Tên thiết bị</th><th>Trạng thái</th><th>Nhóm thiết bị</th><th>CPU</th><th>RAM</th><th>Cập nhật lần cuối</th><th></th></tr></thead><tbody>${visible.map(d=>{const info=state.details[d.device_id]||d;return `<tr><td><a class="device-cell" href="#/devices/${d.device_id}"><span class="device-icon">${icon(d.group_name?.includes('Hạ tầng')?'server':'monitor')}</span><span><strong>${esc(d.device_name)}</strong><small>${esc(info.static_info?.os_name||'Windows PC')} ${esc(info.static_info?.ip_private||info.static_info?.local_ip||'')}</small></span></a></td><td>${status(d.status)}</td><td class="muted">${esc(d.group_name||'Chưa phân nhóm')}</td><td>${meter(d.status==='Paused'||d.status==='Offline'?null:info.cpu_usage)}</td><td>${meter(d.status==='Paused'||d.status==='Offline'?null:info.ram_usage)}</td><td class="muted" title="${esc(date(d.last_heartbeat))}">${esc(ago(d.last_heartbeat))}</td><td><a href="#/devices/${d.device_id}" class="icon-btn" aria-label="Chi tiết ${esc(d.device_name)}" style="width:26px;height:26px;border:0">${icon('chevron')}</a></td></tr>`;}).join('')}</tbody></table></div><div class="table-footer"><span>Hiển thị ${(state.page-1)*8+1}–${Math.min(state.page*8,devices.length)} / ${devices.length} thiết bị</span><div class="pagination">${button('←','page','sm','',`data-value="${state.page-1}" ${state.page<=1?'disabled':''}`)}<span style="padding:0 7px">${state.page} / ${pages}</span>${button('→','page','sm','',`data-value="${state.page+1}" ${state.page>=pages?'disabled':''}`)}</div></div>`:empty(state.devices.length?'Không tìm thấy thiết bị':'Chưa có thiết bị nào',state.devices.length?'Thử thay đổi từ khóa hoặc điều kiện lọc.':'Kết nối máy tính đầu tiên để bắt đầu theo dõi tài nguyên và trạng thái.', 'monitor',admin()?button('Thêm thiết bị đầu tiên','add-device','primary','plus'):'' )}`,compact?'<a class="text-link text-xs" href="#/devices">Tất cả thiết bị →</a>':'');
+  return panel(compact?'Thiết bị trong không gian':'Danh sách thiết bị',`${state.devices.length} thiết bị · ${state.groups.length} nhóm`,`${compact?'':`<div class="toolbar"><div class="toolbar-left"><div class="search-box">${icon('search')}<input id="device-search" placeholder="Tìm kiếm thiết bị…" aria-label="Tìm thiết bị" value="${esc(state.search)}"></div><select class="filter-select" id="status-filter" aria-label="Lọc trạng thái">${[['all','Mọi trạng thái'],['Online','Trực tuyến'],['Warning','Cảnh báo'],['Offline','Ngoại tuyến'],['Paused','Tạm dừng']].map(([v,l])=>`<option value="${v}" ${v===state.statusFilter?'selected':''}>${l}</option>`).join('')}</select><select class="filter-select" id="group-filter" aria-label="Lọc theo nhóm">${[['all','Tất cả các nhóm'],['none','Chưa phân nhóm'],...state.groups.map(g=>[String(g.group_id),g.group_name])].map(([v,l])=>`<option value="${v}" ${v===state.groupFilter?'selected':''}>${esc(l)}</option>`).join('')}</select><select class="filter-select" id="label-filter" aria-label="Lọc theo nhãn">${[['all','Tất cả nhãn'],...labelOptions(state.devices)].map(([v,l])=>`<option value="${esc(v)}" ${v===state.labelFilter?'selected':''}>${esc(l)}</option>`).join('')}</select></div>${button('Xuất CSV','export-devices','sm','download')}</div>`}${state.loading&&!state.devices.length?loading():visible.length?`<div class="table-scroll"><table><thead><tr><th>Tên thiết bị</th><th>Trạng thái</th><th>Nhóm thiết bị</th><th>CPU</th><th>RAM</th><th>Cập nhật lần cuối</th><th></th></tr></thead><tbody>${visible.map(d=>{const info=state.details[d.device_id]||d;return `<tr><td><a class="device-cell" href="#/devices/${d.device_id}"><span class="device-icon">${icon(d.group_name?.includes('Hạ tầng')?'server':'monitor')}</span><span><strong>${esc(d.device_name)}</strong><div class="device-labels">${labelChips(d.labels)}</div><small>${esc(info.static_info?.os_name||'Windows PC')} ${esc(info.static_info?.ip_private||info.static_info?.local_ip||'')}</small></span></a></td><td>${status(d.status)}</td><td class="muted">${esc(d.group_name||'Chưa phân nhóm')}</td><td>${meter(d.status==='Paused'||d.status==='Offline'?null:info.cpu_usage)}</td><td>${meter(d.status==='Paused'||d.status==='Offline'?null:info.ram_usage)}</td><td class="muted" title="${esc(date(d.last_heartbeat))}">${esc(ago(d.last_heartbeat))}</td><td><a href="#/devices/${d.device_id}" class="icon-btn" aria-label="Chi tiết ${esc(d.device_name)}" style="width:26px;height:26px;border:0">${icon('chevron')}</a></td></tr>`;}).join('')}</tbody></table></div><div class="table-footer"><span>Hiển thị ${(state.page-1)*8+1}–${Math.min(state.page*8,devices.length)} / ${devices.length} thiết bị</span><div class="pagination">${button('←','page','sm','',`data-value="${state.page-1}" ${state.page<=1?'disabled':''}`)}<span style="padding:0 7px">${state.page} / ${pages}</span>${button('→','page','sm','',`data-value="${state.page+1}" ${state.page>=pages?'disabled':''}`)}</div></div>`:empty(state.devices.length?'Không tìm thấy thiết bị':'Chưa có thiết bị nào',state.devices.length?'Thử thay đổi từ khóa hoặc điều kiện lọc.':'Kết nối máy tính đầu tiên để bắt đầu theo dõi tài nguyên và trạng thái.', 'monitor',admin()?button('Thêm thiết bị đầu tiên','add-device','primary','plus'):'' )}`,compact?'<a class="text-link text-xs" href="#/devices">Tất cả thiết bị →</a>':'');
 }
 function overview(){return heading('Tổng quan hệ thống','Một góc nhìn rõ ràng về thiết bị và hoạt động của đội ngũ.',button('Làm mới','refresh','','refresh',state.refreshBusy?'disabled':'')+(admin()?button('Thêm thiết bị','add-device','primary','plus'):''))+statCards()+`<div class="grid-chart">${chartPanel()}${statusPanel()}</div>`+deviceTable(false);}
 function devicesView(){return heading('Thiết bị','Quản lý máy tính, trạng thái kết nối và hiệu năng.',button('Làm mới','refresh','','refresh')+(admin()?button('Thêm thiết bị','add-device','primary','plus'):''))+deviceTable(false);}
 
 function resourceCharts(){
-  const hourly=state.range!=='1h';
-  const ranges='<div class="segmented">'+[['1h','1 giờ'],['24h','24 giờ'],['7d','7 ngày']].map(([v,t])=>'<button data-action="range" data-value="'+v+'" class="'+(state.range===v?'active':'')+'">'+t+'</button>').join('')+'</div>';
+  const ranges='<div class="segmented">'+rangeOptions.map(([v,t])=>'<button data-action="range" data-value="'+v+'" class="'+(state.range===v?'active':'')+'">'+t+'</button>').join('')+'</div>';
   const configs=[
-    ['CPU','Mức sử dụng bộ xử lý','cpu',[[hourly?'cpu_avg':'cpu_usage','#27795c',true,'CPU']], '%',100],
-    ['RAM','Mức sử dụng bộ nhớ','memory',[[hourly?'ram_avg':'ram_usage','#6489c2',true,'RAM']], '%',100],
-    ['Ổ đĩa','Tỷ lệ dung lượng đã sử dụng','disk',[[hourly?'disk_avg':'disk_usage','#b58b45',true,'Ổ đĩa']], '%',100],
-    ['Lưu lượng mạng','Tốc độ tải xuống và tải lên','wifi',[[hourly?'net_in_avg_kbps':'net_in_kbps','#608a84',true,'Tải xuống'],[hourly?'net_out_avg_kbps':'net_out_kbps','#9674ac',true,'Tải lên']], ' KB/s',null]
+    ['CPU','Mức sử dụng bộ xử lý','cpu',[['cpu_usage','#27795c',true,'CPU']], '%',100],
+    ['RAM','Mức sử dụng bộ nhớ','memory',[['ram_usage','#6489c2',true,'RAM']], '%',100],
+    ['Ổ đĩa','Tỷ lệ dung lượng đã sử dụng','disk',[['disk_usage','#b58b45',true,'Ổ đĩa']], '%',100],
+    ['GPU','Lịch sử từ mẫu mới do Agent cung cấp','monitor',[['gpu_usage_pct','#9674ac',true,'GPU']], '%',100],
+    ['Nhiệt độ CPU','Chỉ ghi khi đọc được cảm biến','cpu',[['cpu_temp_c','#c95a53',true,'CPU']], ' °C',null],
+    ['Lưu lượng mạng','Tốc độ tải xuống và tải lên','wifi',[['net_in_kbps','#608a84',true,'Tải xuống'],['net_out_kbps','#9674ac',true,'Tải lên']], ' KB/s',null]
   ];
-  return '<div class="metrics-toolbar"><div><strong>Phân tích tài nguyên</strong><p>Cùng khoảng thời gian cho tất cả biểu đồ</p></div>'+ranges+'</div><div class="resource-charts">'+configs.map(([title,sub,ico,series,unit,ceiling])=>panel(icon(ico)+' '+title,sub,'<div class="chart-wrap">'+chart(state.metrics,{hourly,series,unit,ceiling})+'</div>','','metric-panel')).join('')+'</div><div class="notice gap-top">GPU: API hiện cung cấp số liệu mới nhất ở tab Tổng quan; chưa có dữ liệu lịch sử GPU.</div>';
+  return '<div class="metrics-toolbar"><div><strong>Phân tích tài nguyên</strong><p>'+resolutionText(state.metricsResolution)+(state.metricsStep?' · Mỗi điểm '+state.metricsStep+' giây':'')+'</p></div>'+ranges+'</div><div class="resource-charts">'+configs.map(([title,sub,ico,series,unit,ceiling])=>panel(icon(ico)+' '+title,sub,'<div class="chart-wrap">'+chart(state.metrics,{series,unit,ceiling,resolution:state.metricsResolution,stepSeconds:state.metricsStep})+'</div>','','metric-panel')).join('')+'</div><div class="notice gap-top">Lịch sử GPU/nhiệt độ bắt đầu khi server lưu các mẫu mới; phần không có dữ liệu được giữ trống.</div>';
 }
 function canControl(d){return !d?.archived_at&&(admin()||(d?.group_id?state.groupPermissions?.[d.group_id]==='Manager':org()?.role==='Manager'));}
 function deviceOverview(d){
-  const info=d.static_info||{},stale=['Offline','Paused'].includes(d.status),rows=state.metrics,hourly=state.range!=='1h';
+  const info=d.static_info||{},stale=['Offline','Paused'].includes(d.status),rows=state.metrics,hourly=false;
   const disks=[...(d.disks||[])].sort((a,b)=>String(a.mountpoint).localeCompare(String(b.mountpoint)));
   const alerts=state.alerts.filter(a=>String(a.device_id)===String(d.device_id)&&!a.resolved_at);
   const resource=(name,value,ico,sub,key,color)=>`<article class="resource-stat"><div class="split"><small>${name}</small>${icon(ico)}</div><strong>${percent(value)}</strong><p class="text-sm muted">${sub}</p>${meter(value,' ')}<div class="resource-history">${key?spark(rows.map(r=>r[key]).filter(v=>v!=null&&Number.isFinite(Number(v))),color)||'<span>Chưa có lịch sử</span>':'<span>Số liệu mới nhất · chưa có lịch sử GPU</span>'}</div></article>`;
   const ramTotal=info.ram_total_mb?info.ram_total_mb/1024:null;
   const ram=ramTotal&&d.ram_usage!=null?`~${number(ramTotal*d.ram_usage/100)} / ${number(ramTotal)} GB`:'Chưa có dung lượng bộ nhớ';
   const gpuSub=`${esc(d.gpu_name||info.gpu_name||'Chưa nhận tên GPU')} · VRAM ${d.gpu_vram_used_mb==null?'—':number(d.gpu_vram_used_mb/1024)} / ${d.gpu_vram_total_mb==null?'—':number(d.gpu_vram_total_mb/1024)} GB`;
-  const resources='<div class="overview-resources">'+resource('CPU',d.cpu_usage,'cpu',d.cpu_temp_c>0?number(d.cpu_temp_c)+' °C':'Không có cảm biến nhiệt độ',hourly?'cpu_avg':'cpu_usage','#27795c')+resource('RAM',d.ram_usage,'memory',ram,hourly?'ram_avg':'ram_usage','#6489c2')+resource('GPU',d.gpu_usage_pct,'monitor',gpuSub,null,'#9674ac')+'</div>';
+  const resources='<div class="overview-resources">'+resource('CPU',d.cpu_usage,'cpu',d.cpu_temp_c>0?number(d.cpu_temp_c)+' °C':'Không có cảm biến nhiệt độ',hourly?'cpu_avg':'cpu_usage','#27795c')+resource('RAM',d.ram_usage,'memory',ram,hourly?'ram_avg':'ram_usage','#6489c2')+resource('GPU',d.gpu_usage_pct,'monitor',gpuSub,'gpu_usage_pct','#9674ac')+'</div>';
   const driveCards=disks.map(disk=>`<article class="drive-card"><div class="split"><h3>${icon('disk')} ${esc(disk.mountpoint||'—')}</h3><span class="pill">${esc(disk.fstype||'Phân vùng')}</span></div><strong class="drive-usage">${percent(disk.used_percent)}</strong>${meter(disk.used_percent,' ')}<div class="drive-capacity"><span>Đã dùng<b>${number(disk.used_gb)} GB</b></span><span>Còn trống<b>${number(disk.free_gb)} GB</b></span><span>Tổng<b>${number(disk.total_gb)} GB</b></span></div>${disk.used_percent>=90?'<p class="drive-warning">Phân vùng sắp đầy (≥ 90%)</p>':''}</article>`).join('');
   const processes=[...(d.top_processes||[])].sort((a,b)=>state.overviewSort==='ram'?(b.ram_mb||0)-(a.ram_mb||0):state.overviewSort==='gpu'?(b.gpu_usage_pct??-1)-(a.gpu_usage_pct??-1):(b.cpu_percent??b.cpu_pct??0)-(a.cpu_percent??a.cpu_pct??0)).slice(0,5);
   return panel('Trạng thái thiết bị','Trạng thái kết nối và thời điểm cập nhật',`<div class="panel-body"><div class="row wrap">${status(d.status)}<strong>Cập nhật cuối: ${esc(date(d.last_heartbeat))}</strong><span class="muted">Hoạt động: ${d.uptime_seconds==null?'—':Math.floor(d.uptime_seconds/86400)+' ngày '+Math.floor(d.uptime_seconds%86400/3600)+' giờ'}</span></div>${stale?'<div class="notice gap-top">Dữ liệu lần cuối đã lưu; không phản ánh trạng thái sử dụng hiện tại.</div>':''}</div>`)+
@@ -155,6 +158,7 @@ function deviceView(){
   }else if(state.detailTab==='connections'){body=connectionsView(d,panel);
   }else if(state.detailTab==='commands')body=commandsTable();
   else body=`<div class="detail-grid">${panel('Thông tin thiết bị','Cập nhật tên, mô tả và nhóm thiết bị.',`<div class="panel-body">${kv('Tên hiển thị',d.device_name)}${kv('Mô tả',d.description||'Chưa có mô tả')}${kv('Nhóm thiết bị',d.group_name||'Chưa phân nhóm')}${kv('Theo dõi',d.is_monitoring?'Đang bật':'Tạm dừng')}${canControl(d)?`<div class="gap-top">${button('Chỉnh sửa thiết bị','edit-device','','edit')}</div>`:''}</div>`)}${panel('Tác vụ quản trị','Thao tác nhạy cảm cần được xác nhận.',`<div class="panel-body">${admin()?`<div class="setting-row"><div><strong>Tạo lại token agent</strong><p>Token hiện tại sẽ hết hiệu lực.</p></div>${button('Tạo lại','regenerate-token','sm','key')}</div>`:''}${canControl(d)?`<div class="setting-row"><div><strong>Xóa thiết bị & gỡ agent</strong><p>Gửi lệnh gỡ phần mềm xuống máy tính.</p></div>${button('Xóa thiết bị','delete-device','sm danger','trash')}</div>`:'<p class="muted text-sm">Tài khoản của bạn không có quyền thay đổi thiết bị này.</p>'}</div>`)}</div>`;
+  if(state.detailTab==='settings')body+='<div class="gap-top">'+labelsPanel(d,canControl(d),panel)+'</div>';
   return `<a class="text-link text-xs" href="#/devices" style="display:inline-block;margin-bottom:18px">← Danh sách thiết bị</a><div class="page-heading">${title}<div class="heading-actions">${controls}</div></div>${state.commandNotice&&String(state.commandNotice.deviceId)===String(d.device_id)?`<div class="notice ${['FAILED','TIMEOUT'].includes(state.commandNotice.command.status)?'error':''}" role="status"><strong>${esc(commandFeedback(state.commandNotice.command))}</strong></div>`:''}<div class="tabs" role="tablist">${[['overview','Tổng quan'],['metrics','Lịch sử hiệu năng'],['processes','Tiến trình'],['connections','Kết nối mạng'],['events','Nhật ký Windows'],['commands','Lịch sử lệnh'],['settings','Cấu hình']].map(([key,label])=>`<button role="tab" aria-selected="${key===state.detailTab}" data-action="detail-tab" data-value="${key}" class="${key===state.detailTab?'active':''}">${label}</button>`).join('')}</div>${body}`;
 }
 function commandsTable(){
@@ -194,18 +198,18 @@ function render(){
   if(path==='/login'||path==='/register'){document.title=(path==='/login'?'Đăng nhập':'Đăng ký')+' · DMS Monitor';preserveRender(authView(path==='/register'));return;}
   if(!state.user){if(api.session){preserveRender(`<main class="boot"><span class="brand-mark">d</span><div><p>${state.error?esc(state.error):'Đang mở không gian làm việc…'}</p>${state.error?button('Thử lại','refresh','sm','refresh')+button('Đăng xuất','logout','sm'):''}</div></main>`);return;}navigate('/login');return;}
   document.title=(navItems.find(([r])=>r===path)?.[2]||'Chi tiết thiết bị')+' · DMS Monitor';
-  let content=path==='/overview'?overview():path==='/devices'?devicesView():path.startsWith('/devices/')?deviceView():path==='/alerts'?alertsView():path==='/checks'?(admin()?checksView(state,panel,heading):empty('Không có quyền','Chỉ Owner/Admin được xem và quản lý kiểm tra dịch vụ.','shield')):path==='/organizations'?organizationsView():path==='/activity'?activityView():path==='/settings'?settingsView():empty('Không tìm thấy trang','Về trang tổng quan để tiếp tục.','home','<a href="#/overview" class="btn primary">Về tổng quan</a>');
+  let content=path==='/overview'?overview():path==='/devices'?devicesView():path==='/analytics'?analyticsView(state,panel,heading):path.startsWith('/devices/')?deviceView():path==='/alerts'?alertsView():path==='/checks'?(admin()?checksView(state,panel,heading):empty('Không có quyền','Chỉ Owner/Admin được xem và quản lý kiểm tra dịch vụ.','shield')):path==='/organizations'?organizationsView():path==='/activity'?activityView():path==='/settings'?settingsView():empty('Không tìm thấy trang','Về trang tổng quan để tiếp tục.','home','<a href="#/overview" class="btn primary">Về tổng quan</a>');
   preserveRender(shell(content));
 }
 
 async function mapPool(items, fn, limit=4){let index=0;const result=[];await Promise.all(Array.from({length:Math.min(limit,items.length)},async()=>{while(index<items.length){const i=index++;result[i]=await fn(items[i],i);}}));return result;}
 async function loadChart(){
   const id=state.selectedDevice;if(!id){state.metrics=[];return;}
-  if(state.demo){state.metrics=structuredClone(demo.metrics).map(m=>state.range==='1h'?m:{hour_bucket:m.created_at,cpu_avg:m.cpu_usage,ram_avg:m.ram_usage,disk_avg:m.disk_usage,net_in_avg_kbps:m.net_in_kbps,net_out_avg_kbps:m.net_out_kbps});return;}
-  const generation=++chartGeneration;const hours=state.range==='1h'?1:state.range==='24h'?24:168;
-  const query=qs({from:new Date(Date.now()-hours*3600000).toISOString(),to:new Date().toISOString(),interval:state.range==='1h'?'raw':'hourly',limit:1000});
+  if(state.demo){state.metrics=structuredClone(demo.metrics);state.metricsResolution='raw';state.metricsStep=null;return;}
+  const generation=++chartGeneration,hours=rangeHours(state.range),end=new Date();
+  const query=qs({from:new Date(end.getTime()-hours*3600000).toISOString(),to:end.toISOString(),interval:'auto',format:'series',limit:500});
   const data=await api.request(`devices/${safeNumber(id)}/metrics?${query}`);
-  if(generation===chartGeneration&&String(id)===String(state.selectedDevice))state.metrics=data;
+  if(generation===chartGeneration&&String(id)===String(state.selectedDevice)){state.metrics=fillTimeline(data.items,data.from,data.to,data.step_seconds);state.metricsResolution=data.resolution;state.metricsStep=data.step_seconds;}
 }
 function syncCommandNotice(commands){
   const notice=state.commandNotice;
@@ -274,6 +278,7 @@ async function loadWorkspace({silent=false}={}){
     ]);
     if(generation!==loadGeneration)return;
     Object.assign(state,{devices,groups,alerts,rules,members,version,connection:true});
+    if(state.labelFilter!=='all'&&!labelOptions(devices).some(([value])=>value===state.labelFilter))state.labelFilter='all';
     if(admin()){const channels=await api.request(`orgs/${id}/email-channels`);if(generation!==loadGeneration)return;state.emailChannels=channels;const checks=await api.request(`orgs/${id}/checks`);if(generation!==loadGeneration)return;state.checks=checks;}else {state.emailChannels=[];state.checks=[];}
     if(!devices.some(d=>String(d.device_id)===String(state.selectedDevice)))state.selectedDevice=devices.find(d=>d.status==='Online')?.device_id||devices[0]?.device_id||null;
     if(!admin()){
@@ -337,7 +342,7 @@ async function refreshCurrent(){
   if(!state.user&&api.session)return bootstrap();
   await loadWorkspace();
 }
-const writeActions=new Set(['add-check','edit-check','run-check','delete-check','add-email','edit-email','test-email','delete-email','add-device','edit-device','toggle-monitoring','device-command','kill-process','delete-device','regenerate-token','create-org','join-org','leave-org','add-group','edit-group','delete-group','add-invitation','member-role','remove-member','remove-group-member','add-rule','edit-rule','delete-rule','ack-alert','resolve-alert']);
+const writeActions=new Set(['add-label','edit-label','delete-label','add-check','edit-check','run-check','delete-check','add-email','edit-email','test-email','delete-email','add-device','edit-device','toggle-monitoring','device-command','kill-process','delete-device','regenerate-token','create-org','join-org','leave-org','add-group','edit-group','delete-group','add-invitation','member-role','remove-member','remove-group-member','add-rule','edit-rule','delete-rule','ack-alert','resolve-alert']);
 
 async function action(name, element){
   const id=element?.dataset.id;const value=element?.dataset.value;
@@ -439,6 +444,16 @@ async function action(name, element){
       await api.request(r?`${base}/${r.check_id}`:base,{method:r?'PUT':'POST',body:checkPayload(f)});toast('Đã lưu phép kiểm tra.');await loadWorkspace();
     }});return;
   }
+  if(['add-label','edit-label','delete-label'].includes(name)){
+    const d=currentDevice();if(!d||!canControl(d))throw new Error('Bạn không có quyền sửa nhãn thiết bị này.');
+    const key=element.dataset.key||'',deviceId=safeNumber(d.device_id),orgId=state.orgId,base=`devices/${deviceId}/labels`;
+    if(name==='delete-label'){confirmAction('Xóa nhãn thiết bị',esc(key),async()=>{await api.request(`${base}/${encodeURIComponent(key)}`,{method:'DELETE'});});return;}
+    openModal(key?'Chỉnh nhãn thiết bị':'Thêm nhãn thiết bị',labelForm(key,d.labels?.[key]||''),{onSubmit:async f=>{
+      if(String(state.orgId)!==String(orgId))throw new Error('Không gian đã thay đổi.');
+      const labelKey=String(f.get('key')).trim();await api.request(`${base}/${encodeURIComponent(labelKey)}`,{method:'PUT',body:{value:String(f.get('value'))}});
+      toast('Đã lưu nhãn thiết bị.');await loadWorkspace();
+    }});return;
+  }
   if(name==='edit-rule'){
     const r=state.rules.find(r=>String(r.rule_id)===String(id));if(!r)return;
     const numeric=!['SERVICE','PROCESS_MISSING','DISK_HEALTH'].includes(r.metric_type);
@@ -476,6 +491,7 @@ document.addEventListener('input',event=>{
   if(event.target.id==='device-search'){state.search=event.target.value;state.page=1;render();}
 });
 document.addEventListener('change',async event=>{
+  if(event.target.closest?.('#analysis-form')){state.analysisFilter[event.target.name]=event.target.value;return;}
   if(event.target.name==='event_level'){state.eventLevel=event.target.value;state.eventBefore=null;try{await loadEvents(state.selectedDevice);render();}catch(e){toast(e.message,'error');}return;}
   if(event.target.name==='alert_language'){state.alertLanguage=event.target.value;localStorage.setItem('dms.alertLanguage',state.alertLanguage);render();return;}
 
@@ -493,6 +509,7 @@ document.addEventListener('change',async event=>{
   try{
     if(event.target.id==='org-picker'){const id=safeNumber(event.target.value);resetOrgData();state.orgId=id;await loadWorkspace();}
     if(event.target.id==='status-filter'){state.statusFilter=event.target.value;state.page=1;render();}
+    if(event.target.id==='label-filter'){state.labelFilter=event.target.value;state.page=1;render();}
     if(event.target.id==='group-filter'){state.groupFilter=event.target.value;state.page=1;render();}
     if(event.target.id==='chart-device'||event.target.id==='activity-device'){
       chartGeneration++;state.selectedDevice=safeNumber(event.target.value);state.metrics=[];state.commands=[];render();await loadDetail(state.selectedDevice);render();
@@ -501,6 +518,19 @@ document.addEventListener('change',async event=>{
 });
 document.addEventListener('submit',async event=>{
   const form=event.target;
+  if(form.id==='analysis-form'){
+    event.preventDefault();if(state.analysisBusy)return;
+    const f=new FormData(form),generation=++analysisGeneration,orgId=state.orgId;
+    state.analysisFilter=Object.fromEntries(f.entries());state.analysisBusy=true;render();
+    try{
+      if(state.demo){state.analysisData={metric:f.get('metric'),agg:f.get('agg'),group_by:f.get('group_by'),resolution:'raw',step_seconds:60,series:[]};return;}
+      const end=new Date(),query=qs({metric:f.get('metric'),agg:f.get('agg'),group_by:f.get('group_by'),from:new Date(end.getTime()-rangeHours(f.get('range'))*3600000).toISOString(),to:end.toISOString(),...(f.get('label')!=='all'?{label:f.get('label')}:{}),...(f.get('step')?{step:f.get('step')}: {})});
+      const data=await api.request(`orgs/${safeNumber(orgId)}/metrics/query?${query}`);
+      if(generation===analysisGeneration&&String(orgId)===String(state.orgId))state.analysisData=data;
+    }catch(e){toast(e.message,'error');}
+    finally{if(generation===analysisGeneration){state.analysisBusy=false;render();}}
+    return;
+  }
   if(form.id==='auth-form'){
     event.preventDefault();const data=new FormData(form);const submit=form.querySelector('[type=submit]');const error=$('#auth-error');error.innerHTML='';submit.disabled=true;
     try{

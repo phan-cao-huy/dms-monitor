@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal, engine
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState
 from app.models.device import Device, DeviceCommand, DeviceMetric, DeviceMetricHourly
+from app.models.metrics import DeviceMetricMinute
 from app.models.monitoring import CheckAudit, CheckIncident, CheckResult, DeviceEvent
 
 logging.basicConfig(
@@ -242,6 +243,7 @@ async def manage_partitions() -> None:
 async def cleanup_metrics() -> None:
     # Bound each transaction; composite keys are unique across partitions.
     targets = [
+        (DeviceMetricMinute, (DeviceMetricMinute.device_id, DeviceMetricMinute.minute_bucket), DeviceMetricMinute.minute_bucket, settings.MINUTE_RETENTION_DAYS),
         (DeviceEvent, (DeviceEvent.event_pk,), DeviceEvent.occurred_at, settings.EVENTS_RETENTION_DAYS),
         (CheckResult, (CheckResult.result_id,), CheckResult.checked_at, 7),
         (CheckIncident, (CheckIncident.incident_id,), CheckIncident.resolved_at, 30),
@@ -262,6 +264,7 @@ async def cleanup_metrics() -> None:
 
 def build_scheduler() -> AsyncIOScheduler:
     from app.workers.email_notifications import send_pending_emails
+    from app.workers.metric_rollups import aggregate_recent_metrics, backfill_metrics
     from app.workers.notifications import send_pending_notifications
     from app.workers.rules import evaluate_alert_rules
     from app.workers.synthetic_checks import run_synthetic_checks, send_check_emails
@@ -274,7 +277,8 @@ def build_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(evaluate_alert_rules, "interval", minutes=1)
     scheduler.add_job(send_pending_emails, "interval", minutes=1)
     scheduler.add_job(send_pending_notifications, "interval", minutes=1)
-    scheduler.add_job(aggregate_hourly_metrics, "cron", minute=5)
+    scheduler.add_job(aggregate_recent_metrics, "interval", minutes=1)
+    scheduler.add_job(backfill_metrics, "cron", hour=0, minute=15)
     scheduler.add_job(manage_partitions, "cron", hour=0, minute=0)
     scheduler.add_job(cleanup_metrics, "cron", hour=1, minute=0)
     return scheduler
@@ -298,6 +302,11 @@ async def worker_lifespan():
                 await manage_partitions()
             except Exception:
                 logger.exception("Partition initialization failed; daily job will retry")
+            from app.workers.metric_rollups import backfill_metrics
+            try:
+                await backfill_metrics()
+            except Exception:
+                logger.exception("Metric history backfill failed; scheduled job will retry")
             scheduler = build_scheduler()
             scheduler.start()
             async def monitor_connection():

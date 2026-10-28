@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     EMBEDDED_WORKER: bool = False
     METRICS_RETENTION_DAYS: int = Field(default=7, ge=1)
+    MINUTE_RETENTION_DAYS: int = Field(default=30, ge=3)
     HOURLY_RETENTION_DAYS: int = Field(default=90, ge=1)
     NOTIFICATION_ENCRYPTION_KEY: str | None = None
     EVENTS_RETENTION_DAYS: int = Field(default=7, ge=1, le=365)

@@ -30,9 +30,9 @@ class HeartbeatIn(BaseModel):
     agent_version: str | None = None
 
     # Nhiet do & GPU
-    cpu_temp_c: float | None = None
+    cpu_temp_c: float | None = Field(default=None, ge=-50, le=150, allow_inf_nan=False)
     gpu_name: str | None = None
-    gpu_usage_pct: float | None = None
+    gpu_usage_pct: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
     gpu_temp_c: float | None = None
     gpu_vram_total_mb: int | None = None
     gpu_vram_used_mb: int | None = None

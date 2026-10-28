@@ -79,3 +79,5 @@ th{font-size:11px;font-weight:700;color:var(--muted)}
 [data-theme=dark] .heat-low{color:#a4d6a0}[data-theme=dark] .heat-warm{color:#efce83}[data-theme=dark] .heat-high{color:#f1aaa0}
 
 .partition-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.partition-card{padding:18px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}.partition-card>strong{font-size:15px}.event-message{white-space:pre-wrap;overflow-wrap:anywhere;max-width:720px;line-height:1.6}.table-scroll details summary{max-width:480px;cursor:pointer;overflow-wrap:anywhere}.tabs{overflow-x:auto;flex-wrap:nowrap}.tabs>button{white-space:nowrap}
+
+.analysis-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;align-items:end}.analysis-form .form-field{margin:0}.label-chip{font-size:10px;padding:3px 7px;margin:2px 3px 2px 0}.device-labels{display:flex;flex-wrap:wrap;gap:3px;max-width:320px}.toolbar-left{flex-wrap:wrap}.metrics-toolbar .segmented{flex-wrap:wrap}

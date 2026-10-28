@@ -105,6 +105,8 @@ def test_list_devices_returns_dynamic_status():
                     def scalars(self):
                         class MockScalars:
                             def all(self):
+                                if "device_labels" in sql:
+                                    return []
                                 if "org_members" in sql:
                                     return [member]
                                 if "user_group_access" in sql:
@@ -162,6 +164,10 @@ def test_get_device_detail_includes_static_info_and_processes():
                 sql = str(stmt).lower()
 
                 class MockResult:
+                    def scalars(self):
+                        return self
+                    def all(self):
+                        return []
                     def scalar_one_or_none(self):
                         if "device_metrics" in sql:
                             return None
