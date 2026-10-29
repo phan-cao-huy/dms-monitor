@@ -1,14 +1,16 @@
-> **T3 (web 1.0.23):** minute/hour statistics, auto-resolution history, labels and scoped analytics; deployed with 124 backend tests (PostgreSQL included) and 23 web tests passing; GPU/CPU-temperature history from new samples. Android/Agent unchanged. See [docs/T3_METRICS_LABELS.md](docs/T3_METRICS_LABELS.md).
+> **Android 1.0.24 (build 22):** T1–T3 now available on Android with Vietnamese/English screens: email/rules, diagnostics/service checks, charts/labels/analytics. Signed APK published; 20 unit tests passed, lint 0 errors. Phone visual/install checks pending. See [docs/ANDROID_T1_T2_T3.md](docs/ANDROID_T1_T2_T3.md).
 
-> **T2 (web 1.0.22 / Agent 1.3.0):** disk health, native Windows events, process connections, server service checks and incident emails. Deployed; 112 backend tests including PostgreSQL, 19 web tests, Go tests/vet passed. Android deferred. See [docs/T2_MONITORING.md](docs/T2_MONITORING.md).
+> **T3 (web 1.0.23):** minute/hour statistics, auto-resolution history, labels and scoped analytics; deployed with 124 backend tests (PostgreSQL included) and 23 web tests passing; GPU/CPU-temperature history from new samples. Agent unchanged. See [docs/T3_METRICS_LABELS.md](docs/T3_METRICS_LABELS.md).
 
-> **T1 email (web 1.0.21):** web-first at user request; Android remains 1.0.20. See [docs/T1_EMAIL.md](docs/T1_EMAIL.md). SMTP channels, independent delivery ledger, workspace defaults; backend/worker deployed locally; 88 backend tests including PostgreSQL and 15 web tests passed. Real Gmail SMTP verification pending.
+> **T2 (web 1.0.22 / Agent 1.3.0):** disk health, native Windows events, process connections, server service checks and incident emails. Deployed; 112 backend tests including PostgreSQL, 19 web tests, Go tests/vet passed. See [docs/T2_MONITORING.md](docs/T2_MONITORING.md).
+
+> **T1 email (web 1.0.21):** originally web-first at user request. See [docs/T1_EMAIL.md](docs/T1_EMAIL.md). SMTP channels, independent delivery ledger, workspace defaults; backend/worker deployed locally; 88 backend tests including PostgreSQL and 15 web tests passed. Real Gmail SMTP verification pending.
 
 # DMS MONITOR — PROJECT COMPREHENSIVE CONTEXT & SPECIFICATION
 
 > **Quy ước người dùng:** Mọi thay đổi tính năng/giao diện từ nay phải đồng bộ web và Android; dùng chung API/database.
 
-> **Release hiện tại: v1.0.20 (Build 21)** — server HTTPS cố định, ký release, đã khôi phục cập nhật APK qua server. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
+> **Release Android hiện tại: v1.0.24 (Build 22)** — server HTTPS cố định, ký release, cập nhật APK qua server. Web 1.0.23, Agent 1.3.0. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
 
 > **26/10/2026 — đối chiếu và bản sửa:** Xem [docs/RELIABILITY_FIXES.md](docs/RELIABILITY_FIXES.md) để biết hành vi mới, kết quả kiểm tra và phần chưa triển khai. Các mô tả cũ bên dưới có điểm đã lỗi thời.
 > **Tài liệu chuyển giao ngữ cảnh toàn diện dự án DMS (Device Monitoring System)**  

@@ -99,11 +99,12 @@ def get_app_version():
         "web_version": "1.0.23",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 21,
-        "version_name": "1.0.20",
+        "version_code": 22,
+        "version_name": "1.0.24",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Khôi phục câu Đang thực thi lệnh...\n• Tách dừng một PID và đóng tất cả tiến trình cùng tên\n• Hiện rõ phạm vi và cảnh báo trước khi đóng toàn ứng dụng",
+        "release_notes": "• Quản lý email cảnh báo và quy tắc ngay trên điện thoại\n• Xem sức khỏe ổ đĩa, kết nối mạng, nhật ký Windows và kiểm tra dịch vụ\n• Biểu đồ lịch sử đến 90 ngày, phân tích tài nguyên và lọc thiết bị theo nhãn\n• Chỉnh thời gian cảnh báo mất kết nối trong Cài đặt & nhãn",
+        "release_notes_en": "• Manage alert email channels and rules on your phone\n• View disk health, network connections, Windows events and service checks\n• Explore up to 90 days of history, resource analytics and device labels\n• Adjust the offline alert delay in Settings & labels",
         "force_update": False
     }
 

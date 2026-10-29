@@ -1,5 +1,8 @@
 package com.example.myapplication.ui.screen
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
@@ -69,13 +72,15 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    var showRules by remember { mutableStateOf(false) }
+    var alertPane by remember(dashboardState.selectedOrg?.id) { mutableStateOf("history") }
     val strings = LocalAppStrings.current
+    RefreshFeature(currentUser?.id to dashboardState.selectedOrg?.id,dashboardState.selectedOrg!=null){onRefreshDashboard()}
 
     val navItems = listOf(
         BottomNavItem(strings.navDevices, Icons.Default.Computer, Icons.Default.Computer),
         BottomNavItem(strings.navOrganization, Icons.Default.SpaceDashboard, Icons.Default.SpaceDashboard),
-        BottomNavItem(strings.navAlerts, Icons.Default.Notifications, Icons.Default.Notifications)
+        BottomNavItem(strings.navAlerts, Icons.Default.Notifications, Icons.Default.Notifications),
+        BottomNavItem(featureText("Công cụ","Tools"),Icons.Default.Tune,Icons.Default.Tune)
     )
 
     Scaffold(
@@ -147,13 +152,16 @@ fun MainScreen(
                     onCreateOrg = onCreateOrg,
                     onClearMessages = onClearOrgMessages
                 )
+                3 -> key(currentUser?.id,dashboardState.selectedOrg?.id){WorkspaceToolsScreen(dashboardState.selectedOrg,dashboardState.organizations,dashboardState.devices,onSelectOrg)}
                 2 -> Column {
                     NotificationPermissionCard()
-                    Row {
-                        TextButton(onClick={showRules=false}){Text("Lịch sử")}
-                        TextButton(onClick={showRules=true}){Text("Ngưỡng cảnh báo")}
+                    Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        TextButton(onClick={alertPane="history"}){Text(featureText("Lịch sử","History"))}
+                        TextButton(onClick={alertPane="rules"}){Text(featureText("Ngưỡng cảnh báo","Alert rules"))}
+                        if(dashboardState.selectedOrg?.role in listOf("Owner","Admin"))TextButton(onClick={alertPane="email"}){Text("Email")}
                     }
-                    if(showRules)key(dashboardState.selectedOrg?.id){AlertRulesScreen(dashboardState.selectedOrg,dashboardState.devices,dashboardState.groups)}
+                    if(alertPane=="rules")key(currentUser?.id,dashboardState.selectedOrg?.id){AlertRulesScreen(dashboardState.selectedOrg,dashboardState.devices,dashboardState.groups)}
+                    else if(alertPane=="email")key(currentUser?.id,dashboardState.selectedOrg?.id){EmailChannelsScreen(dashboardState.selectedOrg)}
                     else AlertScreen(
                     alerts = dashboardState.alerts,
                     isLoading = dashboardState.isLoading,

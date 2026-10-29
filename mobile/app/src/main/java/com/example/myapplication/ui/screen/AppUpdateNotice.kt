@@ -36,7 +36,7 @@ fun AppUpdateNotice(enabled:Boolean,onOpenUpdater:()->Unit){
             title={Text(if(en)"Update available" else "Có bản cập nhật mới")},
             text={Column{
                 Text(if(en)"DMS Monitor ${info.versionName}" else "DMS Monitor phiên bản ${info.versionName}")
-                Text(info.releaseNotes.orEmpty(),style=MaterialTheme.typography.bodyMedium)
+                Text((if(en)info.releaseNotesEn?:info.releaseNotes else info.releaseNotes).orEmpty(),style=MaterialTheme.typography.bodyMedium)
             }},
             confirmButton={Button(onClick={dismissedVersion=info.versionCode;available=null;onOpenUpdater()}){
                 Text(if(en)"View & download" else "Xem và tải cập nhật")

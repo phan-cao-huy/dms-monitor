@@ -1,6 +1,7 @@
 # T3 — Tiered metric history, labels and query API
 
-Web 1.0.23. Android stays at 1.0.20 and Agent stays at 1.3.0.
+Web 1.0.23. Android support added in 1.0.24 / build 22; Agent stays at 1.3.0.
+See [Android rollout](ANDROID_T1_T2_T3.md).
 The existing Agent payload already includes GPU/CPU temperature when available;
 this task starts persisting those fields in history. No old GPU/temperature history
 is inferred from a device's latest snapshot.

@@ -122,7 +122,8 @@ interface ApiService {
         @Path("id") deviceId: String,
         @Query("from") from: String? = null,
         @Query("to") to: String? = null,
-        @Query("interval") interval: String = "raw"
+        @Query("interval") interval: String = "raw",
+        @Query("limit") limit: Int = 500
     ): Response<List<Metric>>
 
     @GET("devices/{id}/processes")
@@ -172,4 +173,30 @@ interface ApiService {
     // === App Update ===
     @GET("app/version")
     suspend fun getAppVersion(): Response<AppVersionResponse>
+
+    @GET("orgs/{org}/email-channels") suspend fun emailChannels(@Path("org") org: String): Response<List<EmailChannel>>
+    @POST("orgs/{org}/email-channels") suspend fun createEmailChannel(@Path("org") org: String, @Body body: EmailChannelWrite): Response<EmailChannel>
+    @PUT("orgs/{org}/email-channels/{id}") suspend fun updateEmailChannel(@Path("org") org: String, @Path("id") id: Int, @Body body: EmailChannelWrite): Response<EmailChannel>
+    @DELETE("orgs/{org}/email-channels/{id}") suspend fun deleteEmailChannel(@Path("org") org: String, @Path("id") id: Int): Response<Unit>
+    @POST("orgs/{org}/email-channels/{id}/test") suspend fun testEmailChannel(@Path("org") org: String, @Path("id") id: Int): Response<Map<String,String>>
+    @GET("orgs/{org}/email-channels/{id}/deliveries") suspend fun emailDeliveries(@Path("org") org: String, @Path("id") id: Int): Response<List<EmailDelivery>>
+
+    @GET("orgs/{org}/checks") suspend fun serviceChecks(@Path("org") org: String): Response<List<ServiceCheck>>
+    @POST("orgs/{org}/checks") suspend fun createCheck(@Path("org") org: String, @Body body: CheckWrite): Response<ServiceCheck>
+    @PUT("orgs/{org}/checks/{id}") suspend fun updateCheck(@Path("org") org: String, @Path("id") id: Int, @Body body: CheckWrite): Response<ServiceCheck>
+    @DELETE("orgs/{org}/checks/{id}") suspend fun deleteCheck(@Path("org") org: String, @Path("id") id: Int): Response<Unit>
+    @POST("orgs/{org}/checks/{id}/run") suspend fun runCheck(@Path("org") org: String, @Path("id") id: Int): Response<CheckResult>
+    @GET("orgs/{org}/checks/{id}/history") suspend fun checkHistory(@Path("org") org: String, @Path("id") id: Int): Response<CheckHistory>
+
+    @GET("devices/{id}/events") suspend fun deviceEvents(@Path("id") id: String, @Query("level") level: String? = null,
+        @Query("before") before: Long? = null, @Query("limit") limit: Int = 50): Response<DeviceEventPage>
+    @PATCH("devices/{id}") suspend fun updateDeviceSettings(@Path("id") id: String, @Body body: DeviceSettingsWrite): Response<DeviceDetail>
+    @GET("devices/{id}/labels") suspend fun deviceLabels(@Path("id") id: String): Response<Map<String,String>>
+    @PUT("devices/{id}/labels/{key}") suspend fun setDeviceLabel(@Path("id") id: String, @Path("key") key: String, @Body body: LabelWrite): Response<Map<String,String>>
+    @DELETE("devices/{id}/labels/{key}") suspend fun deleteDeviceLabel(@Path("id") id: String, @Path("key") key: String): Response<Unit>
+    @GET("devices/{id}/metrics") suspend fun metricSeries(@Path("id") id: String, @Query("from") from: String, @Query("to") to: String,
+        @Query("interval") interval: String = "auto", @Query("format") format: String = "series", @Query("limit") limit: Int = 500): Response<MetricEnvelope>
+    @GET("orgs/{org}/metrics/query") suspend fun queryMetrics(@Path("org") org: String, @Query("metric") metric: String,
+        @Query("agg") agg: String, @Query("group_by") groupBy: String, @Query("from") from: String, @Query("to") to: String,
+        @Query("label") label: String? = null, @Query("step") step: Int? = null): Response<MetricsQuery>
 }

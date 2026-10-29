@@ -50,9 +50,11 @@ fun DeviceDetailScreen(
     onClearMessages: () -> Unit,
     onUpdateDeviceGroup: (String, Int?) -> Unit = { _, _ -> },
     onToggleMonitoring: ((String, Boolean?) -> Unit)? = null,
-    onDeleteDevice: (() -> Unit)? = null
+    onDeleteDevice: (() -> Unit)? = null,
+    canEditLabels: Boolean = false,
+    onLabelsChanged: () -> Unit = {}
 ) {
-    val tabs = listOf("Tổng quan", "Biểu đồ", "Tiến trình", "Lệnh")
+    val tabs = listOf(featureText("Tổng quan","Overview"),featureText("Biểu đồ","Charts"),featureText("Tiến trình","Processes"),featureText("Lệnh","Commands"),featureText("Kết nối mạng","Connections"),featureText("Nhật ký Windows","Windows events"),featureText("Cấu hình & nhãn","Settings & labels"))
     var showTopDeleteDialog by remember { mutableStateOf(false) }
 
     if (showTopDeleteDialog && onDeleteDevice != null) {
@@ -98,7 +100,7 @@ fun DeviceDetailScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            TabRow(selectedTabIndex = uiState.selectedTab) {
+            ScrollableTabRow(selectedTabIndex = uiState.selectedTab) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = uiState.selectedTab == index,
@@ -153,7 +155,7 @@ fun DeviceDetailScreen(
                     onToggleMonitoring = { enable -> onToggleMonitoring?.invoke(deviceId, enable) },
                     onUpdateDeviceGroup = { grpId -> onUpdateDeviceGroup(deviceId, grpId) }
                 )
-                1 -> MetricsTab(uiState.metrics)
+                1 -> DeviceHistoryScreen(deviceId)
                 2 -> ProcessesTab(
                     processes = uiState.processes,
                     totalRamMb = uiState.device?.staticInfo?.ramTotalMb,
@@ -162,6 +164,9 @@ fun DeviceDetailScreen(
                     onSendCommand = onSendCommand
                 )
                 3 -> CommandsTab(uiState.commands, deviceId, onSendCommand)
+                4 -> DeviceConnectionsScreen(uiState.device)
+                5 -> DeviceEventsScreen(deviceId,uiState.device)
+                6 -> DeviceLabelsScreen(deviceId,canEditLabels,onLabelsChanged,uiState.device)
             }
         }
     }

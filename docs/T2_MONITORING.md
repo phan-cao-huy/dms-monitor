@@ -1,6 +1,7 @@
 # T2 — Device details and service checks (web first)
 
-Web 1.0.22, Agent 1.3.0. Android remains 1.0.20 at the user's request.
+Initial web 1.0.22, Agent 1.3.0. Android support added in 1.0.24 / build 22;
+see [Android rollout](ANDROID_T1_T2_T3.md).
 Backend and web changes use the existing database, users and workspaces.
 
 ## Web navigation

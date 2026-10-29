@@ -84,7 +84,7 @@ fun OverviewTab(device:DeviceDetail?, groups:List<DeviceGroup> = emptyList(),met
                 val vram=device.gpuVramTotalMB?:info?.gpuVramTotalMB
                 val used=device.gpuVramUsedMB?:info?.gpuVramUsedMB
                 InfoRow("VRAM",if(vram!=null&&used!=null)decimal(used/1024f)+" / "+decimal(vram/1024f)+" GB" else "—")
-                Text(t("Số liệu GPU mới nhất; chưa có lịch sử GPU.","Latest GPU snapshot; GPU history unavailable."),style=MaterialTheme.typography.bodySmall)
+                Text(t("Số liệu GPU mới nhất. Xem lịch sử ở tab Biểu đồ.","Latest GPU snapshot. See history in Charts."),style=MaterialTheme.typography.bodySmall)
             }
         }
         item{Text(t("Ổ đĩa & phân vùng","Storage & volumes")+" · ${disks.size}",style=MaterialTheme.typography.titleLarge)}
@@ -101,7 +101,8 @@ fun OverviewTab(device:DeviceDetail?, groups:List<DeviceGroup> = emptyList(),met
                 InfoRow(t("Còn trống","Free"),decimal(disk.freeGb)+" GB")
             }
         }
-        item{Text(t("Đây là các phân vùng, không phải số ổ cứng vật lý. Chưa có số liệu đọc/ghi hay sức khỏe SSD/HDD.","These are volumes, not physical disk counts. Disk I/O and SSD/HDD health are not collected."),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        item{Text(t("Đây là các phân vùng, không phải số ổ cứng vật lý. Sức khỏe ổ vật lý được hiển thị riêng bên dưới; chưa có số liệu đọc/ghi.","These are volumes, not physical disk counts. Physical disk health is shown separately below; I/O is not collected."),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        item { DeviceHealthCard(device) }
         item{
             OverviewSection(t("Kết nối mạng","Network")){
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){

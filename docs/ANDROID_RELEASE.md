@@ -1,4 +1,12 @@
-# DMS Monitor release 1.0.20 (build 21)
+# DMS Monitor release 1.0.24 (build 22)
+
+Android now includes T1 email/rules, T2 device diagnostics/service checks and T3
+historical charts/labels/analytics. See [Android T1–T3](ANDROID_T1_T2_T3.md) for
+navigation, permissions, validation and remaining phone checks. The production API
+and release signing identity below are unchanged. APK is published separately at
+https://dms.ky215.io.vn/static/dms-app.apk.
+
+## Earlier release 1.0.20 (build 21)
 
 ## Application
 

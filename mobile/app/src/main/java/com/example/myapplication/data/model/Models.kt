@@ -124,6 +124,7 @@ data class UpdateDeviceGroupRequest(
 
 // === Device ===
 data class Device(
+    val labels: Map<String,String>? = emptyMap(),
     @SerializedName("device_id", alternate = ["id"]) val id: String = "",
     @SerializedName("device_name", alternate = ["name"]) val name: String = "",
     val status: String = "Offline", // Online, Offline, Warning, Maintenance, Archived, Paused
@@ -146,6 +147,9 @@ data class DiskInfo(
 )
 
 data class DeviceDetail(
+    @SerializedName("offline_threshold_minutes") val offlineThresholdMinutes: Int = 5,
+    val labels: Map<String,String>? = emptyMap(),
+    @SerializedName("org_id") val orgId: String? = null,
     @SerializedName("device_id", alternate = ["id"]) val id: String = "",
     @SerializedName("device_name", alternate = ["name"]) val name: String = "",
     val status: String = "Offline",
@@ -183,6 +187,10 @@ data class ToggleMonitoringResponse(
 )
 
 data class StaticInfo(
+    @SerializedName("disks_health") val disksHealth: List<DiskHealth>? = null,
+    val connections: List<ProcessConnection>? = null,
+    @SerializedName("event_log_status") val eventLogStatus: Map<String,String>? = null,
+    @SerializedName("t2_collected_at") val t2CollectedAt: String? = null,
     val hostname: String? = null,
     @SerializedName("agent_version") val agentVersion: String? = null,
     @SerializedName("os_name") val osName: String? = null,
@@ -261,11 +269,15 @@ data class Command(
 
 // === Alert ===
 data class AlertRule(
+    @SerializedName("workspace_id") val workspaceId: Int? = null,
+    @SerializedName("default_key") val defaultKey: String? = null,
     @SerializedName("rule_id") val ruleId: Int? = null,
     @SerializedName("device_id") val deviceId: Int? = null,
     @SerializedName("group_id") val groupId: Int? = null,
     @SerializedName("rule_name") val ruleName: String? = null,
     @SerializedName("metric_type") val metricType: String = "CPU",
+    @SerializedName("service_name") val serviceName: String? = null,
+    @SerializedName("process_name") val processName: String? = null,
     val condition: String = ">=",
     val threshold: Float? = 90f,
     @SerializedName("duration_minutes") val durationMinutes: Int = 1,
@@ -313,5 +325,6 @@ data class AppVersionResponse(
     @SerializedName("apk_url") val apkUrl: String = "/static/dms-app.apk",
     @SerializedName("apk_size_bytes") val apkSizeBytes: Long = 0,
     @SerializedName("release_notes") val releaseNotes: String? = null,
+    @SerializedName("release_notes_en") val releaseNotesEn: String? = null,
     @SerializedName("force_update") val forceUpdate: Boolean = false
 )

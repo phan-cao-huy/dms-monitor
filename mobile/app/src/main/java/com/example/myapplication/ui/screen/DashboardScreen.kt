@@ -53,6 +53,8 @@ fun DashboardScreen(
     currentUser: UserInfo? = null,
     onNavigateToSettings: () -> Unit = {}
 ) {
+    var labelFilter by remember(uiState.selectedOrg?.id) { mutableStateOf("") }
+    val visibleDevices=filteredDevices.filter { com.example.myapplication.util.MonitoringSupport.labelMatches(it.labels,labelFilter) }
     val strings = LocalAppStrings.current
     val context = LocalContext.current
     var showAddDeviceDialog by remember { mutableStateOf(false) }
@@ -528,6 +530,10 @@ fun DashboardScreen(
                     }
                 }
 
+                item {
+                    val options=uiState.devices.flatMap { device->device.labels.orEmpty().map { (key,value)->"$key:$value" } }.distinct().sorted()
+                    FeatureChoice(if(strings.isEnglish)"Filter by label" else "Lọc theo nhãn",labelFilter,listOf("" to if(strings.isEnglish)"All labels" else "Tất cả nhãn")+options.map{it to it},{labelFilter=it})
+                }
                 // Thanh tìm kiếm
                 item {
                     OutlinedTextField(
@@ -550,11 +556,11 @@ fun DashboardScreen(
                 }
 
                 // Danh sách thiết bị
-                items(filteredDevices, key = { it.id }) { device ->
+                items(visibleDevices, key = { it.id }) { device ->
                     DeviceCard(device = device, onClick = { onDeviceClick(device.id) })
                 }
 
-                if (filteredDevices.isEmpty() && !uiState.isLoading) {
+                if (visibleDevices.isEmpty() && !uiState.isLoading) {
                     item {
                         Box(
                             modifier = Modifier
@@ -704,6 +710,7 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
                     )
                 }
 
+                if(!device.labels.isNullOrEmpty())Text(device.labels.entries.joinToString(" · "){(key,value)->"$key:$value"},style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary,maxLines=2,overflow=TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(2.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {

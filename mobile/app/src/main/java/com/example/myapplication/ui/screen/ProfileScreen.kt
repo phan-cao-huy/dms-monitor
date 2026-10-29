@@ -613,7 +613,8 @@ fun ProfileScreen(
                             val sizeMB = String.format("%.1f", info.apkSizeBytes / (1024f * 1024f))
                             Text(if (strings.isEnglish) "• Download size: ~$sizeMB MB" else "• Dung lượng: ~$sizeMB MB")
                         }
-                        if (!info.releaseNotes.isNullOrBlank()) {
+                        val localizedNotes=if(strings.isEnglish)info.releaseNotesEn?:info.releaseNotes else info.releaseNotes
+                        if (!localizedNotes.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(if (strings.isEnglish) "Changelog:" else "Nhật ký thay đổi:", fontWeight = FontWeight.SemiBold)
                             Surface(
@@ -621,7 +622,7 @@ fun ProfileScreen(
                                 shape = MaterialTheme.shapes.small,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(info.releaseNotes, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
+                                Text(localizedNotes, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
                             }
                         }
                     }

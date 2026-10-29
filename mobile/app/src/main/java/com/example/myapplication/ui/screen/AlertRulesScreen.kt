@@ -1,7 +1,6 @@
 package com.example.myapplication.ui.screen
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,126 +12,94 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.api.RetrofitClient
 import com.example.myapplication.data.model.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
+import java.util.Locale
 
-@Composable
-fun AlertRulesScreen(org: Organization?, devices: List<Device>, groups: List<DeviceGroup>) {
-    var rules by remember(org?.id) { mutableStateOf<List<AlertRule>>(emptyList()) }
-    var error by remember(org?.id) { mutableStateOf<String?>(null) }
-    var busy by remember(org?.id) { mutableStateOf(false) }
-    var editing by remember(org?.id) { mutableStateOf<AlertRule?>(null) }
-    var creating by remember(org?.id) { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val canEdit = org?.role in listOf("Owner", "Admin")
-    suspend fun reload() {
-        if(org==null)return
-        val response=RetrofitClient.apiService.getAlertRules(org.id)
-        if(!response.isSuccessful)error="Không tải được quy tắc (${response.code()})"
-        else rules=response.body().orEmpty()
-    }
-    LaunchedEffect(org?.id) {
-        while(true){
-            try { reload() } catch(e:Exception) { if(e is CancellationException)throw e; error="Không kết nối được server" }
-            delay(30000)
-        }
-    }
-    Column(Modifier.fillMaxSize().padding(horizontal=16.dp)) {
-        Text("Ngưỡng cảnh báo", style=MaterialTheme.typography.headlineSmall)
-        Text("Lưu trên server, đồng bộ với web.",style=MaterialTheme.typography.bodyMedium)
-        if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
-        if(canEdit)Button(onClick={creating=true},enabled=org!=null&&!busy){Text("Thêm quy tắc")}
-        LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(vertical=12.dp)) {
-            if(rules.isEmpty())item { Text("Chưa có quy tắc. Tạo ngưỡng cho thiết bị hoặc nhóm thiết bị.") }
-            items(rules,key={it.ruleId?:0}) { rule ->
-                OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                        Text(rule.ruleName?:rule.metricType,style=MaterialTheme.typography.titleMedium)
-                        val target=devices.find{it.id.toIntOrNull()==rule.deviceId}?.name
-                            ?:groups.find{it.groupId==rule.groupId}?.groupName?:"Thiết bị #${rule.deviceId}"
-                        Text("${rule.metricType} ${rule.condition} ${rule.threshold?:"—"} · $target")
-                        Text("${rule.durationMinutes} phút liên tục · Lặp lại sau ${rule.cooldownMinutes} phút")
-                        Text(if(rule.isActive)"Đang áp dụng" else "Tạm tắt",color=MaterialTheme.colorScheme.primary)
-                        if(canEdit)TextButton(onClick={editing=rule},enabled=!busy){Text("Chỉnh ngưỡng")}
-                    }
-                }
-            }
-        }
-    }
-    if(creating||editing!=null) {
-        key(org?.id,editing?.ruleId,creating) {
-            RuleEditor(editing,devices,groups,busy,error,onDismiss={if(!busy){creating=false;editing=null}},
-                onSave={ rule,update ->
-                    scope.launch {
-                        busy=true;error=null
-                        try {
-                            val response=if(editing!=null)RetrofitClient.apiService.updateAlertRule(org!!.id,editing!!.ruleId!!,update)
-                                else RetrofitClient.apiService.createAlertRule(org!!.id,rule)
-                            if(response.isSuccessful){creating=false;editing=null;reload()}
-                            else error="Không lưu được quy tắc (${response.code()}). Kiểm tra quyền và giá trị."
-                        } catch(e:Exception){if(e is CancellationException)throw e;error="Không kết nối được server"}
-                        finally {busy=false}
-                    }
-                })
-        }
-    }
+@Composable fun AlertRulesScreen(org:Organization?,devices:List<Device>,groups:List<DeviceGroup>) {
+    if(org==null){Text(featureText("Chọn không gian làm việc trước.","Select a workspace first."));return}
+    key(org.id){AlertRulesContent(org,devices,groups)}
 }
 
-@Composable
-private fun RuleEditor(existing: AlertRule?, devices: List<Device>, groups: List<DeviceGroup>,busy:Boolean,error:String?,
-    onDismiss:()->Unit,onSave:(AlertRule,AlertRuleUpdate)->Unit) {
-    val metrics=listOf("CPU","RAM","GPU","DISK","NET_IN","NET_OUT","OFFLINE")
+@Composable private fun AlertRulesContent(org:Organization,devices:List<Device>,groups:List<DeviceGroup>) {
+    val status=remember{FeatureStatus()}
+    val scope=rememberCoroutineScope()
+    val api=RetrofitClient.apiService
+    var rules by remember{mutableStateOf<List<AlertRule>>(emptyList())}
+    var creating by remember{mutableStateOf(false)}
+    var editing by remember{mutableStateOf<AlertRule?>(null)}
+    var deleting by remember{mutableStateOf<AlertRule?>(null)}
+    val canEdit=org.role in listOf("Owner","Admin")
+    suspend fun reload(){rules=api.getAlertRules(org.id).required()}
+    RefreshFeature(org.id,!status.busy&&!creating&&editing==null&&deleting==null){status.refresh{reload()}}
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        item {
+            Text(featureText("Ngưỡng cảnh báo","Alert rules"),style=MaterialTheme.typography.headlineSmall)
+            Text(featureText("Lưu trên server và đồng bộ với web. Quy tắc mặc định áp dụng cho cả thiết bị mới.","Saved on server and shared with web. Workspace defaults also apply to new devices."))
+            FeatureMessages(status)
+            if(canEdit)Button(onClick={status.error=null;creating=true},enabled=!status.busy){Text(featureText("Thêm quy tắc","Add rule"))}
+        }
+        if(rules.isEmpty())item{Text(featureText("Chưa có quy tắc trong phạm vi được cấp quyền.","No rules in your access scope."))}
+        items(rules,key={it.ruleId?:0}){rule->OutlinedCard(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            Text(if(rule.defaultKey!=null)when(rule.metricType){"CPU"->featureText("CPU cao","High CPU");"RAM"->featureText("RAM cao","High RAM");"DISK"->featureText("Ổ đĩa gần đầy","Disk nearly full");"CPU_TEMP"->featureText("Nhiệt độ CPU cao","High CPU temperature");else->featureText("Thiết bị mất kết nối","Device offline")} else rule.ruleName?:rule.metricType,style=MaterialTheme.typography.titleMedium)
+            val target=if(rule.workspaceId!=null)featureText("Toàn không gian (thiết bị hiện tại và mới)","Whole workspace (existing and new devices)") else devices.find{it.id.toIntOrNull()==rule.deviceId}?.name ?: groups.find{it.groupId==rule.groupId}?.groupName ?: "#${rule.deviceId?:rule.groupId}"
+            Text(target)
+            Text(when{rule.defaultKey=="OFFLINE"->featureText("Theo ngưỡng mất kết nối của từng thiết bị.","Uses each device's offline threshold.");rule.metricType=="DISK_HEALTH"->featureText("Báo khi Windows ghi nhận ổ đĩa có lỗi/cảnh báo.","Alerts when Windows reports a disk warning or failure.");rule.metricType=="SERVICE"->rule.serviceName?:"—";rule.metricType=="PROCESS_MISSING"->rule.processName?:"—";else->"${rule.metricType} ${rule.condition} ${featureDecimal(rule.threshold)}"})
+            Text("${rule.durationMinutes} "+featureText("phút liên tục · Khoảng cách ","continuous minutes · Cooldown ")+rule.cooldownMinutes+featureText(" phút"," minutes"))
+            Text((if(rule.defaultKey!=null)featureText("Mặc định · ","Default · ") else "")+if(rule.isActive)featureText("Đang bật","Enabled") else featureText("Tạm tắt","Disabled"),color=MaterialTheme.colorScheme.primary)
+            if(canEdit)Row{TextButton(onClick={status.error=null;editing=rule},enabled=!status.busy){Text(featureText("Chỉnh sửa","Edit"))}
+                if(rule.defaultKey==null)TextButton(onClick={deleting=rule},enabled=!status.busy){Text(featureText("Xóa","Delete"))}}
+        }}}
+    }
+    if(creating||editing!=null)key(creating,editing?.ruleId){RuleEditor(editing,devices,groups,status,{creating=false;editing=null},{body,update->scope.launch{status.perform{
+        if(editing!=null)api.updateAlertRule(org.id,editing!!.ruleId!!,update).verify() else api.createAlertRule(org.id,body).verify()
+        reload();creating=false;editing=null
+    }}})}
+    deleting?.let{rule->ConfirmFeature(featureText("Xóa quy tắc","Delete rule"),status,{deleting=null},{scope.launch{status.perform{api.deleteAlertRule(rule.ruleId!!).verify();reload();deleting=null}}})}
+}
+
+@Composable private fun RuleEditor(existing:AlertRule?,devices:List<Device>,groups:List<DeviceGroup>,status:FeatureStatus,onDismiss:()->Unit,onSave:(AlertRule,AlertRuleUpdate)->Unit) {
     var metric by remember{mutableStateOf(existing?.metricType?:"CPU")}
+    var target by remember{mutableStateOf(existing?.deviceId?.let{"d:$it"}?:existing?.groupId?.let{"g:$it"}?:devices.firstOrNull()?.let{"d:${it.id}"}?:groups.firstOrNull()?.let{"g:${it.groupId}"}?:"")}
     var threshold by remember{mutableStateOf((existing?.threshold?:90f).toString())}
     var duration by remember{mutableStateOf((existing?.durationMinutes?:1).toString())}
     var cooldown by remember{mutableStateOf((existing?.cooldownMinutes?:30).toString())}
     var active by remember{mutableStateOf(existing?.isActive?:true)}
-    var target by remember{mutableStateOf(devices.firstOrNull()?.let{"d:${it.id}"}?:groups.firstOrNull()?.let{"g:${it.groupId}"}?:"")}
-    var targetMenu by remember{mutableStateOf(false)}
-    var metricMenu by remember{mutableStateOf(false)}
-    val percent=metric in listOf("CPU","RAM","GPU","DISK")
-    val numeric=metric !in listOf("SERVICE","PROCESS_MISSING")
+    var name by remember{mutableStateOf(existing?.ruleName?:"")}
+    var condition by remember{mutableStateOf(existing?.condition?:">=")}
+    var severity by remember{mutableStateOf(existing?.severity?:"WARNING")}
+    var service by remember{mutableStateOf(existing?.serviceName?:"")}
+    var process by remember{mutableStateOf(existing?.processName?:"")}
+    val fixed=metric=="DISK_HEALTH"||existing?.defaultKey=="OFFLINE"
+    val numeric=metric !in listOf("SERVICE","PROCESS_MISSING")&&!fixed
+    val value=threshold.replace(',','.').toFloatOrNull()
     val min=if(metric=="OFFLINE")1f else 0f
-    val max=if(percent)100f else if(metric=="OFFLINE")1440f else maxOf(10000f,existing?.threshold?:0f)
-    val value=threshold.toFloatOrNull()
-    val valid=(!numeric||(value!=null&&value.isFinite()&&value in min..max))&&(duration.toIntOrNull()?:0)>=1&&(cooldown.toIntOrNull()?:0)>=1
-    AlertDialog(onDismissRequest=onDismiss,title={Text(if(existing==null)"Tạo quy tắc" else "Chỉnh ngưỡng")},
-        text={
-            Column(Modifier.heightIn(max=480.dp).verticalScrollCompat(),verticalArrangement=Arrangement.spacedBy(10.dp)){
-                if(error!=null)Text(error,color=MaterialTheme.colorScheme.error)
-                if(existing==null){
-                    Box {
-                        OutlinedButton(onClick={metricMenu=true}){Text("Chỉ số: $metric")}
-                        DropdownMenu(metricMenu,{metricMenu=false}){
-                            metrics.forEach{m->DropdownMenuItem(text={Text(m)},onClick={metric=m;threshold=if(m=="OFFLINE")"5" else "90";metricMenu=false})}
-                        }
-                    }
-                    Box {
-                        val names=devices.map{"d:${it.id}" to it.name}+groups.map{"g:${it.groupId}" to "Nhóm: ${it.groupName}"}
-                        OutlinedButton(onClick={targetMenu=true}){Text(names.find{it.first==target}?.second?:"Chọn thiết bị")}
-                        DropdownMenu(targetMenu,{targetMenu=false}){names.forEach{(id,name)->DropdownMenuItem(text={Text(name)},onClick={target=id;targetMenu=false})}}
-                    }
-                }
-                if(numeric){
-                    OutlinedTextField(threshold,{threshold=it},label={Text("Ngưỡng "+if(percent)"(%)" else if(metric=="OFFLINE")"(phút)" else "(KB/s)")},
-                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,isError=value==null||!value.isFinite()||value !in min..max)
-                    Slider(value=(value?:min).coerceIn(min,max),onValueChange={threshold=("%.1f".format(java.util.Locale.US,it))},valueRange=min..max,enabled=!busy)
-                }
-                OutlinedTextField(duration,{duration=it},label={Text("Vượt ngưỡng liên tục (phút)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
-                OutlinedTextField(cooldown,{cooldown=it},label={Text("Khoảng cách cảnh báo (phút)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
-                Row { Checkbox(active,{active=it});Text("Áp dụng quy tắc") }
-                Text("Điều kiện: ${existing?.condition?:">="} · Mức độ: ${existing?.severity?:"WARNING"}",style=MaterialTheme.typography.bodySmall)
-            }
-        },
-        confirmButton={Button(enabled=valid&&!busy&&(existing!=null||target.isNotBlank()),onClick={
-            val rule=AlertRule(deviceId=if(target.startsWith("d:"))target.substringAfter(":").toInt() else null,
-                groupId=if(target.startsWith("g:"))target.substringAfter(":").toInt() else null,
-                ruleName="$metric · $threshold",metricType=metric,threshold=value,durationMinutes=duration.toInt(),cooldownMinutes=cooldown.toInt(),isActive=active)
-            onSave(rule,AlertRuleUpdate(if(numeric)value else null,duration.toInt(),cooldown.toInt(),active))
-        }){Text(if(busy)"Đang lưu…" else "Lưu")}},
-        dismissButton={TextButton(onClick=onDismiss,enabled=!busy){Text("Hủy")}})
+    val max=when(metric){"CPU","RAM","GPU","DISK"->100f;"CPU_TEMP"->150f;"OFFLINE"->1440f;else->100000f}
+    val valid=(!numeric||(value!=null&&value.isFinite()&&value in min..max))&&(duration.toIntOrNull()?:0)>0&&(cooldown.toIntOrNull()?:0)>0&&
+        (existing!=null||target.isNotBlank())&&(metric!="SERVICE"||service.isNotBlank())&&(metric!="PROCESS_MISSING"||process.isNotBlank())&&name.length<=150&&service.length<=100&&process.length<=100
+    FeatureDialog(featureText("Thiết lập quy tắc","Rule settings"),status,onDismiss,valid=valid,onSave={
+        val body=AlertRule(deviceId=if(target.startsWith("d:"))target.substringAfter(':').toIntOrNull() else null,groupId=if(target.startsWith("g:"))target.substringAfter(':').toIntOrNull() else null,
+            ruleName=name.ifBlank{"$metric · $threshold"},metricType=metric,threshold=if(metric=="DISK_HEALTH")1f else value,
+            condition=if(metric=="DISK_HEALTH")">=" else condition,severity=severity,durationMinutes=duration.toInt(),cooldownMinutes=cooldown.toInt(),isActive=active,
+            serviceName=service.takeIf{metric=="SERVICE"},processName=process.takeIf{metric=="PROCESS_MISSING"})
+        onSave(body,AlertRuleUpdate(if(numeric)value else null,duration.toInt(),cooldown.toInt(),active))
+    }){
+        if(existing==null){
+            OutlinedTextField(name,{name=it},label={Text(featureText("Tên quy tắc","Rule name"))},singleLine=true)
+            FeatureChoice(featureText("Chỉ số","Metric"),metric,listOf("CPU","RAM","GPU","DISK","CPU_TEMP","DISK_HEALTH","NET_IN","NET_OUT","OFFLINE","SERVICE","PROCESS_MISSING").map{it to it},{metric=it;threshold=if(it=="OFFLINE")"5" else if(it=="CPU_TEMP")"85" else "90"})
+            FeatureChoice(featureText("Phạm vi","Scope"),target,devices.map{"d:${it.id}" to it.name}+groups.map{"g:${it.groupId}" to it.groupName},{target=it})
+            if(numeric)FeatureChoice(featureText("Điều kiện","Condition"),condition,listOf(">=" to "≥",">" to ">","<=" to "≤","<" to "<"),{condition=it})
+            FeatureChoice(featureText("Mức độ","Severity"),severity,listOf("WARNING" to featureText("Cảnh báo","Warning"),"CRITICAL" to featureText("Nghiêm trọng","Critical"),"INFO" to featureText("Thông tin","Info")),{severity=it})
+        } else Text(existing.ruleName?:metric)
+        if(numeric){
+            val unit=when(metric){"CPU","RAM","GPU","DISK"->"%";"CPU_TEMP"->"°C";"OFFLINE"->featureText("phút","minutes");else->"KB/s"}
+            OutlinedTextField(threshold,{threshold=it},label={Text(featureText("Ngưỡng","Threshold")+" ($unit)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
+            Slider(value=(value?.takeIf{it.isFinite()}?:min).coerceIn(min,max),onValueChange={threshold=String.format(Locale.US,"%.1f",it)},valueRange=min..max,enabled=!status.busy)
+        }
+        if(existing?.defaultKey=="OFFLINE")Text(featureText("Dùng ngưỡng tại Chi tiết thiết bị → Cấu hình & nhãn.","Uses the setting in Device details → Settings & labels."))
+        if(metric=="DISK_HEALTH")Text(featureText("Điều kiện cố định: Windows báo ổ có cảnh báo/lỗi. Không có dữ liệu không được tính là lỗi.","Fixed condition: Windows reports a warning/failure. Missing data is not treated as failure."))
+        if(metric=="SERVICE")OutlinedTextField(service,{service=it},label={Text("Windows Service")},readOnly=existing!=null,singleLine=true)
+        if(metric=="PROCESS_MISSING")OutlinedTextField(process,{process=it},label={Text(featureText("Tên tiến trình","Process name"))},readOnly=existing!=null,singleLine=true)
+        OutlinedTextField(duration,{duration=it},label={Text(featureText("Liên tục (phút)","Continuous duration (minutes)"))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
+        OutlinedTextField(cooldown,{cooldown=it},label={Text(featureText("Khoảng cách cảnh báo (phút)","Cooldown (minutes)"))},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
+        Row{Checkbox(active,{active=it});Text(featureText("Áp dụng quy tắc","Enable rule"))}
+    }
 }
-
-@Composable
-private fun Modifier.verticalScrollCompat(): Modifier =
-    this.then(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()))

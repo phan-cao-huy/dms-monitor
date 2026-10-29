@@ -1,6 +1,7 @@
 # T1 — Email notifications (web first)
 
-Web version: 1.0.21. Android stays at 1.0.20; no APK or Agent update is required.
+Initial web version: 1.0.21. Android support added in 1.0.24 / build 22;
+see [Android rollout](ANDROID_T1_T2_T3.md). No Agent update is required for T1.
 Telegram/webhook are deferred. Existing FCM delivery is unchanged.
 
 ## Setup

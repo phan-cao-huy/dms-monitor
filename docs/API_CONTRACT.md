@@ -3,6 +3,10 @@
 Base URL: `http://localhost:8000/api/v1` · Swagger: `http://localhost:8000/docs`
 Lỗi trả về dạng `{"detail": "..."}`. Thời gian: ISO-8601 UTC.
 
+Android 1.0.24 uses the T1–T3 endpoints documented in the linked feature documents.
+`GET /api/v1/app/version` also returns optional `release_notes_en`; English clients
+fall back to `release_notes` when it is absent. See [Android rollout](ANDROID_T1_T2_T3.md).
+
 ## Agent (auth: `Authorization: Bearer <secret_token>`)
 
 ### POST /agent/heartbeat  → 202

@@ -72,10 +72,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         )
                     } else {
                         val savedOrgId = tokenManager.currentOrgId.first()
-                        val selected = orgs.find { it.id == savedOrgId } ?: orgs.firstOrNull()
+                        val selected = orgs.find { it.id == _uiState.value.selectedOrg?.id } ?: orgs.find { it.id == savedOrgId } ?: orgs.firstOrNull()
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             organizations = orgs,
+                            devices = if(_uiState.value.selectedOrg?.id==selected?.id)_uiState.value.devices else emptyList(),
+                            groups = if(_uiState.value.selectedOrg?.id==selected?.id)_uiState.value.groups else emptyList(),
+                            alerts = if(_uiState.value.selectedOrg?.id==selected?.id)_uiState.value.alerts else emptyList(),
                             selectedOrg = selected
                         )
                         selected?.let {
@@ -101,11 +104,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun selectOrganization(org: Organization) {
+        _uiState.value = _uiState.value.copy(selectedOrg=org,selectedGroupFilter=null,devices=emptyList(),groups=emptyList(),alerts=emptyList(),newlyCreatedDevice=null,searchQuery="",error=null)
         viewModelScope.launch {
             tokenManager.saveOrgId(org.id)
-            _uiState.value = _uiState.value.copy(selectedOrg = org, selectedGroupFilter = null)
-            loadDevices(org.id)
-            loadGroups(org.id)
+            if(_uiState.value.selectedOrg?.id==org.id){loadDevices(org.id);loadGroups(org.id)}
         }
     }
 
@@ -128,6 +130,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.apiService.getGroups(orgId)
+                if(_uiState.value.selectedOrg?.id!=orgId)return@launch
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(groups = response.body()!!)
                 }
@@ -146,6 +149,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val response = RetrofitClient.apiService.getDevices(orgId)
+                if(_uiState.value.selectedOrg?.id!=orgId)return@launch
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -159,12 +163,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                if(_uiState.value.selectedOrg?.id!=orgId)return@launch
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
                 )
             }
-            loadAlerts(orgId)
+            if(_uiState.value.selectedOrg?.id==orgId)loadAlerts(orgId)
         }
     }
 
@@ -174,6 +179,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.apiService.getAlerts(orgId, resolved = null)
+                if(_uiState.value.selectedOrg?.id!=orgId)return@launch
                 if (response.isSuccessful && response.body() != null) {
                     _uiState.value = _uiState.value.copy(alerts = response.body()!!)
                 }
