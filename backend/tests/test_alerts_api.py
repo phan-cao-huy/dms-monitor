@@ -63,7 +63,7 @@ def test_create_and_list_alert_rules():
                                     return [5]
                                 if "device_groups" in sql:
                                     return []
-                                return [rule]
+                                return [] if "alert_rules.metric_type =" in sql else [rule]
 
                         return MockScalars()
 

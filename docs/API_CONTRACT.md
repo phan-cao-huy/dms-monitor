@@ -7,6 +7,11 @@ Android 1.0.24 uses the T1–T3 endpoints documented in the linked feature docum
 `GET /api/v1/app/version` also returns optional `release_notes_en`; English clients
 fall back to `release_notes` when it is absent. See [Android rollout](ANDROID_T1_T2_T3.md).
 
+Since 1.0.25, rule creation/activation returns HTTP 409 with detail starting
+`RULE_COMPONENT_EXISTS` for another enabled rule with the same target/component.
+One effective rule per device/component uses device > group > workspace priority.
+List results omit rules targeting archived devices. See [rule policy](UNIQUE_ALERT_RULES.md).
+
 ## Agent (auth: `Authorization: Bearer <secret_token>`)
 
 ### POST /agent/heartbeat  → 202

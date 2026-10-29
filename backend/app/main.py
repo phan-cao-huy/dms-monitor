@@ -33,7 +33,7 @@ async def _ensure_db_schema() -> None:
     async with engine.begin() as conn:
         for stmt in migration_statements:
             await conn.execute(text(stmt))
-        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql"):
+        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql"):
             migration = Path(__file__).resolve().parent / "db" / name
             for stmt in migration.read_text(encoding="utf-8").split(";"):
                 if stmt.strip():
@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.23",
+        "web_version": "1.0.25",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 22,
-        "version_name": "1.0.24",
+        "version_code": 23,
+        "version_name": "1.0.25",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Quản lý email cảnh báo và quy tắc ngay trên điện thoại\n• Xem sức khỏe ổ đĩa, kết nối mạng, nhật ký Windows và kiểm tra dịch vụ\n• Biểu đồ lịch sử đến 90 ngày, phân tích tài nguyên và lọc thiết bị theo nhãn\n• Chỉnh thời gian cảnh báo mất kết nối trong Cài đặt & nhãn",
-        "release_notes_en": "• Manage alert email channels and rules on your phone\n• View disk health, network connections, Windows events and service checks\n• Explore up to 90 days of history, resource analytics and device labels\n• Adjust the offline alert delay in Settings & labels",
+        "release_notes": "• Mỗi thiết bị chỉ áp dụng một quy tắc cho từng chỉ số\n• Chặn tạo trùng quy tắc đang bật; chỉnh ngưỡng trên quy tắc hiện có\n• Lọc quy tắc theo thiết bị, phân biệt máy trùng tên bằng mã thiết bị\n• Ẩn quy tắc của máy đã xóa và tính lại thời gian khi đổi ngưỡng",
+        "release_notes_en": "• One effective rule per device and component\n• Prevent duplicate active rules; edit the existing threshold instead\n• Filter effective rules by device and distinguish duplicate names by ID\n• Hide archived device rules and restart the evaluation window after edits",
         "force_update": False
     }
 

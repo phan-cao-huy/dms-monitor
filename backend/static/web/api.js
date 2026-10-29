@@ -38,7 +38,7 @@ export function createClient({fetcher = (...args) => fetch(...args), storage, on
     try { data = await response.json(); } catch { throw new ApiError(`Server trả nội dung không hợp lệ (HTTP ${response.status}).`, response.status); }
     if (!response.ok) {
       const detail = data.detail;
-      const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map(e => `${e.loc?.slice(1).join('.') || 'Dữ liệu'}: ${e.msg}`).join('; ') : `Yêu cầu thất bại (HTTP ${response.status}).`;
+      const message = typeof detail === 'string' ? (detail.startsWith('RULE_COMPONENT_EXISTS')?'Đã có quy tắc cho chỉ số này trong phạm vi đã chọn. Hãy chỉnh quy tắc hiện có.':detail) : Array.isArray(detail) ? detail.map(e => `${e.loc?.slice(1).join('.') || 'Dữ liệu'}: ${e.msg}`).join('; ') : `Yêu cầu thất bại (HTTP ${response.status}).`;
       throw new ApiError(message, response.status);
     }
     return data;

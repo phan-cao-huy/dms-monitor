@@ -14,6 +14,7 @@ from app.models.device import Device
 from app.models.email_channel import EmailChannel, EmailDelivery
 from app.models.organization import Organization
 from app.services.email_channels import decrypt_config, safe_delivery_error, send_email
+from app.services.rule_selection import alert_rule_is_effective
 
 
 async def send_pending_emails():
@@ -46,6 +47,12 @@ async def send_pending_emails():
                    AlertHistory.resolved_at.is_(None), AlertHistory.created_at >= now - timedelta(hours=24))
             .order_by(EmailDelivery.delivery_id).limit(100))).all()
         for delivery, channel, alert in rows:
+            if getattr(alert, "rule_id", None):
+                device = await db.get(Device, alert.device_id)
+                if device is None or not await alert_rule_is_effective(db, device, alert.rule_id):
+                    alert.resolved_at = now
+                    await db.commit()
+                    continue
             if delivery.last_attempt_at and now - delivery.last_attempt_at < timedelta(minutes=1):
                 continue
             delivery.attempts += 1

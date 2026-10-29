@@ -23,6 +23,7 @@ def session(role="Admin", target_org=10):
                      severity="WARNING", is_active=True, service_name=None, process_name=None)
     result = Mock()
     result.scalar_one_or_none.return_value = member
+    result.scalars.return_value.all.return_value = []
     db = Mock(execute=AsyncMock(return_value=result),
               get=AsyncMock(side_effect=[rule, Device(device_id=3, org_id=target_org)]),
               commit=AsyncMock(), refresh=AsyncMock())

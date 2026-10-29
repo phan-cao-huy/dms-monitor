@@ -27,6 +27,7 @@ internal fun Response<*>.verify() {
     throw when {
         code()==401 -> FeatureFailure("Phiên đăng nhập hết hạn. Hãy đăng nhập lại.","Session expired. Sign in again.")
         code()==403 -> FeatureFailure("Bạn không có quyền thực hiện thao tác này.","You do not have permission for this action.")
+        code()==409&&detail?.startsWith("RULE_COMPONENT_EXISTS")==true -> FeatureFailure("Đã có quy tắc cho chỉ số này trong phạm vi đã chọn. Hãy chỉnh quy tắc hiện có.","A rule already exists for this component and scope. Edit the existing rule.")
         code()==429 -> FeatureFailure("Chưa đến lượt kiểm tra tiếp theo. Chờ 30–60 giây rồi thử lại.","Wait 30–60 seconds before testing again.")
         detail=="SMTP_AUTH_FAILED" -> FeatureFailure("Gmail từ chối đăng nhập. Kiểm tra email và mật khẩu ứng dụng.","SMTP authentication failed. Check the address and app password.")
         detail=="SMTP_CONNECTION_FAILED" -> FeatureFailure("Server không kết nối được SMTP.","Server could not connect to SMTP.")

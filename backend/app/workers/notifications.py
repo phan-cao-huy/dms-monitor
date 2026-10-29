@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -13,6 +13,7 @@ from app.models.auth import AuthToken
 from app.models.device import Device
 from app.models.organization import OrganizationMember, UserGroupAccess
 from app.services.alert_text import alert_text
+from app.services.rule_selection import alert_rule_is_effective
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,9 @@ async def send_pending_notifications():
             device = await db.get(Device, alert.device_id)
             if device is None or device.archived_at is not None:
                 continue
+            if alert.rule_id and not await alert_rule_is_effective(db, device, alert.rule_id):
+                alert.resolved_at = now
+                continue
             allowed_group = (
                 select(UserGroupAccess.access_id)
                 .where(
@@ -95,7 +99,9 @@ async def send_pending_notifications():
                 recipients.setdefault(user_id, set()).add(token)
             if not tokens:
                 continue
-            success = True
+            success = False
+            delivered = 0
+            retryable_failure = False
             try:
                 rule = await db.get(AlertRule, alert.rule_id) if alert.rule_id else None
                 metric_type = rule.metric_type if rule else ("RAM" if alert.message.startswith("RAM") else "OFFLINE")
@@ -128,7 +134,20 @@ async def send_pending_notifications():
                             ),
                             app=app,
                         )
-                        success = success and response.failure_count == 0
+                        delivered += response.success_count
+                        expired = []
+                        for token, result in zip(batch, response.responses, strict=True):
+                            if result.success:
+                                continue
+                            if isinstance(result.exception, messaging.UnregisteredError):
+                                expired.append(token)
+                            else:
+                                retryable_failure = True
+                                logger.warning("FCM alert %s failed: %s", alert.alert_id, type(result.exception).__name__)
+                        if expired:
+                            # Remove only tokens Firebase explicitly revoked. Keep login sessions.
+                            await db.execute(update(AuthToken).where(AuthToken.fcm_token.in_(expired)).values(fcm_token=None))
+                        success = delivered > 0 and not retryable_failure
             except Exception:
                 logger.exception("FCM delivery failed for alert %s", alert.alert_id)
                 success = False

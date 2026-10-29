@@ -1,4 +1,10 @@
-# DMS Monitor release 1.0.24 (build 22)
+# DMS Monitor release 1.0.25 (build 23)
+
+One effective rule per device/component, duplicate active-rule prevention and
+device-specific rule filters now match web. Archived device rules are hidden.
+See [rule policy and validation](UNIQUE_ALERT_RULES.md).
+
+## Earlier release 1.0.24 (build 22)
 
 Android now includes T1 email/rules, T2 device diagnostics/service checks and T3
 historical charts/labels/analytics. See [Android T1–T3](ANDROID_T1_T2_T3.md) for

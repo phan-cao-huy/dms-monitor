@@ -147,7 +147,8 @@ def test_fcm_delivery_respects_scope_and_records_result(failed, expected):
         patch("app.workers.notifications.SessionLocal", return_value=context),
         patch(
             "firebase_admin.messaging.send_each_for_multicast",
-            return_value=Mock(failure_count=failed),
+            return_value=Mock(failure_count=failed,success_count=1-failed,
+                responses=[Mock(success=not failed,exception=RuntimeError("temporary") if failed else None)]),
         ) as send,
     ):
         config.FCM_ENABLED = True

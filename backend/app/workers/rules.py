@@ -3,12 +3,13 @@
 import operator
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select, update
 
 from app.db.session import SessionLocal
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState, MaintenanceWindow
 from app.models.device import Device, DeviceMetric
 from app.services.alert_text import alert_text
+from app.services.rule_selection import effective_rules
 
 COMPARATORS = {">": operator.gt, ">=": operator.ge, "<": operator.lt, "<=": operator.le}
 METRIC_FIELDS = {
@@ -164,7 +165,7 @@ async def evaluate_alert_rules():
     now = datetime.now(UTC).replace(tzinfo=None)
     async with SessionLocal() as db:
         rules = list(
-            (await db.execute(select(AlertRule).where(AlertRule.is_active.is_(True))))
+            (await db.execute(select(AlertRule)))
             .scalars()
             .all()
         )
@@ -174,15 +175,19 @@ async def evaluate_alert_rules():
             .all()
         )
         for device in devices:
-            matching = [
-                r
-                for r in rules
-                if r.device_id == device.device_id
-                or (r.group_id is not None and r.group_id == device.group_id)
-                or r.workspace_id == device.org_id
-            ]
-            custom_metrics = {r.metric_type for r in matching if not r.default_key}
-            matching = [r for r in matching if not r.default_key or r.metric_type not in custom_metrics]
+            matching = effective_rules(device, rules)
+            selected_ids = [rule.rule_id for rule in matching]
+            # Retire shadowed/disabled windows and alerts, retaining their history.
+            await db.execute(delete(AlertRuleState).where(
+                AlertRuleState.device_id == device.device_id,
+                AlertRuleState.rule_id.not_in(selected_ids),
+            ))
+            await db.execute(update(AlertHistory).where(
+                AlertHistory.device_id == device.device_id,
+                AlertHistory.rule_id.is_not(None),
+                AlertHistory.rule_id.not_in(selected_ids),
+                AlertHistory.resolved_at.is_(None),
+            ).values(resolved_at=now))
             if matching:
                 await evaluate_device_rules(db, device, matching, now)
         await db.commit()

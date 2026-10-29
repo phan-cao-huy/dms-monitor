@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
 from typing import NoReturn
+from types import SimpleNamespace
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState
 from app.models.device import Device
@@ -14,6 +16,7 @@ from app.models.organization import (
 )
 from app.schemas.alert import AlertRuleCreate, AlertRuleUpdate
 from app.services.devices import DeviceError, check_user_device_access
+from app.services.rule_selection import component_key
 
 
 class AlertError(Exception):
@@ -53,7 +56,7 @@ async def list_alert_rules(
     db: AsyncSession, org_id: int, user_id: int
 ) -> list[AlertRule]:
     member = await _get_org_member(db, org_id, user_id)
-    device_query = select(Device.device_id).where(Device.org_id == org_id)
+    device_query = select(Device.device_id).where(Device.org_id == org_id, Device.archived_at.is_(None))
     group_query = select(DeviceGroup.group_id).where(DeviceGroup.org_id == org_id)
     if member.role not in ("Owner", "Admin"):
         assigned_groups = select(UserGroupAccess.group_id).where(UserGroupAccess.user_id == user_id)
@@ -65,7 +68,7 @@ async def list_alert_rules(
     group_ids = set(grp_res.scalars().all())
 
     stmt = select(AlertRule).where(
-        (AlertRule.device_id.in_(device_ids)) | (AlertRule.group_id.in_(group_ids)) | (AlertRule.workspace_id == org_id if member.role in ("Owner", "Admin") else False)
+        (AlertRule.device_id.in_(device_ids)) | (AlertRule.group_id.in_(group_ids)) | (AlertRule.workspace_id == org_id)
     ).order_by(AlertRule.rule_id.desc())
 
     res = await db.execute(stmt)
@@ -85,7 +88,7 @@ async def create_alert_rule(
     if payload.device_id is not None:
         dev_res = await db.execute(
             select(Device).where(
-                Device.device_id == payload.device_id, Device.org_id == org_id
+                Device.device_id == payload.device_id, Device.org_id == org_id, Device.archived_at.is_(None)
             )
         )
         if dev_res.scalar_one_or_none() is None:
@@ -101,6 +104,7 @@ async def create_alert_rule(
         if grp_res.scalar_one_or_none() is None:
             _fail(404, "Device group not found in this organization")
 
+    await _check_duplicate(db, org_id, payload)
     rule = AlertRule(
         group_id=payload.group_id,
         device_id=payload.device_id,
@@ -117,9 +121,33 @@ async def create_alert_rule(
         created_by=user_id,
     )
     db.add(rule)
-    await db.commit()
+    await _commit_rule(db)
     await db.refresh(rule)
     return rule
+
+
+async def _commit_rule(db):
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        if "uq_rule_" in str(exc.orig):
+            _fail(409, "RULE_COMPONENT_EXISTS: Edit the existing rule for this component and scope")
+        raise
+
+
+async def _check_duplicate(db, org_id, rule, exclude_id=None):
+    if not rule.is_active:
+        return
+    # Serialize writes even when no matching rule exists yet.
+    await db.execute(select(Organization.org_id).where(Organization.org_id == org_id).with_for_update())
+    scope = AlertRule.device_id == rule.device_id if rule.device_id is not None else AlertRule.group_id == rule.group_id
+    query = select(AlertRule).where(scope, AlertRule.metric_type == rule.metric_type, AlertRule.is_active.is_(True))
+    if exclude_id is not None:
+        query = query.where(AlertRule.rule_id != exclude_id)
+    rows = (await db.execute(query)).scalars().all()
+    if any(component_key(other) == component_key(rule) for other in rows):
+        _fail(409, "RULE_COMPONENT_EXISTS: Edit the existing rule for this component and scope")
 
 
 async def update_alert_rule(
@@ -149,11 +177,16 @@ async def update_alert_rule(
         AlertRuleCreate.model_validate(merged)
     except ValueError as exc:
         _fail(422, str(exc))
+    if not rule.workspace_id and changes.get("is_active", rule.is_active):
+        await _check_duplicate(db, org_id, SimpleNamespace(**merged), rule.rule_id)
     for key, value in changes.items():
         setattr(rule, key, value)
     # A changed threshold starts a fresh continuous evaluation window.
+    await db.execute(update(AlertHistory).where(
+        AlertHistory.rule_id == rule_id, AlertHistory.resolved_at.is_(None),
+    ).values(resolved_at=_utc_naive()))
     await db.execute(delete(AlertRuleState).where(AlertRuleState.rule_id == rule_id))
-    await db.commit()
+    await _commit_rule(db)
     await db.refresh(rule)
     return rule
 
