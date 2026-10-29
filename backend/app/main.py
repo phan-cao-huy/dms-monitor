@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.29",
+        "web_version": "1.0.30",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 27,
-        "version_name": "1.0.29",
+        "version_code": 28,
+        "version_name": "1.0.30",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Khóa nhãn tự chuyển chữ hoa thành chữ thường để lưu đúng định dạng\n• Giải thích rõ khi khóa hoặc giá trị chưa hợp lệ\n• Báo nhãn đã tồn tại để tránh ghi đè nhầm\n• Hiện bộ đếm ký tự khi chỉnh giá trị nhãn",
-        "release_notes_en": "• Convert label keys to lowercase for valid saves\n• Explain invalid label keys and values\n• Detect existing labels to prevent accidental overwrites\n• Show character counts while editing label values",
+        "release_notes": "• Sửa bộ đếm trực tuyến: máy đang có cảnh báo vẫn được tính là online\n• Hiển thị rõ Online · Cảnh báo trên thẻ thiết bị\n• Đồng bộ cách đếm với bộ lọc và biểu đồ trạng thái trên web",
+        "release_notes_en": "• Count connected devices with warnings as online\n• Clarify Online · Warning on device cards\n• Match web online filtering and status chart labels",
         "force_update": False
     }
 

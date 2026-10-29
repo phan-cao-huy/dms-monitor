@@ -587,7 +587,7 @@ fun DashboardScreen(
 @Composable
 fun StatusSummaryRow(devices: List<Device>) {
     val strings = LocalAppStrings.current
-    val online = devices.count { it.status == "Online" }
+    val online = devices.count { com.example.myapplication.util.DeviceConnection.isOnline(it.status) }
     val offline = devices.count { it.status == "Offline" }
     val warning = devices.count { it.status == "Warning" }
 
@@ -722,7 +722,7 @@ fun DeviceCard(device: Device, onClick: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = device.status,
+                        text = if(device.status=="Warning")featureText("Online · Cảnh báo","Online · Warning") else device.status,
                         style = MaterialTheme.typography.bodySmall,
                         color = statusColor
                     )

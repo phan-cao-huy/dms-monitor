@@ -1,4 +1,9 @@
-# DMS Monitor release 1.0.29 (build 27)
+# DMS Monitor release 1.0.30 (build 28)
+
+Online counts now include connected devices with warnings, matching web filtering
+and connection semantics. See [online/warning display fix](ONLINE_WARNING_FIX.md).
+
+## Earlier release 1.0.29 (build 27)
 
 Label input converts uppercase keys to lowercase, explains validation failures and
 prevents accidentally overwriting an existing label. See [label editor fix](LABEL_EDITOR_FIX.md).

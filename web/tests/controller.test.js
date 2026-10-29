@@ -15,7 +15,13 @@ test('workspace routes render and demo mode cannot write to the real API',async(
   await import('../dist/app.js');
   assert.match(nodes.get('#app').innerHTML,/Trong <em>một tầm nhìn/);
   const click=async(action,data={})=>events.get('click')({preventDefault(){},target:{closest:selector=>selector==='[data-action]'?{dataset:{action,...data},disabled:false}:null}});
-  await click('demo');await windowEvents.get('hashchange')();
+  await click('demo');location.hash='#/overview';await windowEvents.get('hashchange')();
+  // Fixture: 8 healthy online + 1 warning, 2 offline, 1 paused.
+  assert.match(nodes.get('#app').innerHTML,/Trực tuyến<span class="kpi-icon">[\s\S]*?<div class="kpi-value">09<\/div>/);
+  await events.get('change')({target:{id:'status-filter',value:'Online'}});
+  assert.match(nodes.get('#app').innerHTML,/DESIGN-WS-03/);
+  assert.match(nodes.get('#app').innerHTML,/\/ 9 thiết bị/);
+  await events.get('change')({target:{id:'status-filter',value:'all'}});
   for(const [path,title] of [['/overview','Tổng quan hệ thống'],['/devices','Danh sách thiết bị'],['/analytics','Phân tích tài nguyên'],['/devices/1','DESIGN-WS-01'],['/alerts','Lịch sử cảnh báo'],['/organizations','Nhóm thiết bị'],['/activity','Lịch sử lệnh'],['/settings','Cài đặt & tài khoản']]){
     location.hash='#'+path;await windowEvents.get('hashchange')();
     const html=nodes.get('#app').innerHTML;

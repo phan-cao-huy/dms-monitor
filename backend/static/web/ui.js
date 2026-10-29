@@ -37,7 +37,7 @@ export function ago(value) {
   const seconds = Math.max(0,(Date.now()-d.getTime())/1000);
   return !Number.isFinite(seconds) ? '—' : seconds<60 ? 'Vừa cập nhật' : seconds<3600 ? `${Math.floor(seconds/60)} phút trước` : seconds<86400 ? `${Math.floor(seconds/3600)} giờ trước` : `${Math.floor(seconds/86400)} ngày trước`;
 }
-const statusNames = {Online:'Trực tuyến',Offline:'Ngoại tuyến',Warning:'Cảnh báo',Paused:'Tạm dừng',Archived:'Đã lưu trữ',PENDING:'Đang chờ',EXECUTING:'Đang chạy',SUCCESS:'Thành công',FAILED:'Thất bại',TIMEOUT:'Hết thời gian'};
+const statusNames = {Online:'Trực tuyến',Offline:'Ngoại tuyến',Warning:'Trực tuyến · Cảnh báo',Paused:'Tạm dừng',Archived:'Đã lưu trữ',PENDING:'Đang chờ',EXECUTING:'Đang chạy',SUCCESS:'Thành công',FAILED:'Thất bại',TIMEOUT:'Hết thời gian'};
 export const status = value => `<span class="pill ${esc(String(value || '').toLowerCase())}"><i class="dot"></i>${esc(statusNames[value] || value || 'Không rõ')}</span>`;
 export const button = (text, action, kind = '', ico = '', attrs = '') => `<button type="button" class="btn ${kind}" data-action="${action}" ${attrs}>${ico?icon(ico):''}${text}</button>`;
 export const empty = (title, description, ico = 'monitor', action = '') => `<div class="empty-state">${icon(ico)}<h3>${esc(title)}</h3><p>${esc(description)}</p>${action}</div>`;
