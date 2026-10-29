@@ -125,11 +125,18 @@ import kotlinx.coroutines.launch
     if(create||editing!=null)key(editing,create){
         var key by remember{mutableStateOf(editing?:"")}
         var value by remember{mutableStateOf(editing?.let{labels[it]}?:"")}
-        FeatureDialog(featureText("Lưu nhãn thiết bị","Save device label"),status,{create=false;editing=null},valid=MonitoringSupport.validLabel(key,value),onSave={scope.launch{status.perform{
-            api.setDeviceLabel(deviceId,key,LabelWrite(value)).verify();reload();onChanged();create=false;editing=null
+        val labelKey=MonitoringSupport.normalizeLabelKey(key)
+        val keyInvalid=!MonitoringSupport.validLabel(labelKey,"")
+        val valueInvalid=!MonitoringSupport.validLabel("env",value)
+        val duplicate=create&&labels.containsKey(labelKey)
+        FeatureDialog(featureText("Lưu nhãn thiết bị","Save device label"),status,{create=false;editing=null},valid=!keyInvalid&&!valueInvalid&&!duplicate,onSave={scope.launch{status.perform{
+            api.setDeviceLabel(deviceId,labelKey,LabelWrite(value)).verify();reload();onChanged();create=false;editing=null
         }}}){
-            OutlinedTextField(key,{key=it},readOnly=editing!=null,label={Text(featureText("Khóa (chữ thường/số/gạch dưới)","Key (lowercase/numbers/underscore)"))},singleLine=true)
-            OutlinedTextField(value,{value=it},label={Text(featureText("Giá trị (tối đa 64 ký tự)","Value (up to 64 characters)"))},singleLine=true)
+            OutlinedTextField(key,{key=MonitoringSupport.normalizeLabelKey(it)},readOnly=editing!=null,label={Text(featureText("Khóa nhãn","Label key"))},singleLine=true,
+                isError=(key.isNotEmpty()&&keyInvalid)||duplicate,
+                supportingText={Text(when{duplicate->featureText("Nhãn này đã tồn tại. Hãy chọn Sửa trên nhãn hiện có.","This label already exists. Edit the existing label.");editing!=null->featureText("Khóa giữ nguyên; bạn có thể sửa giá trị bên dưới.","The key stays fixed; edit its value below.");else->featureText("Bắt đầu bằng a–z; dùng chữ, số, dấu _. Tối đa 32 ký tự. Chữ hoa tự chuyển thành chữ thường.","Start with a–z; use letters, numbers or _. Up to 32 characters. Uppercase is converted to lowercase.")})})
+            OutlinedTextField(value,{value=it},label={Text(featureText("Giá trị (tối đa 64 ký tự)","Value (up to 64 characters)"))},singleLine=true,isError=valueInvalid,
+                supportingText={Text(if(valueInvalid)featureText("Tối đa 64 ký tự, không dùng xuống dòng hoặc ký tự điều khiển.","Up to 64 characters; no line breaks or control characters.") else "${value.codePointCount(0,value.length)} / 64")})
             Text("env:production · location:hanoi · role:database",style=MaterialTheme.typography.bodySmall)
         }
     }

@@ -1,4 +1,9 @@
-# DMS Monitor release 1.0.28 (build 26)
+# DMS Monitor release 1.0.29 (build 27)
+
+Label input converts uppercase keys to lowercase, explains validation failures and
+prevents accidentally overwriting an existing label. See [label editor fix](LABEL_EDITOR_FIX.md).
+
+## Earlier release 1.0.28 (build 26)
 
 Joining selects the invited workspace for both members and devices; delayed loads
 cannot revert selection to the personal workspace. Web join resets scoped filters.

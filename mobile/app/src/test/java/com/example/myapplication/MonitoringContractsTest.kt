@@ -60,6 +60,9 @@ class MonitoringContractsTest {
         assertNotNull(MonitoringSupport.instant(page.items[0].occurredAt))
     }
     @Test fun labelFiltersPreserveColonAndEnforceLimits() {
+        assertEquals("kt01_",MonitoringSupport.normalizeLabelKey(" KT01_ "))
+        assertTrue(MonitoringSupport.validLabel(MonitoringSupport.normalizeLabelKey("KT01_"),"phong"))
+        assertFalse(MonitoringSupport.validLabel(MonitoringSupport.normalizeLabelKey("01_KT"),"phong"))
         assertTrue(MonitoringSupport.labelMatches(mapOf("env" to "prod:blue"),"env:prod:blue"))
         assertFalse(MonitoringSupport.labelMatches(mapOf("env" to "prod:blue"),"env:prod"))
         assertFalse(MonitoringSupport.validLabel("Bad Key","value"))

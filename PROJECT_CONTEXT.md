@@ -1,3 +1,5 @@
+> **Web/Android 1.0.29 (Android build 27):** label editor normalizes uppercase keys and explains invalid/duplicate input; `KT01_` saves as `kt01_`. API/storage format unchanged. See [docs/LABEL_EDITOR_FIX.md](docs/LABEL_EDITOR_FIX.md).
+
 > **Web/Android 1.0.28 (Android build 26):** join/create selects the returned workspace ID, members/devices stay in sync, stale organization loads discarded; web join clears old filters. Permissions unchanged. See [docs/JOIN_WORKSPACE_FIX.md](docs/JOIN_WORKSPACE_FIX.md).
 
 > **Android 1.0.27 (build 25):** shared device PATCH fixed for web/app group assignment; explicit Android group removal; omitted group settings preserved. Backend 133 tests passed including PostgreSQL group transitions. See [docs/DEVICE_GROUP_FIX.md](docs/DEVICE_GROUP_FIX.md).
@@ -18,7 +20,7 @@
 
 > **Quy ước người dùng:** Mọi thay đổi tính năng/giao diện từ nay phải đồng bộ web và Android; dùng chung API/database.
 
-> **Release Android hiện tại: v1.0.28 (Build 26)** — server HTTPS cố định, ký release, cập nhật APK qua server. Web 1.0.28, Agent 1.3.0. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
+> **Release Android hiện tại: v1.0.29 (Build 27)** — server HTTPS cố định, ký release, cập nhật APK qua server. Web 1.0.29, Agent 1.3.0. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
 
 > **26/10/2026 — đối chiếu và bản sửa:** Xem [docs/RELIABILITY_FIXES.md](docs/RELIABILITY_FIXES.md) để biết hành vi mới, kết quả kiểm tra và phần chưa triển khai. Các mô tả cũ bên dưới có điểm đã lỗi thời.
 > **Tài liệu chuyển giao ngữ cảnh toàn diện dự án DMS (Device Monitoring System)**  

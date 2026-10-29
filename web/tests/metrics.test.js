@@ -1,9 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {analyticsView,labelsPanel,labelChips,labelOptions,matchesLabel,rangeHours,fillTimeline} from '../dist/metrics.js';
+import {analyticsView,labelsPanel,labelChips,labelOptions,matchesLabel,rangeHours,fillTimeline,normalizeLabelKey,labelInputError} from '../dist/metrics.js';
 import {chart} from '../dist/ui.js';
 
 const panel=(...args)=>args.join('');
+
+test('reported uppercase label saves canonically while invalid keys and values explain rejection',()=>{
+  assert.equal(normalizeLabelKey(' KT01_ '),'kt01_');
+  assert.equal(labelInputError('KT01_','phong'),'');
+  assert.notEqual(labelInputError('01_KT','phong'),'');
+  assert.notEqual(labelInputError('kt 01','phong'),'');
+  assert.notEqual(labelInputError('a'.repeat(33),'phong'),'');
+  assert.equal(labelInputError('env','😀'.repeat(64)),'');
+  assert.notEqual(labelInputError('env','😀'.repeat(65)),'');
+  assert.notEqual(labelInputError('env','a\nb'),'');
+});
 
 test('labels filter preserves values containing colon and escapes HTML',()=>{
   const d={labels:{env:'prod:blue',name:'<script>'}};

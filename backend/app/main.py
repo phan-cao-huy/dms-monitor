@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.28",
+        "web_version": "1.0.29",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 26,
-        "version_name": "1.0.28",
+        "version_code": 27,
+        "version_name": "1.0.29",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Tự chuyển sang đúng không gian vừa tham gia hoặc tạo mới\n• Đồng bộ không gian khi xem thành viên, thiết bị và công cụ\n• Chặn dữ liệu tải cũ ghi đè không gian đã chọn\n• Xóa bộ lọc thiết bị cũ khi chuyển không gian",
-        "release_notes_en": "• Switch to the workspace you just joined or created\n• Keep members, devices and tools in the same workspace\n• Ignore stale workspace responses\n• Clear old device filters when switching workspaces",
+        "release_notes": "• Khóa nhãn tự chuyển chữ hoa thành chữ thường để lưu đúng định dạng\n• Giải thích rõ khi khóa hoặc giá trị chưa hợp lệ\n• Báo nhãn đã tồn tại để tránh ghi đè nhầm\n• Hiện bộ đếm ký tự khi chỉnh giá trị nhãn",
+        "release_notes_en": "• Convert label keys to lowercase for valid saves\n• Explain invalid label keys and values\n• Detect existing labels to prevent accidental overwrites\n• Show character counts while editing label values",
         "force_update": False
     }
 

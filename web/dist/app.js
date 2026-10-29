@@ -1,12 +1,12 @@
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.28';
-const WEB_VERSION='1.0.28';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.28';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.28';
-import {demoData} from './demo.js?v=1.0.28';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.29';
+const WEB_VERSION='1.0.29';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.29';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.29';
+import {demoData} from './demo.js?v=1.0.29';
 
-import {analyticsView,labelsPanel,labelForm,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.28';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.28';
-import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.28';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.29';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.29';
+import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.29';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -455,7 +455,7 @@ async function action(name, element){
     if(name==='delete-label'){confirmAction('Xóa nhãn thiết bị',esc(key),async()=>{await api.request(`${base}/${encodeURIComponent(key)}`,{method:'DELETE'});});return;}
     openModal(key?'Chỉnh nhãn thiết bị':'Thêm nhãn thiết bị',labelForm(key,d.labels?.[key]||''),{onSubmit:async f=>{
       if(String(state.orgId)!==String(orgId))throw new Error('Không gian đã thay đổi.');
-      const labelKey=String(f.get('key')).trim();await api.request(`${base}/${encodeURIComponent(labelKey)}`,{method:'PUT',body:{value:String(f.get('value'))}});
+      const labelKey=normalizeLabelKey(f.get('key')),value=String(f.get('value'));const invalid=labelInputError(labelKey,value);if(invalid)throw new Error(invalid);if(!key&&Object.hasOwn(d.labels||{},labelKey))throw new Error('Nhãn này đã tồn tại. Hãy chọn Sửa trên nhãn hiện có.');await api.request(`${base}/${encodeURIComponent(labelKey)}`,{method:'PUT',body:{value:String(f.get('value'))}});
       toast('Đã lưu nhãn thiết bị.');await loadWorkspace();
     }});return;
   }
@@ -486,6 +486,16 @@ document.addEventListener('click',async event=>{
   try{await action(element.dataset.action,element);}catch(error){toast(error.message,'error');}
 });
 document.addEventListener('input',event=>{
+  const labelEditor=event.target.closest('.label-editor');
+  if(labelEditor){
+    const key=labelEditor.querySelector('[name="key"]'),value=labelEditor.querySelector('[name="value"]');
+    if(event.target===key&&!key.readOnly)key.value=normalizeLabelKey(key.value);
+    const error=labelInputError(key.value,value.value);
+    key.setCustomValidity(!/^[a-z][a-z0-9_]{0,31}$/.test(key.value)?error:'');
+    value.setCustomValidity(!key.validationMessage?error:'');
+    labelEditor.querySelector('[data-label-error]').textContent=error;
+  }
+
   const wrap=event.target.closest('.threshold-control');
   if(wrap){
     const input=wrap.querySelector('[name="threshold"]'),slider=wrap.querySelector('[data-threshold-slider]');

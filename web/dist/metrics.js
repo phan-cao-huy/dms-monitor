@@ -1,4 +1,4 @@
-import {esc, number, date, button, field, select, empty, chart} from './ui.js?v=1.0.28';
+import {esc, number, date, button, field, select, empty, chart} from './ui.js?v=1.0.29';
 
 export const metricOptions=[['cpu_usage','CPU (%)'],['ram_usage','RAM (%)'],['disk_usage','Dung lượng ổ đĩa (%)'],['net_in_kbps','Mạng tải xuống (KB/s)'],['net_out_kbps','Mạng tải lên (KB/s)'],['gpu_usage_pct','GPU (%)'],['cpu_temp_c','Nhiệt độ CPU (°C)']];
 export const rangeOptions=[['1h','1 giờ'],['6h','6 giờ'],['24h','24 giờ'],['3d','3 ngày'],['7d','7 ngày'],['30d','30 ngày'],['90d','90 ngày']];
@@ -26,9 +26,17 @@ export function labelsPanel(d,canEdit,panel){
     canEdit?button('Thêm nhãn','add-label','sm primary','plus',labels.length>=20?'disabled':''):'');
 }
 
+export function normalizeLabelKey(key){return String(key).trim().toLowerCase();}
+export function labelInputError(key,value){
+  if(!/^[a-z][a-z0-9_]{0,31}$/.test(normalizeLabelKey(key)))return 'Khóa phải bắt đầu bằng a–z; chỉ dùng chữ, số, dấu _ và tối đa 32 ký tự.';
+  if([...value].length>64||/[\x00-\x1f\x7f]/.test(value))return 'Giá trị tối đa 64 ký tự, không dùng xuống dòng hoặc ký tự điều khiển.';
+  return '';
+}
 export function labelForm(key='',value=''){
-  return field('Khóa nhãn (chữ thường, số, dấu gạch dưới)','key','text',key,`required maxlength="32" pattern="[a-z][a-z0-9_]{0,31}" ${key?'readonly':''} placeholder="env"`)+
-    field('Giá trị','value','text',value,'maxlength="64" placeholder="production"');
+  return '<div class="label-editor">'+field('Khóa nhãn','key','text',key,`required maxlength="32" pattern="[a-z][a-z0-9_]{0,31}" autocapitalize="none" ${key?'readonly':''} placeholder="env"`)+
+    '<p class="muted text-xs">Bắt đầu bằng a–z; dùng chữ, số, dấu _. Tối đa 32 ký tự. Chữ hoa tự chuyển thành chữ thường.</p>'+
+    field('Giá trị (tối đa 64 ký tự)','value','text',value,'placeholder="production"')+
+    '<p data-label-error role="status" class="text-xs"></p></div>';
 }
 
 export function analyticsView(state,panel,heading){

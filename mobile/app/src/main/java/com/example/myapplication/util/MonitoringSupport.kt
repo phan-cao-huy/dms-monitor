@@ -9,6 +9,7 @@ import kotlin.math.ceil
 data class PlotPoint(val timestamp: String, val value: Double?)
 
 object MonitoringSupport {
+    fun normalizeLabelKey(key:String)=key.trim().lowercase(java.util.Locale.ROOT)
     val metrics = listOf("cpu_usage", "ram_usage", "disk_usage", "net_in_kbps", "net_out_kbps", "gpu_usage_pct", "cpu_temp_c")
     val ranges = linkedMapOf("1h" to 1L,"6h" to 6L,"24h" to 24L,"3d" to 72L,"7d" to 168L,"30d" to 720L,"90d" to 2160L)
     fun smtpPassword(host: String,password: String): String? =
