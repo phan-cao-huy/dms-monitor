@@ -436,7 +436,7 @@ fun ProcessesTab(
     val en=com.example.myapplication.ui.i18n.LocalAppStrings.current.isEnglish
     var sortBy by remember { mutableStateOf("CPU") }
     var selectedPid by remember { mutableStateOf<Int?>(null) }
-    var stopWholeApplication by remember { mutableStateOf(false) }
+    var stopWholeApplication by remember { mutableStateOf(true) }
     val gpuAvailable=processes.any{it.gpuUsagePct!=null}
 
     val killPresets = listOf(
@@ -452,8 +452,8 @@ fun ProcessesTab(
     showKillDialog?.takeIf{canControl}?.let { process ->
         val finalReason = if (selectedKillPreset == killPresets.last()) customKillReason.trim() else selectedKillPreset
         AlertDialog(
-            onDismissRequest = { showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first() },
-            title = { Text("Dừng tiến trình") },
+            onDismissRequest = { showKillDialog = null; stopWholeApplication=true; customKillReason = ""; selectedKillPreset = killPresets.first() },
+            title = { Text(if(en)"Force close application — End task" else "Buộc tắt ứng dụng — End task") },
             text = {
                 Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState())) {
                     Card(
@@ -469,7 +469,7 @@ fun ProcessesTab(
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Checkbox(stopWholeApplication,{stopWholeApplication=it})
-                        Text(if(en)"Stop every ${process.name} process on this PC" else "Dừng tất cả tiến trình ${process.name} trên máy")
+                        Text(if(en)"Stop every ${process.name} process on this PC" else "End task: buộc tắt tất cả tiến trình ${process.name} trên máy")
                     }
                     if(stopWholeApplication)Text(
                         if(en)"This closes all matching processes and windows on this PC, including other sessions. Unsaved work may be lost."
@@ -489,21 +489,21 @@ fun ProcessesTab(
             confirmButton = {
                 Button(
                     onClick = {
-                        // Keep PID scope by default; whole-app scope requires explicit selection.
+                        // End task defaults to exact executable scope; PID-only remains an explicit option.
                         onSendCommand(
                             deviceId,
                             "KILL_PROCESS",
                             if(stopWholeApplication)mapOf("process_name" to process.name) else mapOf("pid" to process.pid.toLong()),
                             finalReason
                         )
-                        showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first()
+                        showKillDialog = null; stopWholeApplication=true; customKillReason = ""; selectedKillPreset = killPresets.first()
                     },
                     enabled = finalReason.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text(if(stopWholeApplication)if(en)"Stop entire application" else "Đóng toàn bộ ứng dụng" else if(en)"Stop selected PID" else "Dừng PID đã chọn") }
+                ) { Text(if(stopWholeApplication)if(en)"Stop entire application" else "Buộc tắt ứng dụng" else if(en)"Stop selected PID" else "Buộc tắt PID đã chọn") }
             },
             dismissButton = {
-                TextButton(onClick = { showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first() }) { Text("Hủy") }
+                TextButton(onClick = { showKillDialog = null; stopWholeApplication=true; customKillReason = ""; selectedKillPreset = killPresets.first() }) { Text("Hủy") }
             }
         )
     }
@@ -561,7 +561,7 @@ fun ProcessesTab(
                             Text(process.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
                             Text("PID ${process.pid}",style=MaterialTheme.typography.labelSmall)
                         }
-                        if(isMonitoring&&canControl)IconButton(onClick={stopWholeApplication=false;showKillDialog=process}){
+                        if(isMonitoring&&canControl)IconButton(onClick={stopWholeApplication=true;showKillDialog=process}){
                             Icon(Icons.Default.Close,contentDescription=if(en)"Stop process" else "Dừng tiến trình",tint=MaterialTheme.colorScheme.error)}
                     }
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){

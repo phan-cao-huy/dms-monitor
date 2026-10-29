@@ -640,6 +640,9 @@ fun GroupsTab(
 
     // Dialog cấp quyền người dùng vào nhóm
     assigningGroupId?.let { grpId ->
+        val storedRole=groupMembers[grpId]?.find{it.userId==selectedUserId}?.role
+        val workspaceRole=allOrgMembers.find{it.userId.toIntOrNull()==selectedUserId}?.role
+        LaunchedEffect(grpId,selectedUserId){selectedGroupRole=storedRole?:"Viewer"}
         AlertDialog(
             onDismissRequest = { assigningGroupId = null; selectedUserId = null },
             title = { Text("Cấp quyền thành viên vào nhóm") },
@@ -670,7 +673,9 @@ fun GroupsTab(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Quyền hạn trên các máy thuộc nhóm này:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("Đang lưu trong nhóm: ${storedRole?:"Chưa cấp quyền"}",style=MaterialTheme.typography.bodySmall)
+                    Text(if(workspaceRole=="Viewer")"Quyền thực tế: chỉ xem. Viewer trong không gian không được điều khiển, dù nhóm ghi Manager." else "Quyền thực tế kết hợp vai trò trong không gian và trong nhóm.",style=MaterialTheme.typography.bodySmall)
+                    Text("Vai trò muốn lưu trong nhóm:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -681,7 +686,7 @@ fun GroupsTab(
                         Spacer(modifier = Modifier.width(6.dp))
                         Column {
                             Text("Quản lý (Manager)", fontWeight = FontWeight.Bold)
-                            Text("Được xem + gửi lệnh (Reboot, Kill process)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Chỉ được gửi lệnh khi vai trò trong không gian cũng cho phép", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
@@ -707,8 +712,8 @@ fun GroupsTab(
                         assigningGroupId = null
                         selectedUserId = null
                     },
-                    enabled = selectedUserId != null
-                ) { Text("Cấp quyền") }
+                    enabled = selectedUserId != null && selectedGroupRole != storedRole
+                ) { Text("Lưu thay đổi quyền") }
             },
             dismissButton = {
                 TextButton(onClick = { assigningGroupId = null; selectedUserId = null }) { Text("Hủy") }
@@ -810,7 +815,7 @@ fun GroupsTab(
                                         color = if (gm.role == "Manager") Color(0xFF315C41).copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
                                     ) {
                                         Text(
-                                            text = if (gm.role == "Manager") "Quản lý (Xem & Lệnh)" else "Chỉ xem",
+                                            text = "Nhóm: ${gm.role} · Thực tế: "+if(com.example.myapplication.util.DevicePermissions.canControl(allOrgMembers.find{it.userId.toIntOrNull()==gm.userId}?.role,group.groupId.toString(),gm.role))"Quản lý" else "Chỉ xem",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = if (gm.role == "Manager") Color(0xFF315C41) else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)

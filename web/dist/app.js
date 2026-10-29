@@ -1,14 +1,16 @@
-import {canControlDevice} from './permissions.js?v=1.0.31';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.31';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.31';
-const WEB_VERSION='1.0.31';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.31';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.31';
-import {demoData} from './demo.js?v=1.0.31';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.32';
+import {groupEditorState} from './group-access.js?v=1.0.32';
+import {canControlDevice} from './permissions.js?v=1.0.32';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.32';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.32';
+const WEB_VERSION='1.0.32';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.32';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.32';
+import {demoData} from './demo.js?v=1.0.32';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.31';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.31';
-import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.31';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.32';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.32';
+import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.32';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -141,7 +143,7 @@ function processesPanel(d){
   const cell=(text,v,warm,hot)=>`<td class="proc-heat ${processHeat(v,warm,hot)}" style="--heat:${v==null?0:.08+Math.max(0,Math.min(100,v))/100*.2}">${text}</td>`;
   return panel('Tiến trình dùng tài nguyên nhiều nhất','Sắp xếp giảm dần · Xanh: thấp · Vàng: vừa · Đỏ: cao',`<div class="panel-body">${controls}<p class="muted text-sm gap-top">Snapshot top CPU/RAM/GPU do agent gửi; không phải toàn bộ tiến trình trên máy. Nhấn hàng để xem chi tiết.</p>${!gpuAvailable?'<p class="notice gap-top">Chưa có GPU theo tiến trình. Cần cập nhật Agent Windows và bộ đếm GPU được hỗ trợ.</p>':''}</div>`+(processes.length?`<div class="table-scroll"><table class="process-table"><thead><tr><th>Tiến trình</th><th>PID</th><th>CPU</th><th>RAM</th><th>GPU</th><th></th></tr></thead><tbody>${processes.map(p=>{
     const selected=state.processSelected===p.pid,share=ram>0?p.ram_mb/ram*100:null;
-    return `<tr data-action="process-select" data-id="${p.pid}" class="${selected?'selected':''}" tabindex="0"><td><strong>${esc(p.name)}</strong></td><td class="mono">${esc(p.pid)}</td>${cell(percent(p.cpu_percent??p.cpu_pct),p.cpu_percent??p.cpu_pct,20,50)}${cell(number(p.ram_mb)+' MB'+(share==null?'':`<small>${percent(share)} RAM toàn máy</small>`),share,10,25)}${cell(percent(p.gpu_usage_pct),p.gpu_usage_pct,40,80)}<td>${canControl(d)&&d.is_monitoring?button('Dừng','kill-process','sm danger','close',`data-id="${p.pid}" data-name="${esc(p.name)}"`):''}</td></tr>${selected?`<tr class="process-detail"><td colspan="6"><strong>${esc(p.name)} · PID ${p.pid}</strong><p>Người dùng: ${esc(p.user||'—')}</p><p class="break">${esc(p.exe_path||'Chưa có đường dẫn chương trình')}</p></td></tr>`:''}`;
+    return `<tr data-action="process-select" data-id="${p.pid}" class="${selected?'selected':''}" tabindex="0"><td><strong>${esc(p.name)}</strong></td><td class="mono">${esc(p.pid)}</td>${cell(percent(p.cpu_percent??p.cpu_pct),p.cpu_percent??p.cpu_pct,20,50)}${cell(number(p.ram_mb)+' MB'+(share==null?'':`<small>${percent(share)} RAM toàn máy</small>`),share,10,25)}${cell(percent(p.gpu_usage_pct),p.gpu_usage_pct,40,80)}<td>${canControl(d)&&d.is_monitoring?button('End task','kill-process','sm danger','close',`data-id="${p.pid}" data-name="${esc(p.name)}"`):''}</td></tr>${selected?`<tr class="process-detail"><td colspan="6"><strong>${esc(p.name)} · PID ${p.pid}</strong><p>Người dùng: ${esc(p.user||'—')}</p><p class="break">${esc(p.exe_path||'Chưa có đường dẫn chương trình')}</p></td></tr>`:''}`;
   }).join('')}</tbody></table></div>`:empty('Chưa có dữ liệu tiến trình','Đợi snapshot từ agent.','terminal')));
 }
 function deviceView(){
@@ -333,10 +335,29 @@ function showSecret(data){
 async function openGroupMembers(id){
   const group=state.groups.find(g=>String(g.group_id)===String(id));if(!group)throw new Error('Không tìm thấy nhóm.');
   const members=state.demo?demo.members.filter(m=>m.role!=='Owner').map((m,i)=>({...m,access_id:i+1,group_id:Number(id)})):await api.request(`groups/${safeNumber(id)}/members`);
-  const table=members.length?`<div class="table-scroll"><table><thead><tr><th>Thành viên</th><th>Quyền trong nhóm</th><th></th></tr></thead><tbody>${members.map(m=>`<tr><td>${esc(m.full_name||m.username)}</td><td>${esc(m.role)}</td><td>${admin()?button('Thu hồi','remove-group-member','sm danger','trash',`data-id="${m.user_id}" data-group="${id}"`):''}</td></tr>`).join('')}</tbody></table></div>`:empty('Chưa cấp quyền theo nhóm','Owner và Admin vẫn có quyền truy cập toàn không gian làm việc.','users');
-  openModal('Quyền truy cập · '+group.group_name,table+(admin()?`<div class="gap-top">${select('Thành viên','user_id',state.members.filter(m=>!['Owner','Admin'].includes(m.role)).map(m=>[m.user_id,m.full_name||m.username]),'','required')}${select('Vai trò trong nhóm','role',[['Viewer','Viewer — chỉ xem'],['Manager','Manager — quản lý thiết bị']])}<p class="muted text-xs">Chọn lại thành viên đã có quyền để đổi vai trò.</p></div>`:''),{wide:true,onSubmit:admin()?async form=>{
+  const candidates=state.members.filter(m=>!['Owner','Admin'].includes(m.role));
+  const initialId=candidates[0]?.user_id;
+  const initial=groupEditorState(state.members,members,initialId);
+  const table=members.length?`<div class="table-scroll"><table><thead><tr><th>Thành viên</th><th>Đang lưu trong nhóm</th><th>Quyền thực tế</th><th></th></tr></thead><tbody>${members.map(m=>`<tr><td>${esc(m.full_name||m.username)}</td><td>${esc(m.role)}</td><td>${esc(groupEditorState(state.members,members,m.user_id,m.role).effective)}</td><td>${admin()?button('Thu hồi','remove-group-member','sm danger','trash',`data-id="${m.user_id}" data-group="${id}"`):''}</td></tr>`).join('')}</tbody></table></div>`:empty('Chưa cấp quyền theo nhóm','Owner và Admin vẫn có quyền truy cập toàn không gian làm việc.','users');
+  openModal('Quyền truy cập · '+group.group_name,table+(admin()?`<div class="gap-top">${select('Thành viên','user_id',candidates.map(m=>[m.user_id,m.full_name||m.username]),initialId,'required')}${select('Vai trò muốn lưu trong nhóm','role',[['Viewer','Viewer — chỉ xem'],['Manager','Manager — quản lý khi vai trò không gian cho phép']],initial.role)}<p id="group-role-hint" class="muted text-xs">${esc(initial.explanation)} Đang lưu: ${esc(initial.stored||'Chưa cấp quyền')}. Quyền thực tế: ${esc(initial.effective)}.</p></div>`:''),{wide:true,onSubmit:admin()?async form=>{
+    const chosen=groupEditorState(state.members,members,form.get('user_id'),form.get('role'));
+    if(chosen.unchanged)return false;
     await api.request(`groups/${id}/members`,{method:'POST',body:{user_id:safeNumber(form.get('user_id')),role:form.get('role')}});toast('Đã cập nhật quyền trong nhóm.');await loadWorkspace();await openGroupMembers(id);return false;
-  }:null,submit:'Cấp / cập nhật quyền'});
+  }:null,submit:'Lưu thay đổi quyền'});
+  const form=modalRoot.querySelector('#modal-form');
+  const userField=form?.querySelector('[name="user_id"]');
+  if(userField){
+    const roleField=form.querySelector('[name="role"]'),hint=form.querySelector('#group-role-hint'),save=form.querySelector('[type="submit"]');
+    const update=(memberChanged)=>{
+      const chosen=groupEditorState(state.members,members,userField.value,memberChanged?undefined:roleField.value);
+      if(memberChanged)roleField.value=chosen.role;
+      hint.textContent=`Đang lưu: ${chosen.stored||'Chưa cấp quyền'}. Sau khi lưu: ${chosen.role}. Quyền thực tế: ${chosen.effective}. ${chosen.explanation}`;
+      save.disabled=chosen.unchanged||!userField.value;
+    };
+    update(true);
+    form.addEventListener('change',event=>{if(event.target===userField||event.target===roleField)update(event.target===userField);});
+  }
+
 }
 async function copyText(text){try{await navigator.clipboard.writeText(text);toast('Đã sao chép vào clipboard.');}catch{toast('Trình duyệt chưa cho phép sao chép. Hãy chọn và sao chép nội dung trực tiếp.','error');}}
 async function logout(){
@@ -400,7 +421,7 @@ async function action(name, element){
   }
   if(name==='device-command'||name==='kill-process'){
     const d=currentDevice();const kill=name==='kill-process';
-    openModal(kill?'Dừng tiến trình':'Điều khiển thiết bị',`<p class="intro">Thiết bị: <strong>${esc(d.device_name)}</strong>. Lệnh sẽ được thực thi khi agent nhận được yêu cầu.</p>${kill?`<p class="notice">${esc(element.dataset.name)} · PID ${esc(id)}</p>${select('Phạm vi dừng','kill_scope',[['pid','Chỉ PID đã chọn'],['application','Tất cả tiến trình cùng tên trên máy']])}<p class="text-sm muted">Nếu chọn tất cả: đóng mọi tiến trình/cửa sổ cùng tên, kể cả phiên người dùng khác; có thể mất dữ liệu chưa lưu.</p>`:select('Loại lệnh','command_type',[['REBOOT','Khởi động lại máy tính'],['RESTART_SERVICE','Khởi động lại Windows Service']])}${!kill?field('Tên Windows Service (chỉ dùng cho lệnh restart service)','service_name','text','','placeholder="Ví dụ: Spooler"')+field('Độ trễ khởi động lại (giây)','delay_seconds','number',10,'min="0" max="3600"'):''}${area('Lý do thực hiện','reason','','required maxlength="1000"')}`,{submit:'Xác nhận gửi lệnh',onSubmit:async f=>{const command=kill?'KILL_PROCESS':f.get('command_type');const params=kill?(f.get('kill_scope')==='application'?{process_name:element.dataset.name}:{pid:safeNumber(id)}):command==='REBOOT'?{delay_seconds:Number(f.get('delay_seconds'))}:{service_name:f.get('service_name').trim()};if(command==='RESTART_SERVICE'&&!params.service_name)throw new Error('Vui lòng nhập tên Windows Service.');const created=await api.request(`devices/${d.device_id}/commands`,{method:'POST',body:{command_type:command,parameters:params,reason:f.get('reason').trim()}});toast(commandFeedback(created));state.detailTab='commands';void trackCommand(created,d.device_id);await loadWorkspace();}});return;
+    openModal(kill?'Buộc tắt ứng dụng — End task':'Điều khiển thiết bị',`<p class="intro">Thiết bị: <strong>${esc(d.device_name)}</strong>. Lệnh sẽ được thực thi khi agent nhận được yêu cầu.</p>${kill?`<p class="notice">${esc(element.dataset.name)} · PID ${esc(id)}</p>${select('Phạm vi dừng','kill_scope',endTaskScopeOptions)}<p class="text-sm muted">Nếu chọn tất cả: đóng mọi tiến trình/cửa sổ cùng tên, kể cả phiên người dùng khác; có thể mất dữ liệu chưa lưu.</p>`:select('Loại lệnh','command_type',[['REBOOT','Khởi động lại máy tính'],['RESTART_SERVICE','Khởi động lại Windows Service']])}${!kill?field('Tên Windows Service (chỉ dùng cho lệnh restart service)','service_name','text','','placeholder="Ví dụ: Spooler"')+field('Độ trễ khởi động lại (giây)','delay_seconds','number',10,'min="0" max="3600"'):''}${area('Lý do thực hiện','reason','','required maxlength="1000"')}`,{submit:'Xác nhận gửi lệnh',onSubmit:async f=>{const command=kill?'KILL_PROCESS':f.get('command_type');const params=kill?killParameters(safeNumber(id),element.dataset.name,f.get('kill_scope')):command==='REBOOT'?{delay_seconds:Number(f.get('delay_seconds'))}:{service_name:f.get('service_name').trim()};if(command==='RESTART_SERVICE'&&!params.service_name)throw new Error('Vui lòng nhập tên Windows Service.');const created=await api.request(`devices/${d.device_id}/commands`,{method:'POST',body:{command_type:command,parameters:params,reason:f.get('reason').trim()}});toast(commandFeedback(created));state.detailTab='commands';void trackCommand(created,d.device_id);await loadWorkspace();}});return;
   }
   if(name==='delete-device'){const d=currentDevice();confirmAction('Xóa thiết bị & gỡ agent',`Thiết bị <strong>${esc(d.device_name)}</strong> sẽ được lưu trữ. Server gửi lệnh UNINSTALL để gỡ agent khi máy kết nối lại.`,async()=>{await api.request(`devices/${d.device_id}`,{method:'DELETE'});state.selectedDevice=null;navigate('/devices');},{typed:d.device_name});return;}
   if(name==='regenerate-token'){const d=currentDevice();openModal('Tạo lại token agent',`<p class="intro">Token cũ của <strong>${esc(d.device_name)}</strong> sẽ mất hiệu lực. Bạn cần cập nhật lại agent.</p>${field('Nhập tên thiết bị để xác nhận','confirmation','text','','required')}`,{submit:'Tạo token mới',onSubmit:async f=>{if(f.get('confirmation')!==d.device_name)throw new Error('Tên thiết bị chưa khớp.');const created=await api.request(`devices/${d.device_id}/regenerate-token`,{method:'POST'});showSecret(created);return false;}});return;}

@@ -51,7 +51,7 @@ test('workspace routes render and demo mode cannot write to the real API',async(
   await click('group-members',{id:'1'});
   const submit={disabled:false,isConnected:true};
   const originalFormData=globalThis.FormData;
-  globalThis.FormData=class{get(name){return name==='user_id'?'2':'Manager';}};
+  globalThis.FormData=class{get(name){return name==='user_id'?'2':'Viewer';}};
   try{
     await events.get('submit')({preventDefault(){},target:{id:'modal-form',querySelector:()=>submit}});
     assert.equal(requests,0);

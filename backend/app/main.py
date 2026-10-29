@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.31",
+        "web_version": "1.0.32",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 29,
-        "version_name": "1.0.31",
+        "version_code": 30,
+        "version_name": "1.0.32",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Chặn Viewer điều khiển thiết bị kể cả khi nhóm đang gán Manager\n• Ẩn nút kill, khởi động lại và xóa máy với tài khoản chỉ xem\n• Khóa sửa nhóm, nhãn và trạng thái theo dõi khi không có quyền\n• Đồng bộ kiểm tra quyền trên server, web và Android",
-        "release_notes_en": "• Block workspace Viewers from device control even with group Manager access\n• Hide kill, reboot and delete controls for read-only accounts\n• Restrict group, label and monitoring edits to authorized users\n• Match server, web and Android device permissions",
+        "release_notes": "• Biểu mẫu quyền nhóm nạp đúng vai trò đang lưu của thành viên\n• Hiển thị rõ quyền trong nhóm và quyền thực tế theo không gian\n• End task mặc định buộc tắt toàn bộ ứng dụng cùng tên\n• Giữ tùy chọn buộc tắt riêng PID và giới hạn quyền Viewer",
+        "release_notes_en": "• Load the member's stored role in the group editor\n• Explain stored group roles versus effective workspace permissions\n• Default End task to force-closing the whole matching application\n• Keep explicit PID mode and Viewer restrictions",
         "force_update": False
     }
 

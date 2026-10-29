@@ -1,4 +1,10 @@
-# DMS Monitor release 1.0.31 (build 29)
+# DMS Monitor release 1.0.32 (build 30)
+
+Group role editors load existing assignments and explain effective access. End task
+defaults to force-closing all processes with the exact executable name. See
+[group editor / End task](GROUP_EDITOR_END_TASK.md).
+
+## Earlier release 1.0.31 (build 29)
 
 Viewer device controls are hidden/disabled and commands are server-blocked even
 with a legacy group Manager assignment. See [Viewer permission fix](VIEWER_CONTROL_FIX.md).

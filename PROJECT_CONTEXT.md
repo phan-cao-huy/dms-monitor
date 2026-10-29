@@ -1,3 +1,5 @@
+> **Web/Android 1.0.32 (Android build 30):** group editor preloads stored roles, separates effective access, disables unchanged saves; End task defaults to exact executable scope. Disposable Windows parent/child kill verified; Viewer restrictions preserved. See [docs/GROUP_EDITOR_END_TASK.md](docs/GROUP_EDITOR_END_TASK.md).
+
 > **Web/Android 1.0.31 (Android build 29):** workspace Viewer cannot control/modify devices even with group Manager; server 403 and matching web/Android control gates. See [docs/VIEWER_CONTROL_FIX.md](docs/VIEWER_CONTROL_FIX.md).
 
 > **Web/Android 1.0.30 (Android build 28):** online counts include Warning; web Online filter includes connected warning PCs, with clear subset/partition labels. See [docs/ONLINE_WARNING_FIX.md](docs/ONLINE_WARNING_FIX.md).
@@ -24,7 +26,7 @@
 
 > **Quy ước người dùng:** Mọi thay đổi tính năng/giao diện từ nay phải đồng bộ web và Android; dùng chung API/database.
 
-> **Release Android hiện tại: v1.0.31 (Build 29)** — server HTTPS cố định, ký release, cập nhật APK qua server. Web 1.0.31, Agent 1.3.0. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
+> **Release Android hiện tại: v1.0.32 (Build 30)** — server HTTPS cố định, ký release, cập nhật APK qua server. Web 1.0.32, Agent 1.3.0. Xem [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md).
 
 > **26/10/2026 — đối chiếu và bản sửa:** Xem [docs/RELIABILITY_FIXES.md](docs/RELIABILITY_FIXES.md) để biết hành vi mới, kết quả kiểm tra và phần chưa triển khai. Các mô tả cũ bên dưới có điểm đã lỗi thời.
 > **Tài liệu chuyển giao ngữ cảnh toàn diện dự án DMS (Device Monitoring System)**  
