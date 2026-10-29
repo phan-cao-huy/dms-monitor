@@ -133,6 +133,7 @@ fun NavGraph(
                 val orgId = dashboardState.selectedOrg?.id
                 if (orgId != null) {
                     dashboardViewModel.refreshCurrentOrgDevices()
+                    if(orgState.orgId!=orgId)orgViewModel.selectOrganization(orgId)
                 }
             }
 
@@ -178,13 +179,13 @@ fun NavGraph(
                 onRemoveGroupMember = { grpId, uId -> orgViewModel.removeGroupMember(grpId, uId) },
                 onCreateInvitation = { role, maxUses -> orgViewModel.createInvitation(role, maxUses) },
                 onJoinOrg = { code ->
-                    orgViewModel.joinOrganization(code) {
-                        dashboardViewModel.loadOrganizations()
+                    orgViewModel.joinOrganization(code) { joinedOrgId ->
+                        dashboardViewModel.loadOrganizations(joinedOrgId)
                     }
                 },
                 onCreateOrg = { name, desc ->
-                    orgViewModel.createOrganization(name, desc) {
-                        dashboardViewModel.loadOrganizations()
+                    orgViewModel.createOrganization(name, desc) { createdOrgId ->
+                        dashboardViewModel.loadOrganizations(createdOrgId)
                     }
                 },
                 onClearOrgMessages = { orgViewModel.clearMessages() },

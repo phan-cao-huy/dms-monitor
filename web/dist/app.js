@@ -1,12 +1,12 @@
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.25';
-const WEB_VERSION='1.0.25';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.25';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.25';
-import {demoData} from './demo.js?v=1.0.25';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.28';
+const WEB_VERSION='1.0.28';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.28';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.28';
+import {demoData} from './demo.js?v=1.0.28';
 
-import {analyticsView,labelsPanel,labelForm,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.25';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.25';
-import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.25';
+import {analyticsView,labelsPanel,labelForm,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.28';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.28';
+import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.28';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -380,10 +380,10 @@ async function action(name, element){
   if(name==='export-metrics'){csvDownload('dms-hieu-nang.csv',[['Thời gian','CPU %','RAM %','Ổ đĩa %','Mạng vào KB/s','Mạng ra KB/s'],...state.metrics.map(m=>[m.created_at||m.hour_bucket,m.cpu_usage??m.cpu_avg,m.ram_usage??m.ram_avg,m.disk_usage??m.disk_avg,m.net_in_kbps??m.net_in_avg_kbps,m.net_out_kbps??m.net_out_avg_kbps])]);return;}
   if(name==='export-commands'){csvDownload('dms-lich-su-lenh.csv',[['ID','Lệnh','Trạng thái','Lý do','Thời gian','Kết quả'],...state.commands.map(c=>[c.command_id,c.command_type,c.status,c.reason,c.created_at,c.output])]);return;}
   if(name==='create-org'){
-    openModal('Tạo không gian mới',field('Tên không gian làm việc','org_name','text','','required maxlength="100"')+area('Mô tả','description'),{submit:'Tạo không gian',onSubmit:async f=>{const o=await api.request('orgs',{method:'POST',body:{org_name:f.get('org_name').trim(),description:f.get('description')}});state.orgId=o.org_id;state.orgTab='groups';toast('Đã tạo không gian làm việc.');await loadWorkspace();}});return;
+    openModal('Tạo không gian mới',field('Tên không gian làm việc','org_name','text','','required maxlength="100"')+area('Mô tả','description'),{submit:'Tạo không gian',onSubmit:async f=>{const o=await api.request('orgs',{method:'POST',body:{org_name:f.get('org_name').trim(),description:f.get('description')}});resetOrgData();state.orgId=o.org_id;state.orgTab='groups';toast('Đã tạo không gian làm việc.');await loadWorkspace();}});return;
   }
   if(name==='join-org'){
-    openModal('Tham gia không gian',field('Mã mời gồm 6 ký tự','invite_code','text','','required minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6}" autocomplete="off"'),{submit:'Tham gia',onSubmit:async f=>{const o=await api.request('orgs/join',{method:'POST',body:{invite_code:f.get('invite_code').toUpperCase()}});state.orgId=o.org_id;state.orgTab='groups';toast('Đã tham gia không gian làm việc.');await loadWorkspace();}});return;
+    openModal('Tham gia không gian',field('Mã mời gồm 6 ký tự','invite_code','text','','required minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6}" autocomplete="off"'),{submit:'Tham gia',onSubmit:async f=>{const o=await api.request('orgs/join',{method:'POST',body:{invite_code:f.get('invite_code').toUpperCase()}});resetOrgData();state.orgId=o.org_id;state.orgTab='members';toast('Đã tham gia không gian làm việc.');await loadWorkspace();}});return;
   }
   if(name==='leave-org'){const o=state.orgs.find(o=>String(o.org_id)===String(id));confirmAction('Rời không gian',`Bạn sẽ mất quyền truy cập dữ liệu trong ${esc(o?.org_name)}.`,async()=>{await api.request(`orgs/${safeNumber(id)}/leave`,{method:'POST'});state.orgId=null;},{typed:o?.org_name});return;}
   if(name==='add-device'){

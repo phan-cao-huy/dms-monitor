@@ -49,14 +49,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun resetState() {
         // Huỷ tất cả các coroutine job đang chạy trong scope (network calls cũ)
         viewModelScope.coroutineContext[kotlinx.coroutines.Job]?.children?.forEach { it.cancel() }
+        organizationGeneration++
+        preferredOrgId=null
         _uiState.value = DashboardUiState()
     }
 
-    fun loadOrganizations() {
+    private var organizationGeneration = 0
+    private var preferredOrgId: String? = null
+
+    fun loadOrganizations(targetOrgId: String? = null) {
+        if(targetOrgId!=null){
+            preferredOrgId=targetOrgId
+            _uiState.value=_uiState.value.copy(selectedOrg=null,devices=emptyList(),groups=emptyList(),alerts=emptyList(),selectedGroupFilter=null,searchQuery="",newlyCreatedDevice=null)
+        }
+        val generation=++organizationGeneration
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val response = RetrofitClient.apiService.getOrganizations()
+                if(generation!=organizationGeneration)return@launch
                 if (response.isSuccessful && response.body() != null) {
                     val orgs = response.body()!!
                     if (orgs.isEmpty()) {
@@ -72,7 +83,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         )
                     } else {
                         val savedOrgId = tokenManager.currentOrgId.first()
-                        val selected = orgs.find { it.id == _uiState.value.selectedOrg?.id } ?: orgs.find { it.id == savedOrgId } ?: orgs.firstOrNull()
+                        val selected = com.example.myapplication.util.WorkspaceSelection.choose(orgs,preferredOrgId,_uiState.value.selectedOrg?.id,savedOrgId)
+                        if(selected==null){_uiState.value=_uiState.value.copy(isLoading=false,error="Không tải được không gian vừa tham gia. Hãy làm mới.");return@launch}
+                        preferredOrgId=null
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             organizations = orgs,
@@ -95,6 +108,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                if(generation!=organizationGeneration)return@launch
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Không thể kết nối server: ${e.message}"
@@ -104,6 +118,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun selectOrganization(org: Organization) {
+        organizationGeneration++
+        preferredOrgId=null
         _uiState.value = _uiState.value.copy(selectedOrg=org,selectedGroupFilter=null,devices=emptyList(),groups=emptyList(),alerts=emptyList(),newlyCreatedDevice=null,searchQuery="",error=null)
         viewModelScope.launch {
             tokenManager.saveOrgId(org.id)

@@ -35,133 +35,82 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
     fun resetState() {
         // Huỷ tất cả job đang chạy để tránh network call cũ ghi đè state mới
         viewModelScope.coroutineContext[kotlinx.coroutines.Job]?.children?.forEach { it.cancel() }
+        refreshGeneration++
         _uiState.value = OrganizationUiState()
     }
 
+    private var refreshGeneration = 0
+    private var refreshJob: kotlinx.coroutines.Job? = null
+
     fun selectOrganization(orgId: String) {
-        viewModelScope.launch {
-            tokenManager.saveOrgId(orgId)
-            loadData(targetOrgId = orgId)
+        if (_uiState.value.orgId != orgId) {
+            refreshGeneration++
+            refreshJob?.cancel()
+            _uiState.value = _uiState.value.copy(orgId=orgId,orgName=null,members=emptyList(),groups=emptyList(),invitations=emptyList(),groupMembers=emptyMap(),error=null)
         }
+        loadData(orgId)
     }
 
     fun loadData(targetOrgId: String? = null) {
-        loadMembers(targetOrgId)
-        loadInvitations(targetOrgId)
-        loadGroups(targetOrgId)
-    }
-
-    fun loadMembers(targetOrgId: String? = null) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        val generation=++refreshGeneration
+        refreshJob?.cancel()
+        refreshJob=viewModelScope.launch {
+            _uiState.value=_uiState.value.copy(isLoading=true,error=null)
             try {
-                var orgId = targetOrgId ?: tokenManager.currentOrgId.first()
-                val orgsResponse = try {
-                    RetrofitClient.apiService.getOrganizations()
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    null
-                }
-
-                if (orgsResponse?.code() == 401) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Phiên đăng nhập hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại."
-                    )
+                val requested=targetOrgId ?: _uiState.value.orgId ?: tokenManager.currentOrgId.first()
+                val response=RetrofitClient.apiService.getOrganizations()
+                if(generation!=refreshGeneration)return@launch
+                if(!response.isSuccessful)throw IllegalStateException("Không tải được không gian (${response.code()})")
+                val organizations=response.body().orEmpty()
+                val org=if(targetOrgId!=null)organizations.find{it.id==targetOrgId} else organizations.find{it.id==requested} ?: organizations.firstOrNull()
+                if(org==null && targetOrgId!=null && organizations.isNotEmpty())throw IllegalStateException("Không tải được không gian đã chọn. Hãy làm mới.")
+                if(org==null){
+                    _uiState.value=OrganizationUiState(organizations=organizations)
                     return@launch
                 }
-
-                val orgList = if (orgsResponse?.isSuccessful == true) orgsResponse.body().orEmpty() else emptyList()
-
-                if (orgList.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        organizations = emptyList(),
-                        orgId = null,
-                        orgName = null,
-                        members = emptyList(),
-                        invitations = emptyList(),
-                        groups = emptyList(),
-                        groupMembers = emptyMap()
-                    )
-                    return@launch
-                }
-
-                val currentOrg = orgList.find { it.id == orgId } ?: orgList.first()
-                orgId = currentOrg.id
-                tokenManager.saveOrgId(orgId)
-                _uiState.value = _uiState.value.copy(
-                    organizations = orgList,
-                    orgId = orgId,
-                    orgName = currentOrg.orgName
-                )
-
-                val response = RetrofitClient.apiService.getOrgMembers(orgId)
-                if (response.isSuccessful && response.body() != null) {
-                    _uiState.value = _uiState.value.copy(isLoading = false, members = response.body()!!)
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Không thể tải danh sách thành viên (${response.code()})"
-                    )
-                }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Không thể kết nối server: ${e.message}"
-                )
+                val changed=_uiState.value.orgId!=org.id
+                _uiState.value=_uiState.value.copy(organizations=organizations,orgId=org.id,orgName=org.orgName,
+                    members=if(changed)emptyList() else _uiState.value.members,
+                    groups=if(changed)emptyList() else _uiState.value.groups,
+                    invitations=if(changed)emptyList() else _uiState.value.invitations,
+                    groupMembers=if(changed)emptyMap() else _uiState.value.groupMembers)
+                tokenManager.saveOrgId(org.id)
+                val members=RetrofitClient.apiService.getOrgMembers(org.id)
+                if(generation!=refreshGeneration)return@launch
+                if(!members.isSuccessful)throw IllegalStateException("Không tải được thành viên (${members.code()})")
+                _uiState.value=_uiState.value.copy(members=members.body().orEmpty())
+                val groups=RetrofitClient.apiService.getGroups(org.id)
+                if(generation!=refreshGeneration)return@launch
+                if(!groups.isSuccessful)throw IllegalStateException("Không tải được nhóm (${groups.code()})")
+                _uiState.value=_uiState.value.copy(groups=groups.body().orEmpty())
+                if(org.role in listOf("Owner","Admin")){
+                    val invites=RetrofitClient.apiService.getInvitations(org.id)
+                    if(generation!=refreshGeneration)return@launch
+                    _uiState.value=_uiState.value.copy(invitations=if(invites.isSuccessful)invites.body().orEmpty() else emptyList())
+                }else _uiState.value=_uiState.value.copy(invitations=emptyList())
+                _uiState.value=_uiState.value.copy(isLoading=false)
+                _uiState.value.groups.forEach{loadGroupMembers(it.groupId)}
+            }catch(e:Exception){
+                if(e is CancellationException)throw e
+                if(generation==refreshGeneration)_uiState.value=_uiState.value.copy(isLoading=false,error=e.message ?: "Không tải được dữ liệu")
             }
         }
     }
-
-    fun loadInvitations(targetOrgId: String? = null) {
-        viewModelScope.launch {
-            try {
-                val orgId = targetOrgId ?: _uiState.value.orgId ?: tokenManager.currentOrgId.first() ?: return@launch
-                if (orgId.isBlank()) return@launch
-                val response = RetrofitClient.apiService.getInvitations(orgId)
-                if (response.isSuccessful && response.body() != null) {
-                    _uiState.value = _uiState.value.copy(invitations = response.body()!!)
-                }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
-        }
-    }
-
-    fun loadGroups(targetOrgId: String? = null) {
-        viewModelScope.launch {
-            try {
-                val orgId = targetOrgId ?: _uiState.value.orgId ?: tokenManager.currentOrgId.first() ?: return@launch
-                if (orgId.isBlank()) return@launch
-                val response = RetrofitClient.apiService.getGroups(orgId)
-                if (response.isSuccessful && response.body() != null) {
-                    val groups = response.body()!!
-                    _uiState.value = _uiState.value.copy(groups = groups)
-                    // Tải danh sách thành viên cho từng nhóm
-                    groups.forEach { group ->
-                        loadGroupMembers(group.groupId)
-                    }
-                }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
-        }
-    }
+    fun loadMembers(targetOrgId: String? = null) = loadData(targetOrgId)
+    fun loadInvitations(targetOrgId: String? = null) = loadData(targetOrgId)
+    fun loadGroups(targetOrgId: String? = null) = loadData(targetOrgId)
 
     fun loadGroupMembers(groupId: Int) {
+        val generation=refreshGeneration
+        val orgId=_uiState.value.orgId
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.apiService.getGroupMembers(groupId)
-                if (response.isSuccessful && response.body() != null) {
-                    val currentMap = _uiState.value.groupMembers.toMutableMap()
-                    currentMap[groupId] = response.body()!!
-                    _uiState.value = _uiState.value.copy(groupMembers = currentMap)
+                val response=RetrofitClient.apiService.getGroupMembers(groupId)
+                if(generation!=refreshGeneration || _uiState.value.orgId!=orgId)return@launch
+                if(response.isSuccessful && _uiState.value.groups.any{it.groupId==groupId}){
+                    _uiState.value=_uiState.value.copy(groupMembers=_uiState.value.groupMembers+(groupId to response.body().orEmpty()))
                 }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
+            }catch(e:Exception){if(e is CancellationException)throw e}
         }
     }
 
@@ -412,9 +361,10 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         orgId = joinedOrgId,
+                        orgName=null,members=emptyList(),groups=emptyList(),invitations=emptyList(),groupMembers=emptyMap(),
                         successMessage = "Đã tham gia không gian làm việc thành công!"
                     )
-                    loadData(targetOrgId = joinedOrgId)
+                    selectOrganization(joinedOrgId)
                     onJoined(joinedOrgId)
                 } else {
                     val errorMsg = when (response.code()) {
@@ -448,6 +398,7 @@ class OrganizationViewModel(application: Application) : AndroidViewModel(applica
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         orgId = created.id,
+                        orgName=created.orgName,members=emptyList(),groups=emptyList(),invitations=emptyList(),groupMembers=emptyMap(),
                         successMessage = "Đã tạo không gian làm việc '$orgName' thành công!"
                     )
                     loadData(targetOrgId = created.id)

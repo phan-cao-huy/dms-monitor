@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.25",
+        "web_version": "1.0.28",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 25,
-        "version_name": "1.0.27",
+        "version_code": 26,
+        "version_name": "1.0.28",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Sửa lỗi phân thiết bị vào nhóm trên API dùng chung web và app\n• Sửa thao tác Chưa phân nhóm để gỡ thiết bị khỏi nhóm trên Android\n• Giữ nguyên nhóm khi chỉ sửa tên hoặc ngưỡng mất kết nối",
-        "release_notes_en": "• Fix assigning devices to groups in the shared web and Android API\n• Fix removing a device from its group on Android\n• Preserve group membership when editing the name or offline threshold",
+        "release_notes": "• Tự chuyển sang đúng không gian vừa tham gia hoặc tạo mới\n• Đồng bộ không gian khi xem thành viên, thiết bị và công cụ\n• Chặn dữ liệu tải cũ ghi đè không gian đã chọn\n• Xóa bộ lọc thiết bị cũ khi chuyển không gian",
+        "release_notes_en": "• Switch to the workspace you just joined or created\n• Keep members, devices and tools in the same workspace\n• Ignore stale workspace responses\n• Clear old device filters when switching workspaces",
         "force_update": False
     }
 

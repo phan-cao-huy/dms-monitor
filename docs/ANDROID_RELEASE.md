@@ -1,4 +1,10 @@
-# DMS Monitor release 1.0.27 (build 25)
+# DMS Monitor release 1.0.28 (build 26)
+
+Joining selects the invited workspace for both members and devices; delayed loads
+cannot revert selection to the personal workspace. Web join resets scoped filters.
+See [join selection fix](JOIN_WORKSPACE_FIX.md).
+
+## Earlier release 1.0.27 (build 25)
 
 Shared device PATCH no longer requires an unrelated query parameter. Android now
 sends an explicit value when removing a group. See [group assignment fix](DEVICE_GROUP_FIX.md).
