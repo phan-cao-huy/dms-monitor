@@ -99,12 +99,12 @@ def get_app_version():
         "web_version": "1.0.25",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 23,
-        "version_name": "1.0.25",
+        "version_code": 24,
+        "version_name": "1.0.26",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Mỗi thiết bị chỉ áp dụng một quy tắc cho từng chỉ số\n• Chặn tạo trùng quy tắc đang bật; chỉnh ngưỡng trên quy tắc hiện có\n• Lọc quy tắc theo thiết bị, phân biệt máy trùng tên bằng mã thiết bị\n• Ẩn quy tắc của máy đã xóa và tính lại thời gian khi đổi ngưỡng",
-        "release_notes_en": "• One effective rule per device and component\n• Prevent duplicate active rules; edit the existing threshold instead\n• Filter effective rules by device and distinguish duplicate names by ID\n• Hide archived device rules and restart the evaluation window after edits",
+        "release_notes": "• Bổ sung kênh cảnh báo có âm thanh và rung\n• Mở cài đặt âm báo ngay trong phần thông báo điện thoại\n• Cho phép thử lại âm báo bằng nút Gửi thông báo thử\n• Âm báo tuân theo âm lượng và chế độ Im lặng / Không làm phiền của điện thoại",
+        "release_notes_en": "• Add a sound and vibration channel for device alerts\n• Open alert sound settings from the phone notification card\n• Repeat local sound tests with Send test notification\n• Alert sounds respect phone volume, silent mode and Do Not Disturb",
         "force_update": False
     }
 

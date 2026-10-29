@@ -1,4 +1,11 @@
-# DMS Monitor release 1.0.25 (build 23)
+# DMS Monitor release 1.0.26 (build 24)
+
+Android alerts now use an explicitly configured sound/vibration channel. The phone
+notification card opens channel sound settings; repeated local tests can alert
+again without changing duplicate suppression for real alerts. See
+[notification sound and manual checks](NOTIFICATION_SOUND.md).
+
+## Earlier release 1.0.25 (build 23)
 
 One effective rule per device/component, duplicate active-rule prevention and
 device-specific rule filters now match web. Archived device rules are hidden.

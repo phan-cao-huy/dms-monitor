@@ -5,6 +5,8 @@ import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
 import android.os.Build
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -17,13 +19,24 @@ import org.json.JSONObject
 import android.util.Base64
 
 object AlertNotifications {
-    const val CHANNEL="dms_alerts"
+    // Stable sound channel, introduced once in 1.0.26; never rotate on each update.
+    const val CHANNEL="dms_alerts_sound_v1"
+    const val TEST_ID=2147483646
     fun createChannel(context:Context){
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL,"Cảnh báo thiết bị",NotificationManager.IMPORTANCE_HIGH).apply{
-                description="Cảnh báo vượt ngưỡng và mất kết nối từ DMS";enableVibration(true)
+            NotificationChannel(CHANNEL,"Cảnh báo thiết bị / Device alerts",NotificationManager.IMPORTANCE_HIGH).apply{
+                description="Cảnh báo có âm thanh và rung / Alerts with sound and vibration"
+                setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                enableVibration(true)
             })
     }
+    fun soundEnabled(context:Context):Boolean {
+        val channel=context.getSystemService(NotificationManager::class.java).getNotificationChannel(CHANNEL)
+        return channel!=null&&channel.importance>=NotificationManager.IMPORTANCE_DEFAULT&&channel.sound!=null
+    }
+    fun prepareTest(context:Context){NotificationManagerCompat.from(context).cancel(TEST_ID)}
     fun clear(context:Context){NotificationManagerCompat.from(context).cancelAll()}
     suspend fun show(context:Context,data:Map<String,String>){
         val tokens=TokenManager(context)
