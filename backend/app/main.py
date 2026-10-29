@@ -99,12 +99,12 @@ def get_app_version():
         "web_version": "1.0.25",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 24,
-        "version_name": "1.0.26",
+        "version_code": 25,
+        "version_name": "1.0.27",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Bổ sung kênh cảnh báo có âm thanh và rung\n• Mở cài đặt âm báo ngay trong phần thông báo điện thoại\n• Cho phép thử lại âm báo bằng nút Gửi thông báo thử\n• Âm báo tuân theo âm lượng và chế độ Im lặng / Không làm phiền của điện thoại",
-        "release_notes_en": "• Add a sound and vibration channel for device alerts\n• Open alert sound settings from the phone notification card\n• Repeat local sound tests with Send test notification\n• Alert sounds respect phone volume, silent mode and Do Not Disturb",
+        "release_notes": "• Sửa lỗi phân thiết bị vào nhóm trên API dùng chung web và app\n• Sửa thao tác Chưa phân nhóm để gỡ thiết bị khỏi nhóm trên Android\n• Giữ nguyên nhóm khi chỉ sửa tên hoặc ngưỡng mất kết nối",
+        "release_notes_en": "• Fix assigning devices to groups in the shared web and Android API\n• Fix removing a device from its group on Android\n• Preserve group membership when editing the name or offline threshold",
         "force_update": False
     }
 

@@ -8,6 +8,11 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DevicePayloadTest {
+    @Test fun groupAssignmentAndRemovalAlwaysSendAnExplicitGroupId() {
+        val gson=Gson()
+        assertEquals("{\"group_id\":12}",gson.toJson(com.example.myapplication.data.model.UpdateDeviceGroupRequest(12)))
+        assertEquals("{\"group_id\":0}",gson.toJson(com.example.myapplication.data.model.UpdateDeviceGroupRequest()))
+    }
     @Test fun readsEveryVolumeAndActualAgentProcessCpu() {
         val detail=Gson().fromJson("""{"device_id":25,"disks":[{"mountpoint":"C:","total_gb":256,"free_gb":76,"used_gb":180,"used_percent":70.3},{"mountpoint":"D:","total_gb":1000,"free_gb":80,"used_gb":920,"used_percent":92},{"mountpoint":"E:","used_percent":0}],"gpu_usage_pct":0,"top_processes":[{"pid":42,"name":"test.exe","cpu_pct":14.5,"ram_mb":128}]}""",DeviceDetail::class.java)
         assertEquals(3,detail.disks!!.size)

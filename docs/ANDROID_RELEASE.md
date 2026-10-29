@@ -1,4 +1,9 @@
-# DMS Monitor release 1.0.26 (build 24)
+# DMS Monitor release 1.0.27 (build 25)
+
+Shared device PATCH no longer requires an unrelated query parameter. Android now
+sends an explicit value when removing a group. See [group assignment fix](DEVICE_GROUP_FIX.md).
+
+## Earlier release 1.0.26 (build 24)
 
 Android alerts now use an explicitly configured sound/vibration channel. The phone
 notification card opens channel sound settings; repeated local tests can alert

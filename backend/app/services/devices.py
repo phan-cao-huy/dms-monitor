@@ -346,8 +346,8 @@ async def update_device(
         db, device_id, user_id, required_roles=["Owner", "Admin", "Manager"]
     )
 
-    if payload.group_id is not None:
-        if payload.group_id <= 0:
+    if "group_id" in payload.model_fields_set:
+        if payload.group_id is None or payload.group_id <= 0:
             device.group_id = None
         else:
             group_res = await db.execute(

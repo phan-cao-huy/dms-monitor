@@ -119,7 +119,8 @@ data class AssignGroupMemberRequest(
 )
 
 data class UpdateDeviceGroupRequest(
-    @SerializedName("group_id") val groupId: Int? = null
+    // Zero explicitly removes the group; Gson otherwise omits a nullable field.
+    @SerializedName("group_id") val groupId: Int = 0
 )
 
 // === Device ===

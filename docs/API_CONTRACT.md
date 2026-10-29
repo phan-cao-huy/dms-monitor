@@ -3,6 +3,10 @@
 Base URL: `http://localhost:8000/api/v1` · Swagger: `http://localhost:8000/docs`
 Lỗi trả về dạng `{"detail": "..."}`. Thời gian: ISO-8601 UTC.
 
+Device PATCH accepts `group_id` as a destination ID in the same workspace, or
+0/null to remove the group. Omit the field to preserve the group. No monitoring
+query parameter is needed. See [group assignment fix](DEVICE_GROUP_FIX.md).
+
 Android 1.0.24 uses the T1–T3 endpoints documented in the linked feature documents.
 `GET /api/v1/app/version` also returns optional `release_notes_en`; English clients
 fall back to `release_notes` when it is absent. See [Android rollout](ANDROID_T1_T2_T3.md).

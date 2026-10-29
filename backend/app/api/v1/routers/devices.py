@@ -138,7 +138,6 @@ async def get_device(
 async def patch_device(
     device_id: int,
     payload: DeviceUpdate,
-    ToggleMonitoringIn,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> Any:

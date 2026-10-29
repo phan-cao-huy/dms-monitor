@@ -214,7 +214,7 @@ class DeviceDetailViewModel : ViewModel() {
             try {
                 val response = RetrofitClient.apiService.updateDeviceGroup(
                     deviceId,
-                    com.example.myapplication.data.model.UpdateDeviceGroupRequest(groupId)
+                    com.example.myapplication.data.model.UpdateDeviceGroupRequest(groupId ?: 0)
                 )
                 if (response.isSuccessful) {
                     _uiState.value = _uiState.value.copy(
