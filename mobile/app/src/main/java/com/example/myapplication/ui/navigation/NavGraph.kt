@@ -253,10 +253,11 @@ fun NavGraph(
                 val group=detailState.device?.groupId?.toIntOrNull()
                 if(group!=null)try{labelGroupRole=com.example.myapplication.data.api.RetrofitClient.apiService.getGroupMembers(group).body()?.find{it.userId.toString()==authState.user?.id}?.role}catch(e:Exception){if(e is kotlinx.coroutines.CancellationException)throw e}
             }
-            val orgRole=dashboardState.selectedOrg?.role
-            val canEditLabels=orgRole in listOf("Owner","Admin") || (if(detailState.device?.groupId==null)orgRole=="Manager" else labelGroupRole=="Manager")
+            val orgRole=dashboardState.organizations.find{it.id==detailState.device?.orgId}?.role
+            val canEditLabels=com.example.myapplication.util.DevicePermissions.canControl(orgRole,detailState.device?.groupId,labelGroupRole)
             DeviceDetailScreen(
                 canEditLabels=canEditLabels,
+                canControl=canEditLabels,
                 onLabelsChanged={detailViewModel.loadDevice(deviceId,silent=true);dashboardViewModel.refreshCurrentOrgDevices()},
                 uiState = detailState,
                 alerts = dashboardState.alerts.filter { it.deviceId == deviceId },
@@ -265,7 +266,7 @@ fun NavGraph(
                 onBack = { navController.popBackStack() },
                 onTabSelect = { detailViewModel.selectTab(it) },
                 onSendCommand = { id, type, params, reason ->
-                    detailViewModel.sendCommand(id, type, params, reason,english=currentLanguage=="EN")
+                    if(canEditLabels)detailViewModel.sendCommand(id, type, params, reason,english=currentLanguage=="EN")
                 },
                 onClearMessages = { detailViewModel.clearMessages() },
                 onToggleMonitoring = { devId, enable ->

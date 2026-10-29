@@ -112,6 +112,10 @@ async def check_user_device_access(
 
     member = await _get_org_member(db, device.org_id, user_id)
 
+    # Workspace Viewer is a read-only ceiling, even with a stale/elevated group role.
+    if member.role == "Viewer" and required_roles and "Viewer" not in required_roles:
+        _fail(403, "Workspace Viewer is read-only and cannot control or modify devices")
+
     if member.role in ("Owner", "Admin"):
         if required_roles and member.role not in required_roles:
             _fail(403, "Permission denied for this action")

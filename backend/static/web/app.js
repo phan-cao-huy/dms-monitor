@@ -1,13 +1,14 @@
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.30';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.30';
-const WEB_VERSION='1.0.30';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.30';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.30';
-import {demoData} from './demo.js?v=1.0.30';
+import {canControlDevice} from './permissions.js?v=1.0.31';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.31';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.31';
+const WEB_VERSION='1.0.31';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.31';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.31';
+import {demoData} from './demo.js?v=1.0.31';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.30';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.30';
-import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.30';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.31';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.31';
+import {emailView,emailForm,emailPayload,emailHistory} from './email.js?v=1.0.31';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -111,7 +112,7 @@ function resourceCharts(){
   ];
   return '<div class="metrics-toolbar"><div><strong>Phân tích tài nguyên</strong><p>'+resolutionText(state.metricsResolution)+(state.metricsStep?' · Mỗi điểm '+state.metricsStep+' giây':'')+'</p></div>'+ranges+'</div><div class="resource-charts">'+configs.map(([title,sub,ico,series,unit,ceiling])=>panel(icon(ico)+' '+title,sub,'<div class="chart-wrap">'+chart(state.metrics,{series,unit,ceiling,resolution:state.metricsResolution,stepSeconds:state.metricsStep})+'</div>','','metric-panel')).join('')+'</div><div class="notice gap-top">Lịch sử GPU/nhiệt độ bắt đầu khi server lưu các mẫu mới; phần không có dữ liệu được giữ trống.</div>';
 }
-function canControl(d){return !d?.archived_at&&(admin()||(d?.group_id?state.groupPermissions?.[d.group_id]==='Manager':org()?.role==='Manager'));}
+function canControl(d){return !d?.archived_at&&canControlDevice(org()?.role,d?.group_id,state.groupPermissions?.[d?.group_id]);}
 function deviceOverview(d){
   const info=d.static_info||{},stale=['Offline','Paused'].includes(d.status),rows=state.metrics,hourly=false;
   const disks=[...(d.disks||[])].sort((a,b)=>String(a.mountpoint).localeCompare(String(b.mountpoint)));

@@ -1,4 +1,9 @@
-# DMS Monitor release 1.0.30 (build 28)
+# DMS Monitor release 1.0.31 (build 29)
+
+Viewer device controls are hidden/disabled and commands are server-blocked even
+with a legacy group Manager assignment. See [Viewer permission fix](VIEWER_CONTROL_FIX.md).
+
+## Earlier release 1.0.30 (build 28)
 
 Online counts now include connected devices with warnings, matching web filtering
 and connection semantics. See [online/warning display fix](ONLINE_WARNING_FIX.md).

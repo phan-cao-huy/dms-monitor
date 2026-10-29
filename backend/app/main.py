@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.30",
+        "web_version": "1.0.31",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 28,
-        "version_name": "1.0.30",
+        "version_code": 29,
+        "version_name": "1.0.31",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Sửa bộ đếm trực tuyến: máy đang có cảnh báo vẫn được tính là online\n• Hiển thị rõ Online · Cảnh báo trên thẻ thiết bị\n• Đồng bộ cách đếm với bộ lọc và biểu đồ trạng thái trên web",
-        "release_notes_en": "• Count connected devices with warnings as online\n• Clarify Online · Warning on device cards\n• Match web online filtering and status chart labels",
+        "release_notes": "• Chặn Viewer điều khiển thiết bị kể cả khi nhóm đang gán Manager\n• Ẩn nút kill, khởi động lại và xóa máy với tài khoản chỉ xem\n• Khóa sửa nhóm, nhãn và trạng thái theo dõi khi không có quyền\n• Đồng bộ kiểm tra quyền trên server, web và Android",
+        "release_notes_en": "• Block workspace Viewers from device control even with group Manager access\n• Hide kill, reboot and delete controls for read-only accounts\n• Restrict group, label and monitoring edits to authorized users\n• Match server, web and Android device permissions",
         "force_update": False
     }
 

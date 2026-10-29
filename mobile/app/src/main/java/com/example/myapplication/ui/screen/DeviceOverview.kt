@@ -28,7 +28,7 @@ private fun stamp(value:String?):String = try{
 @Composable
 fun OverviewTab(device:DeviceDetail?, groups:List<DeviceGroup> = emptyList(),metrics:List<Metric> = emptyList(),
     alerts:List<Alert> = emptyList(),onViewMetrics:()->Unit={},onViewProcesses:()->Unit={},
-    onToggleMonitoring:((Boolean?)->Unit)?=null,onUpdateDeviceGroup:(Int?)->Unit={}){
+    canEdit:Boolean=false,onToggleMonitoring:((Boolean?)->Unit)?=null,onUpdateDeviceGroup:(Int?)->Unit={}){
     if(device==null){Text("…");return}
     val en=LocalAppStrings.current.isEnglish
     fun t(vi:String,enText:String)=if(en)enText else vi
@@ -152,7 +152,7 @@ fun OverviewTab(device:DeviceDetail?, groups:List<DeviceGroup> = emptyList(),met
                     Switch(device.isMonitoring,{onToggleMonitoring?.invoke(it)},enabled=onToggleMonitoring!=null)
                 }
                 Box{
-                    OutlinedButton(onClick={groupMenu=true}){Text(device.groupName?:t("Chưa phân nhóm","Ungrouped"))}
+                    OutlinedButton(onClick={groupMenu=true},enabled=canEdit){Text(device.groupName?:t("Chưa phân nhóm","Ungrouped"))}
                     DropdownMenu(groupMenu,{groupMenu=false}){
                         DropdownMenuItem(text={Text(t("Chưa phân nhóm","Ungrouped"))},onClick={groupMenu=false;onUpdateDeviceGroup(null)})
                         groups.forEach{g->DropdownMenuItem(text={Text(g.groupName)},onClick={groupMenu=false;onUpdateDeviceGroup(g.groupId)})}

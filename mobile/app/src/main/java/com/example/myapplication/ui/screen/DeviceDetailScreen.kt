@@ -52,12 +52,13 @@ fun DeviceDetailScreen(
     onToggleMonitoring: ((String, Boolean?) -> Unit)? = null,
     onDeleteDevice: (() -> Unit)? = null,
     canEditLabels: Boolean = false,
+    canControl: Boolean = false,
     onLabelsChanged: () -> Unit = {}
 ) {
     val tabs = listOf(featureText("Tổng quan","Overview"),featureText("Biểu đồ","Charts"),featureText("Tiến trình","Processes"),featureText("Lệnh","Commands"),featureText("Kết nối mạng","Connections"),featureText("Nhật ký Windows","Windows events"),featureText("Cấu hình & nhãn","Settings & labels"))
     var showTopDeleteDialog by remember { mutableStateOf(false) }
 
-    if (showTopDeleteDialog && onDeleteDevice != null) {
+    if (showTopDeleteDialog && canControl && onDeleteDevice != null) {
         AlertDialog(
             onDismissRequest = { showTopDeleteDialog = false },
             title = { Text("Xác nhận gỡ cài đặt & xóa PC") },
@@ -89,7 +90,7 @@ fun DeviceDetailScreen(
                     }
                 },
                 actions = {
-                    if (onDeleteDevice != null) {
+                    if (canControl && onDeleteDevice != null) {
                         IconButton(onClick = { showTopDeleteDialog = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.error)
                         }
@@ -152,7 +153,8 @@ fun DeviceDetailScreen(
                     onViewMetrics = { onTabSelect(1) },
                     onViewProcesses = { onTabSelect(2) },
                     groups = groups,
-                    onToggleMonitoring = { enable -> onToggleMonitoring?.invoke(deviceId, enable) },
+                    canEdit = canControl,
+                    onToggleMonitoring = if(canControl)({ enable -> onToggleMonitoring?.invoke(deviceId, enable) }) else null,
                     onUpdateDeviceGroup = { grpId -> onUpdateDeviceGroup(deviceId, grpId) }
                 )
                 1 -> DeviceHistoryScreen(deviceId)
@@ -161,9 +163,10 @@ fun DeviceDetailScreen(
                     totalRamMb = uiState.device?.staticInfo?.ramTotalMb,
                     deviceId = deviceId,
                     isMonitoring = uiState.device?.isMonitoring ?: true,
+                    canControl = canControl,
                     onSendCommand = onSendCommand
                 )
-                3 -> CommandsTab(uiState.commands, deviceId, onSendCommand)
+                3 -> CommandsTab(uiState.commands, deviceId, onSendCommand,canControl)
                 4 -> DeviceConnectionsScreen(uiState.device)
                 5 -> DeviceEventsScreen(deviceId,uiState.device)
                 6 -> DeviceLabelsScreen(deviceId,canEditLabels,onLabelsChanged,uiState.device)
@@ -426,6 +429,7 @@ fun ProcessesTab(
     totalRamMb: Int? = null,
     deviceId: String,
     isMonitoring: Boolean = true,
+    canControl: Boolean = false,
     onSendCommand: (String, String, Map<String, Any>?, String) -> Unit
 ) {
     var showKillDialog by remember { mutableStateOf<ProcessInfo?>(null) }
@@ -445,7 +449,7 @@ fun ProcessesTab(
     var selectedKillPreset by remember { mutableStateOf(killPresets.first()) }
     var customKillReason by remember { mutableStateOf("") }
 
-    showKillDialog?.let { process ->
+    showKillDialog?.takeIf{canControl}?.let { process ->
         val finalReason = if (selectedKillPreset == killPresets.last()) customKillReason.trim() else selectedKillPreset
         AlertDialog(
             onDismissRequest = { showKillDialog = null; stopWholeApplication=false; customKillReason = ""; selectedKillPreset = killPresets.first() },
@@ -557,7 +561,7 @@ fun ProcessesTab(
                             Text(process.name,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
                             Text("PID ${process.pid}",style=MaterialTheme.typography.labelSmall)
                         }
-                        if(isMonitoring)IconButton(onClick={stopWholeApplication=false;showKillDialog=process}){
+                        if(isMonitoring&&canControl)IconButton(onClick={stopWholeApplication=false;showKillDialog=process}){
                             Icon(Icons.Default.Close,contentDescription=if(en)"Stop process" else "Dừng tiến trình",tint=MaterialTheme.colorScheme.error)}
                     }
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
@@ -596,7 +600,8 @@ private fun ProcessHeat(label:String,text:String,value:Float?,warm:Float,hot:Flo
 fun CommandsTab(
     commands: List<Command>,
     deviceId: String,
-    onSendCommand: (String, String, Map<String, Any>?, String) -> Unit
+    onSendCommand: (String, String, Map<String, Any>?, String) -> Unit,
+    canControl: Boolean = false
 ) {
     var showRebootDialog by remember { mutableStateOf(false) }
     val rebootPresets = listOf(
@@ -609,7 +614,7 @@ fun CommandsTab(
     var selectedRebootPreset by remember { mutableStateOf(rebootPresets.first()) }
     var customRebootReason by remember { mutableStateOf("") }
 
-    if (showRebootDialog) {
+    if (showRebootDialog && canControl) {
         val finalReason = if (selectedRebootPreset == rebootPresets.last()) customRebootReason.trim() else selectedRebootPreset
         AlertDialog(
             onDismissRequest = { showRebootDialog = false; customRebootReason = ""; selectedRebootPreset = rebootPresets.first() },
@@ -661,7 +666,7 @@ fun CommandsTab(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            Button(
+            if(canControl)Button(
                 onClick = { showRebootDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBD6254)),
                 modifier = Modifier.fillMaxWidth()

@@ -3,6 +3,11 @@
 Base URL: `http://localhost:8000/api/v1` · Swagger: `http://localhost:8000/docs`
 Lỗi trả về dạng `{"detail": "..."}`. Thời gian: ISO-8601 UTC.
 
+Since 1.0.31, workspace Viewer cannot control/modify devices even with a group
+Manager assignment. These device writes return HTTP 403. Workspace Manager needs
+group Manager for grouped devices; Owner/Admin retain control. Read visibility
+remains group-scoped. See [Viewer controls](VIEWER_CONTROL_FIX.md).
+
 Device PATCH accepts `group_id` as a destination ID in the same workspace, or
 0/null to remove the group. Omit the field to preserve the group. No monitoring
 query parameter is needed. See [group assignment fix](DEVICE_GROUP_FIX.md).
