@@ -19,7 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import com.example.myapplication.data.api.RetrofitClient
 import com.example.myapplication.data.model.AppVersionResponse
+import com.example.myapplication.data.model.ChangePasswordRequest
 import com.example.myapplication.data.model.UserInfo
 import com.example.myapplication.ui.i18n.LocalAppStrings
 import com.example.myapplication.util.AppUpdateManager
@@ -163,37 +166,42 @@ fun ProfileScreen(
         var oldPassword by remember { mutableStateOf("") }
         var newPassword by remember { mutableStateOf("") }
         var confirmPassword by remember { mutableStateOf("") }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
+        var isSubmitting by remember { mutableStateOf(false) }
 
         AlertDialog(
-            onDismissRequest = { showPasswordDialog = false },
+            onDismissRequest = { if (!isSubmitting) showPasswordDialog = false },
             title = { Text(if (strings.isEnglish) "Change Password" else "Đổi mật khẩu") },
             text = {
                 Column {
                     OutlinedTextField(
                         value = oldPassword,
-                        onValueChange = { oldPassword = it },
+                        onValueChange = { oldPassword = it; errorMessage = null },
                         label = { Text(if (strings.isEnglish) "Current Password" else "Mật khẩu hiện tại") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSubmitting
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = newPassword,
-                        onValueChange = { newPassword = it },
+                        onValueChange = { newPassword = it; errorMessage = null },
                         label = { Text(if (strings.isEnglish) "New Password (min 8 chars)" else "Mật khẩu mới (tối thiểu 8 ký tự)") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSubmitting
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
+                        onValueChange = { confirmPassword = it; errorMessage = null },
                         label = { Text(if (strings.isEnglish) "Confirm New Password" else "Xác nhận mật khẩu mới") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSubmitting,
                         isError = confirmPassword.isNotBlank() && newPassword != confirmPassword,
                         supportingText = {
                             if (confirmPassword.isNotBlank() && newPassword != confirmPassword) {
@@ -201,18 +209,70 @@ fun ProfileScreen(
                             }
                         }
                     )
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = errorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             },
             confirmButton = {
+                val isFormValid = oldPassword.isNotBlank() && newPassword.length >= 8 &&
+                        newPassword == confirmPassword && oldPassword != newPassword
                 Button(
-                    onClick = { showPasswordDialog = false },
-                    enabled = oldPassword.isNotBlank() && newPassword.length >= 8 && newPassword == confirmPassword
+                    onClick = {
+                        coroutineScope.launch {
+                            isSubmitting = true
+                            errorMessage = null
+                            try {
+                                val response = RetrofitClient.apiService.changePassword(
+                                    ChangePasswordRequest(oldPassword = oldPassword, newPassword = newPassword)
+                                )
+                                if (response.isSuccessful) {
+                                    Toast.makeText(
+                                        context,
+                                        if (strings.isEnglish) "Password updated successfully!" else "Đổi mật khẩu thành công!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    showPasswordDialog = false
+                                } else {
+                                    val code = response.code()
+                                    errorMessage = if (code == 400) {
+                                        if (strings.isEnglish) "Current password is incorrect" else "Mật khẩu hiện tại không chính xác"
+                                    } else {
+                                        if (strings.isEnglish) "Failed to change password ($code)" else "Đổi mật khẩu thất bại ($code)"
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = e.localizedMessage ?: (if (strings.isEnglish) "Connection error" else "Lỗi kết nối máy chủ")
+                            } finally {
+                                isSubmitting = false
+                            }
+                        }
+                    },
+                    enabled = isFormValid && !isSubmitting
                 ) {
-                    Text(if (strings.isEnglish) "Update Password" else "Đổi mật khẩu")
+                    if (isSubmitting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(if (strings.isEnglish) "Update Password" else "Đổi mật khẩu")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPasswordDialog = false }) { Text(strings.cancel) }
+                TextButton(
+                    onClick = { showPasswordDialog = false },
+                    enabled = !isSubmitting
+                ) {
+                    Text(strings.cancel)
+                }
             }
         )
     }

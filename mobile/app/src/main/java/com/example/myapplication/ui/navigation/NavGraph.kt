@@ -106,6 +106,9 @@ fun NavGraph(
                 onLogin = { identifier, password ->
                     authViewModel.login(identifier, password)
                 },
+                onGoogleLogin = { credential ->
+                    authViewModel.loginWithGoogle(credential)
+                },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
                 },
