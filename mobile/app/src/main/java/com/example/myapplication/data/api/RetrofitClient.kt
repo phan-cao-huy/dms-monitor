@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    const val DEFAULT_BASE_URL = "https://dms.ky215.io.vn/api/v1/"
+    //const val DEFAULT_BASE_URL = "https://dms.ky215.io.vn/api/v1/"
+    const val DEFAULT_BASE_URL = "http://192.168.0.112:8000/api/v1/"
     private val currentBaseUrl = DEFAULT_BASE_URL
     private var tokenManager: TokenManager? = null
     private val tokenRefreshLock = Any()
