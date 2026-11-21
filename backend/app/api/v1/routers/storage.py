@@ -48,12 +48,14 @@ async def storage(org_id: int, db: DB, user: CurrentUser):
     mount = "/run/dms-db-volume"
     free = shutil.disk_usage(mount).free if os.path.ismount(mount) else None
     cleanup = (await db.execute(text("SELECT status, updated_at FROM storage_cleanup WHERE id=1"))).mappings().first()
-    return dict(database_bytes=await db.scalar(text("SELECT pg_database_size(current_database())")),
+    alert_days = await db.scalar(text("SELECT days FROM workspace_alert_retention WHERE org_id=:id"), {"id":org_id})
+    return dict(alert_days=alert_days or 0, database_bytes=await db.scalar(text("SELECT pg_database_size(current_database())")),
                 free_bytes=free, measured_at=datetime.now(UTC), cleanup=cleanup,
                 groups=[dict(**row, days=days.get(row["kind"])) for row in groups])
 
 # Only server-defined identifiers are interpolated into this query.
 POLICIES = {
+    "alerts": ("alert_history", "resolved_at", "Cảnh báo đã xử lý quá thời hạn sẽ bị xóa khỏi lịch sử của không gian này.", "Resolved alerts older than the selected period will be removed from workspace history."),
     "raw": ("device_metrics", "created_at", "Mất chi tiết từng lần đo. Báo cáo cũ chỉ còn các bản tổng hợp đã lưu.", "Individual readings expire. Older reports rely on saved summaries."),
     "minute": ("device_metrics_minute", "minute_bucket", "Mất thống kê từng phút. Xu hướng dài hạn còn xem được ở những giờ đã tổng hợp.", "Minute statistics expire. Saved hourly summaries still show longer trends."),
     "hour": ("device_metrics_hourly", "hour_bucket", "Khi các mẫu gốc và bản theo phút cũng hết hạn, khoảng này sẽ mất khỏi báo cáo hiệu năng.", "Once raw and minute data also expire, this period disappears from performance reports."),
@@ -63,7 +65,7 @@ POLICIES = {
 
 
 @router.get("/orgs/{org_id}/storage/preview")
-async def retention_preview(org_id: int, kind: Literal["raw", "minute", "hour", "events", "checks"],
+async def retention_preview(org_id: int, kind: Literal["raw", "minute", "hour", "events", "checks", "alerts"],
                             db: DB, user: CurrentUser, days: int = Query(ge=1, le=3650)):
     await require_storage_admin(org_id, db, user)
     table, stamp, vi, en = POLICIES[kind]
@@ -76,3 +78,17 @@ async def retention_preview(org_id: int, kind: Literal["raw", "minute", "hour", 
     """), {"org": org_id, "cutoff": cutoff})).mappings().one()
     return dict(records=row["records"], oldest=row["oldest"], newest=row["newest"],
                 days=days, impact_vi=vi, impact_en=en)
+
+
+@router.put("/orgs/{org_id}/storage/alert-retention")
+async def set_alert_retention(org_id: int, db: DB, user: CurrentUser, days: int = Query(ge=0, le=3650)):
+    await require_storage_admin(org_id, db, user)
+    if days == 0:
+        await db.execute(text("DELETE FROM workspace_alert_retention WHERE org_id=:id"), {"id": org_id})
+    else:
+        await db.execute(text("""
+            INSERT INTO workspace_alert_retention(org_id, days) VALUES (:id, :days)
+            ON CONFLICT(org_id) DO UPDATE SET days=excluded.days
+        """), {"id": org_id, "days": days})
+    await db.commit()
+    return {"days": days}

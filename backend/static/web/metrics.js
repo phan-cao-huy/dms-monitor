@@ -1,4 +1,4 @@
-import {esc, number, date, button, field, select, empty, chart} from './ui.js?v=1.0.36';
+import {esc, number, date, button, field, select, empty, chart} from './ui.js?v=1.0.37';
 
 export const metricOptions=[['cpu_usage','CPU (%)'],['ram_usage','RAM (%)'],['disk_usage','Dung lượng ổ đĩa (%)'],['net_in_kbps','Mạng tải xuống (KB/s)'],['net_out_kbps','Mạng tải lên (KB/s)'],['gpu_usage_pct','GPU (%)'],['cpu_temp_c','Nhiệt độ CPU (°C)']];
 export const rangeOptions=[['1h','1 giờ'],['6h','6 giờ'],['24h','24 giờ'],['3d','3 ngày'],['7d','7 ngày'],['30d','30 ngày'],['90d','90 ngày']];

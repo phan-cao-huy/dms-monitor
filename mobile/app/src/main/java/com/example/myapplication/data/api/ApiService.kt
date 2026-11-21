@@ -8,6 +8,9 @@ interface ApiService {
     @GET("orgs/{org}/storage/preview")
     suspend fun previewRetention(@Path("org") org: String, @Query("kind") kind: String, @Query("days") days: Int): Response<RetentionPreview>
 
+    @PUT("orgs/{org}/storage/alert-retention")
+    suspend fun saveAlertRetention(@Path("org") org: String, @Query("days") days: Int): Response<Map<String,Int>>
+
     @GET("orgs/{org}/storage")
     suspend fun storage(@Path("org") org: String): Response<StorageSummary>
 

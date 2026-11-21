@@ -33,7 +33,7 @@ async def _ensure_db_schema() -> None:
     async with engine.begin() as conn:
         for stmt in migration_statements:
             await conn.execute(text(stmt))
-        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql", "storage.sql"):
+        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql", "storage.sql", "alert_retention.sql"):
             migration = Path(__file__).resolve().parent / "db" / name
             for stmt in migration.read_text(encoding="utf-8").split(";"):
                 if stmt.strip():
@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.36",
+        "web_version": "1.0.37",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 34,
-        "version_name": "1.0.36",
+        "version_code": 35,
+        "version_name": "1.0.37",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "Kiểm tra bản tổng hợp trước khi dọn dữ liệu hiệu năng.",
-        "release_notes_en": "Verify summaries before pruning performance history.",
+        "release_notes": "Chọn thời hạn lưu cảnh báo đã xử lý cho từng không gian.",
+        "release_notes_en": "Set a separate retention period for resolved workspace alerts.",
         "force_update": False
     }
 

@@ -1,15 +1,15 @@
-import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.36';
-import {groupEditorState} from './group-access.js?v=1.0.36';
-import {canControlDevice} from './permissions.js?v=1.0.36';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.36';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.36';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.37';
+import {groupEditorState} from './group-access.js?v=1.0.37';
+import {canControlDevice} from './permissions.js?v=1.0.37';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.37';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.37';
 const WEB_VERSION='1.0.32';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.36';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.36';
-import {demoData} from './demo.js?v=1.0.36';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.37';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.37';
+import {demoData} from './demo.js?v=1.0.37';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.36';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.36';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.37';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.37';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -442,11 +442,30 @@ async function action(name, element){
       ${kv('Lần dọn gần nhất',cleaned)}
       <table><thead><tr><th>Loại dữ liệu</th><th>Dung lượng</th><th>Thời hạn giữ</th></tr></thead>
       <tbody>${data.groups.map(g=>`<tr><td>${esc(names[g.kind])}</td><td>${size(g.bytes)}</td><td>${g.days?g.days+' ngày':'—'}</td></tr>`).join('')}</tbody></table>
+      <h3>Lịch sử cảnh báo của không gian</h3>
+      <p>${data.alert_days?'Giữ '+Number(data.alert_days)+' ngày kể từ khi xử lý.':'Đang giữ không thời hạn.'} Cảnh báo đang mở luôn được giữ.</p>
+      ${field('Số ngày sau khi xử lý (0 = giữ mãi)','alert_days','number',String(data.alert_days),'min="0" max="3650"')}
+      ${button('Xem trước và đổi thời hạn','alert-retention','sm','',`data-org="${workspace}"`)}
       <h3>Xem trước tác động trong không gian này</h3>
       ${select('Loại dữ liệu','policy_kind',data.groups.filter(g=>g.days).map(g=>[g.kind,names[g.kind]]))}
       ${field('Số ngày muốn giữ','policy_days','number','7','min="1" max="3650" required')}
       ${button('Xem tác động','preview-retention','sm')}
       <p id="policy-impact" aria-live="polite"></p>`,{wide:true});
+    return;
+  }
+  if(name==='alert-retention'){
+    const workspace=Number(element.dataset.org);
+    const input=element.closest('form').elements.alert_days;
+    const days=input.valueAsNumber;
+    if(!Number.isInteger(days)||days<0||days>3650)throw new Error('Nhập từ 0 đến 3650 ngày.');
+    const base=`orgs/${workspace}/storage`;
+    const preview=days?await api.request(`${base}/preview?kind=alerts&days=${days}`):null;
+    if(Number(state.orgId)!==workspace||!element.isConnected)return;
+    const impact=days?`Giữ ${days} ngày sau khi xử lý. Hiện có ${preview.records} cảnh báo đủ điều kiện xóa ở lượt dọn theo lịch.`:'Giữ lịch sử cảnh báo không thời hạn.';
+    openModal('Đổi thời hạn lưu cảnh báo',`<p>${impact}</p>`,{submit:'Lưu chính sách',onSubmit:async()=>{
+      if(Number(state.orgId)!==workspace)throw new Error('Không gian đã thay đổi.');
+      await api.request(`${base}/alert-retention?days=${days}`,{method:'PUT'});
+    }});
     return;
   }
   if(name==='preview-retention'){
