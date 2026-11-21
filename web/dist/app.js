@@ -1,15 +1,15 @@
-import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.34';
-import {groupEditorState} from './group-access.js?v=1.0.34';
-import {canControlDevice} from './permissions.js?v=1.0.34';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.34';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.34';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.35';
+import {groupEditorState} from './group-access.js?v=1.0.35';
+import {canControlDevice} from './permissions.js?v=1.0.35';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.35';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.35';
 const WEB_VERSION='1.0.32';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.34';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.34';
-import {demoData} from './demo.js?v=1.0.34';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.35';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.35';
+import {demoData} from './demo.js?v=1.0.35';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.34';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.34';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.35';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.35';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -441,7 +441,26 @@ async function action(name, element){
       ${kv('Database đang dùng',size(data.database_bytes))}${kv('Ổ chứa database còn trống',size(data.free_bytes))}
       ${kv('Lần dọn gần nhất',cleaned)}
       <table><thead><tr><th>Loại dữ liệu</th><th>Dung lượng</th><th>Thời hạn giữ</th></tr></thead>
-      <tbody>${data.groups.map(g=>`<tr><td>${esc(names[g.kind])}</td><td>${size(g.bytes)}</td><td>${g.days?g.days+' ngày':'—'}</td></tr>`).join('')}</tbody></table>`,{wide:true});
+      <tbody>${data.groups.map(g=>`<tr><td>${esc(names[g.kind])}</td><td>${size(g.bytes)}</td><td>${g.days?g.days+' ngày':'—'}</td></tr>`).join('')}</tbody></table>
+      <h3>Xem trước tác động trong không gian này</h3>
+      ${select('Loại dữ liệu','policy_kind',data.groups.filter(g=>g.days).map(g=>[g.kind,names[g.kind]]))}
+      ${field('Số ngày muốn giữ','policy_days','number','7','min="1" max="3650" required')}
+      ${button('Xem tác động','preview-retention','sm')}
+      <p id="policy-impact" aria-live="polite"></p>`,{wide:true});
+    return;
+  }
+  if(name==='preview-retention'){
+    const form=element.closest('form');
+    if(!form.reportValidity())return;
+    const kind=form.elements.policy_kind.value, days=form.elements.policy_days.value;
+    const output=form.querySelector('#policy-impact');
+    const kindLabel=form.elements.policy_kind.selectedOptions[0].text;
+    element.disabled=true;
+    try {
+      const result=await api.request(`orgs/${state.orgId}/storage/preview?kind=${encodeURIComponent(kind)}&days=${Number(days)}`);
+      const range=result.records?` (${date(result.oldest)} – ${date(result.newest)})`:'';
+      output.textContent=`Nếu giữ ${result.days} ngày cho ${kindLabel}, ${result.records} bản ghi hiện tại nằm ngoài thời hạn${range}. ${result.impact_vi}`;
+    } finally {element.disabled=false;}
     return;
   }
   if(name==='check-health'){const response=await api.request('health',{auth:false});state.connection=response.status==='ok';toast(state.connection?'Server DMS đang hoạt động.':'Chưa nhận được trạng thái hợp lệ.');render();return;}

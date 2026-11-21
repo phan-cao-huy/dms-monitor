@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.34",
+        "web_version": "1.0.35",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 32,
-        "version_name": "1.0.34",
+        "version_code": 33,
+        "version_name": "1.0.35",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "Thêm màn hình Dung lượng & lưu trữ cho quản trị viên.",
-        "release_notes_en": "Added a storage dashboard for administrators.",
+        "release_notes": "Xem trước tác động của thời hạn lưu lên báo cáo.",
+        "release_notes_en": "Preview how retention affects report history.",
         "force_update": False
     }
 

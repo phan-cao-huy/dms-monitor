@@ -1,5 +1,7 @@
 package com.example.myapplication.ui.screen
 
+import kotlinx.coroutines.launch
+import com.example.myapplication.data.model.RetentionPreview
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -45,7 +47,34 @@ import com.example.myapplication.data.model.StorageSummary
                 HorizontalDivider()
                 Text(name, style = MaterialTheme.typography.titleMedium)
                 Text(Formatter.formatFileSize(context,group.bytes) + (group.days?.let { " · " + featureText("Giữ $it ngày","Retained $it days") } ?: ""))
+                group.days?.let { current ->
+                    key(orgId,group.kind) { RetentionImpact(orgId,group.kind,current) }
+                }
             }
+        }
+    }
+}
+
+@Composable private fun RetentionImpact(orgId: String, kind: String, current: Int) {
+    val scope = rememberCoroutineScope()
+    val status = remember { FeatureStatus() }
+    var open by remember { mutableStateOf(false) }
+    var days by remember { mutableStateOf(current.toString()) }
+    var preview by remember { mutableStateOf<RetentionPreview?>(null) }
+    TextButton(onClick={ open = !open }) { Text(featureText("Xem tác động","Preview impact")) }
+    if (open) {
+        OutlinedTextField(days, { days=it; preview=null }, enabled=!status.busy, singleLine=true,
+            label={Text(featureText("Số ngày muốn giữ","Days to retain"))})
+        Button(enabled=!status.busy && days.toIntOrNull() in 1..3650, onClick={
+            scope.launch { status.perform {
+                preview=RetrofitClient.apiService.previewRetention(orgId,kind,days.toInt()).required()
+            } }
+        }) { Text(featureText("Tính cho không gian này","Calculate for this workspace")) }
+        FeatureMessages(status)
+        preview?.let { result ->
+            Text(featureText("Bản ghi ngoài thời hạn","Records outside retention") + " · " + result.records)
+            if(result.oldest!=null) Text(result.oldest + " – " + result.newest + " UTC")
+            Text(featureText(result.impact_vi,result.impact_en))
         }
     }
 }

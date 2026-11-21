@@ -5,6 +5,9 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface ApiService {
+    @GET("orgs/{org}/storage/preview")
+    suspend fun previewRetention(@Path("org") org: String, @Query("kind") kind: String, @Query("days") days: Int): Response<RetentionPreview>
+
     @GET("orgs/{org}/storage")
     suspend fun storage(@Path("org") org: String): Response<StorageSummary>
 

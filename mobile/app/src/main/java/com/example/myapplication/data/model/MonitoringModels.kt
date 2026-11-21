@@ -87,3 +87,5 @@ data class DeviceSettingsWrite(@SerializedName("offline_threshold_minutes") val 
 data class StorageSummary(val database_bytes: Long, val free_bytes: Long?, val cleanup: CleanupStatus?, val groups: List<StorageGroup>)
 data class CleanupStatus(val status: String, val updated_at: String)
 data class StorageGroup(val kind: String, val bytes: Long, val days: Int?)
+
+data class RetentionPreview(val records: Long, val oldest: String?, val newest: String?, val impact_vi: String, val impact_en: String)
