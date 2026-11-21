@@ -209,6 +209,7 @@ async def check_postgres():
                     async def bound_session():
                         yield db
 
+                    await db.execute(text(Path(__file__).resolve().parents[1].joinpath("app/db/storage.sql").read_text()))
                     with patch("app.workers.runner.SessionLocal", bound_session):
                         await cleanup_metrics()
                     assert (

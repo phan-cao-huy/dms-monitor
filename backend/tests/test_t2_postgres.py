@@ -139,8 +139,10 @@ def test_t2_events_incidents_and_email_ledger():
                         assert not check.incident_open
                         incident=(await db.execute(select(CheckIncident))).scalar_one()
                         assert incident.resolved_at is not None
+                        await db.execute(text(Path(__file__).resolve().parents[1].joinpath('app/db/storage.sql').read_text()))
                         with patch.object(runner, 'SessionLocal', session):
                             await runner.cleanup_metrics()
+                        assert await db.scalar(text('SELECT status FROM storage_cleanup WHERE id=1')) == 'success'
                         assert await db.scalar(select(func.count()).select_from(DeviceEvent))==1
                     await db.close()
                 finally:

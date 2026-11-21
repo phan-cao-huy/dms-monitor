@@ -17,10 +17,11 @@ import com.example.myapplication.data.model.*
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
                 FilterChip(selected=tab=="analytics",onClick={tab="analytics"},label={Text(featureText("Phân tích","Analytics"))})
                 if(org?.role in listOf("Owner","Admin")){
+                    FilterChip(selected=tab=="storage",onClick={tab="storage"},label={Text(featureText("Dung lượng & lưu trữ","Storage"))})
                     FilterChip(selected=tab=="checks",onClick={tab="checks"},label={Text(featureText("Dịch vụ","Service checks"))})
                 }
             }
         }
-        Box(Modifier.weight(1f)){key(org?.id,tab){when(tab){"checks"->ServiceChecksScreen(org);else->MetricAnalysisScreen(org,devices)}}}
+        Box(Modifier.weight(1f)){key(org?.id,tab){when(tab){"storage"->StorageScreen(requireNotNull(org).id);"checks"->ServiceChecksScreen(org);else->MetricAnalysisScreen(org,devices)}}}
     }
 }

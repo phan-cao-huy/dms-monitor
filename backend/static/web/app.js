@@ -1,15 +1,15 @@
-import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.33';
-import {groupEditorState} from './group-access.js?v=1.0.33';
-import {canControlDevice} from './permissions.js?v=1.0.33';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.33';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.33';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.34';
+import {groupEditorState} from './group-access.js?v=1.0.34';
+import {canControlDevice} from './permissions.js?v=1.0.34';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.34';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.34';
 const WEB_VERSION='1.0.32';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.33';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.33';
-import {demoData} from './demo.js?v=1.0.33';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.34';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.34';
+import {demoData} from './demo.js?v=1.0.34';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.33';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.33';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.34';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.34';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -244,7 +244,7 @@ function organizationsView(){
 }
 function settingsView(){
   const u=state.user||{};
-  return heading('Cài đặt & tài khoản','Thông tin tài khoản, giao diện và kết nối của bạn.')+`<div class="account-grid">${panel('Tài khoản DMS','Dùng chung với ứng dụng Android.',`<div class="panel-body">${kv('Họ tên',u.full_name)}${kv('Tên đăng nhập',u.username)}${kv('Email',u.email)}${kv('Vai trò hiện tại',org()?.role)}${kv('Mã người dùng',u.user_id)}<div class="row gap-top">${button('Đổi mật khẩu','change-password','primary sm','key')}${button('Đăng xuất','logout','danger sm','logout')}</div></div>`)}${panel('Tùy chọn & kết nối','Các thay đổi giao diện được lưu trên trình duyệt này.',`<div class="panel-body"><div class="setting-row"><div><strong>Giao diện tối</strong><p>Điều chỉnh độ sáng của không gian làm việc.</p></div><button class="toggle ${state.theme==='dark'?'on':''}" role="switch" aria-checked="${state.theme==='dark'}" aria-label="Giao diện tối" data-action="theme"></button></div><div class="setting-row"><div><strong>Đồng bộ tự động</strong><p>Mỗi 15 giây khi tab đang hiển thị.</p></div><span class="pill online">Đang bật</span></div><div class="setting-row"><div><strong>Kết nối API</strong><p class="break">${API_BASE}</p></div>${icon('shield')}</div><div class="setting-row"><div><strong>Ứng dụng Android</strong><p>${state.version?'Phiên bản '+esc(state.version.version_name):'Kiểm tra bản phát hành mới nhất.'}</p></div><a href="${SERVER}/static/dms-app.apk" class="btn sm">${icon('download')}Tải APK</a></div><div class="setting-row"><div><strong>Trạng thái server</strong><p>${state.connection?'Đã nhận dữ liệu từ API.':'Chưa xác minh kết nối.'}</p></div>${button('Kiểm tra','check-health','sm','refresh')}</div></div>`)}</div>`;
+  return heading('Cài đặt & tài khoản','Thông tin tài khoản, giao diện và kết nối của bạn.',admin()&&!state.demo?button('Dung lượng & lưu trữ','storage','sm','disk'):'')+`<div class="account-grid">${panel('Tài khoản DMS','Dùng chung với ứng dụng Android.',`<div class="panel-body">${kv('Họ tên',u.full_name)}${kv('Tên đăng nhập',u.username)}${kv('Email',u.email)}${kv('Vai trò hiện tại',org()?.role)}${kv('Mã người dùng',u.user_id)}<div class="row gap-top">${button('Đổi mật khẩu','change-password','primary sm','key')}${button('Đăng xuất','logout','danger sm','logout')}</div></div>`)}${panel('Tùy chọn & kết nối','Các thay đổi giao diện được lưu trên trình duyệt này.',`<div class="panel-body"><div class="setting-row"><div><strong>Giao diện tối</strong><p>Điều chỉnh độ sáng của không gian làm việc.</p></div><button class="toggle ${state.theme==='dark'?'on':''}" role="switch" aria-checked="${state.theme==='dark'}" aria-label="Giao diện tối" data-action="theme"></button></div><div class="setting-row"><div><strong>Đồng bộ tự động</strong><p>Mỗi 15 giây khi tab đang hiển thị.</p></div><span class="pill online">Đang bật</span></div><div class="setting-row"><div><strong>Kết nối API</strong><p class="break">${API_BASE}</p></div>${icon('shield')}</div><div class="setting-row"><div><strong>Ứng dụng Android</strong><p>${state.version?'Phiên bản '+esc(state.version.version_name):'Kiểm tra bản phát hành mới nhất.'}</p></div><a href="${SERVER}/static/dms-app.apk" class="btn sm">${icon('download')}Tải APK</a></div><div class="setting-row"><div><strong>Trạng thái server</strong><p>${state.connection?'Đã nhận dữ liệu từ API.':'Chưa xác minh kết nối.'}</p></div>${button('Kiểm tra','check-health','sm','refresh')}</div></div>`)}</div>`;
 }
 
 function render(){
@@ -429,6 +429,21 @@ async function action(name, element){
   if(name==='mobile-menu'){mobileNavOpen=!mobileNavOpen;render();return;}
   if(name==='show-password'){const input=element.parentElement.querySelector('input');input.type=input.type==='password'?'text':'password';return;}
   if(name==='refresh'){await refreshCurrent();return;}
+  if(name==='storage'){
+    const workspace=state.orgId;
+    const data=await api.request(`orgs/${workspace}/storage`);
+    if(state.orgId!==workspace||route()!=='/settings')return;
+    const names={raw:'Mẫu hiệu năng gốc',minute:'Tổng hợp theo phút',hour:'Tổng hợp theo giờ',events:'Nhật ký thiết bị',checks:'Kết quả kiểm tra dịch vụ',alerts:'Lịch sử cảnh báo',other:'Các bảng khác'};
+    const size=n=>n==null?'Chưa đo được':n>=1073741824?(n/1073741824).toFixed(1)+' GiB':(n/1048576).toFixed(2)+' MiB';
+    const status={started:'Đã bắt đầu',success:'Thành công',failed:'Thất bại'};
+    const cleaned=data.cleanup?status[data.cleanup.status]+' · '+date(data.cleanup.updated_at):'Chưa ghi nhận';
+    openModal('Dung lượng & lưu trữ',`<p>Toàn máy chủ DMS · ${esc(date(data.measured_at))}</p>
+      ${kv('Database đang dùng',size(data.database_bytes))}${kv('Ổ chứa database còn trống',size(data.free_bytes))}
+      ${kv('Lần dọn gần nhất',cleaned)}
+      <table><thead><tr><th>Loại dữ liệu</th><th>Dung lượng</th><th>Thời hạn giữ</th></tr></thead>
+      <tbody>${data.groups.map(g=>`<tr><td>${esc(names[g.kind])}</td><td>${size(g.bytes)}</td><td>${g.days?g.days+' ngày':'—'}</td></tr>`).join('')}</tbody></table>`,{wide:true});
+    return;
+  }
   if(name==='check-health'){const response=await api.request('health',{auth:false});state.connection=response.status==='ok';toast(state.connection?'Server DMS đang hoạt động.':'Chưa nhận được trạng thái hợp lệ.');render();return;}
   if(name==='copy'){await copyText(element.dataset.text);return;}
   if(name==='switch-org'){resetOrgData();state.orgId=safeNumber(id);navigate('/overview');await loadWorkspace();return;}

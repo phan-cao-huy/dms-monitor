@@ -22,7 +22,14 @@ services:
     environment:
       EMBEDDED_WORKER: "false"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes: ["./backend:/code"]
+    volumes:
+      - ./backend:/code
+      - type: volume
+        source: pgdata
+        target: /run/dms-db-volume
+        read_only: true
+        volume:
+          subpath: pg_stat_tmp
 
   worker:
     build: ./backend

@@ -33,7 +33,7 @@ async def _ensure_db_schema() -> None:
     async with engine.begin() as conn:
         for stmt in migration_statements:
             await conn.execute(text(stmt))
-        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql"):
+        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql", "storage.sql"):
             migration = Path(__file__).resolve().parent / "db" / name
             for stmt in migration.read_text(encoding="utf-8").split(";"):
                 if stmt.strip():
@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.33",
+        "web_version": "1.0.34",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 31,
-        "version_name": "1.0.33",
+        "version_code": 32,
+        "version_name": "1.0.34",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "Gỡ thông báo qua email khỏi web và Android.",
-        "release_notes_en": "Removed email alerts from web and Android.",
+        "release_notes": "Thêm màn hình Dung lượng & lưu trữ cho quản trị viên.",
+        "release_notes_en": "Added a storage dashboard for administrators.",
         "force_update": False
     }
 

@@ -240,7 +240,26 @@ async def manage_partitions() -> None:
             await conn.execute(text("SELECT create_metrics_partition(:d)"), {"d": _utc_naive().date() + timedelta(days=offset)})
 
 
+async def record_cleanup(status: str) -> None:
+    async with SessionLocal() as db:
+        await db.execute(text("""
+            INSERT INTO storage_cleanup (id, status, updated_at) VALUES (1, :status, now())
+            ON CONFLICT (id) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at
+        """), {"status": status})
+        await db.commit()
+
+
 async def cleanup_metrics() -> None:
+    await record_cleanup("started")
+    try:
+        await _cleanup_metrics()
+    except Exception:
+        await record_cleanup("failed")
+        raise
+    await record_cleanup("success")
+
+
+async def _cleanup_metrics() -> None:
     # Bound each transaction; composite keys are unique across partitions.
     targets = [
         (DeviceMetricMinute, (DeviceMetricMinute.device_id, DeviceMetricMinute.minute_bucket), DeviceMetricMinute.minute_bucket, settings.MINUTE_RETENTION_DAYS),

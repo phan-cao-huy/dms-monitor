@@ -5,6 +5,9 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface ApiService {
+    @GET("orgs/{org}/storage")
+    suspend fun storage(@Path("org") org: String): Response<StorageSummary>
+
 
     // === Auth ===
     @POST("auth/register")
