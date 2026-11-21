@@ -16,6 +16,7 @@ from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import delete, func, select, text, tuple_
 
+from app.workers.retention import prune_statement
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
 from app.models.alert import AlertHistory, AlertRule, AlertRuleState
@@ -252,22 +253,37 @@ async def record_cleanup(status: str) -> None:
 async def cleanup_metrics() -> None:
     await record_cleanup("started")
     try:
-        await _cleanup_metrics()
+        blocked = await _cleanup_metrics()
     except Exception:
         await record_cleanup("failed")
         raise
-    await record_cleanup("success")
+    await record_cleanup("guarded" if blocked else "success")
 
 
-async def _cleanup_metrics() -> None:
+async def _cleanup_metrics() -> int:
+    now = _utc_naive()
+    blocked = 0
+    for tier, days in (("raw", settings.METRICS_RETENTION_DAYS), ("minute", settings.MINUTE_RETENTION_DAYS)):
+        cutoff = (now - timedelta(days=days)).replace(second=0, microsecond=0)
+        if tier == "minute":
+            cutoff = cutoff.replace(minute=0)
+        last_id, last_bucket = -1, cutoff
+        statement = prune_statement(tier)
+        while True:
+            async with SessionLocal() as db:
+                row = (await db.execute(statement, dict(cutoff=cutoff, last_id=last_id, last_bucket=last_bucket))).first()
+                await db.commit()
+            if row is None:
+                break
+            last_id, last_bucket = row.device_id, row.bucket
+            blocked += row.blocked
+
     # Bound each transaction; composite keys are unique across partitions.
     targets = [
-        (DeviceMetricMinute, (DeviceMetricMinute.device_id, DeviceMetricMinute.minute_bucket), DeviceMetricMinute.minute_bucket, settings.MINUTE_RETENTION_DAYS),
         (DeviceEvent, (DeviceEvent.event_pk,), DeviceEvent.occurred_at, settings.EVENTS_RETENTION_DAYS),
         (CheckResult, (CheckResult.result_id,), CheckResult.checked_at, 7),
         (CheckIncident, (CheckIncident.incident_id,), CheckIncident.resolved_at, 30),
         (CheckAudit, (CheckAudit.audit_id,), CheckAudit.created_at, 90),
-        (DeviceMetric, (DeviceMetric.metric_id, DeviceMetric.created_at), DeviceMetric.created_at, settings.METRICS_RETENTION_DAYS),
         (DeviceMetricHourly, (DeviceMetricHourly.device_id, DeviceMetricHourly.hour_bucket), DeviceMetricHourly.hour_bucket, settings.HOURLY_RETENTION_DAYS),
     ]
     for model, keys, timestamp, days in targets:
@@ -275,10 +291,18 @@ async def _cleanup_metrics() -> None:
         for _ in range(100):
             async with SessionLocal() as db:
                 batch = select(*keys).where(timestamp < cutoff).limit(10000)
+                if model is DeviceMetricHourly:
+                    bucket_end = model.hour_bucket + text("interval '1 hour'")
+                    for child, stamp in ((DeviceMetric, DeviceMetric.created_at), (DeviceMetricMinute, DeviceMetricMinute.minute_bucket)):
+                        dependent = select(child.device_id).where(child.device_id == model.device_id,
+                            stamp >= model.hour_bucket, stamp < bucket_end).correlate(model).exists()
+                        batch = batch.where(~dependent)
                 result = await db.execute(delete(model).where(tuple_(*keys).in_(batch)))
                 await db.commit()
                 if result.rowcount < 10000:
                     break
+
+    return blocked
 
 
 def build_scheduler() -> AsyncIOScheduler:

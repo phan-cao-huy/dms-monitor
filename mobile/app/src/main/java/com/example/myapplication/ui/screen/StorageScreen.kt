@@ -27,6 +27,7 @@ import com.example.myapplication.data.model.StorageSummary
             Text(featureText("Ổ chứa database còn trống", "Database disk free") + " · " +
                 (snapshot.free_bytes?.let { Formatter.formatFileSize(context, it) } ?: featureText("Chưa đo được","Unavailable")))
             val result = when(snapshot.cleanup?.status) {
+                "guarded" -> featureText("Đã giữ lại dữ liệu do chưa xác nhận đủ bản tổng hợp","Data retained because summaries could not be verified")
                 "success" -> featureText("Thành công","Succeeded")
                 "failed" -> featureText("Thất bại","Failed")
                 "started" -> featureText("Đã bắt đầu","Started")

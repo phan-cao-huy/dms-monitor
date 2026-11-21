@@ -212,17 +212,30 @@ async def check_postgres():
                     await db.execute(text(Path(__file__).resolve().parents[1].joinpath("app/db/storage.sql").read_text()))
                     with patch("app.workers.runner.SessionLocal", bound_session):
                         await cleanup_metrics()
-                    assert (
-                        await db.execute(
-                            select(DeviceMetric).where(DeviceMetric.created_at == old)
-                        )
-                    ).scalar_one_or_none() is None
-                    assert (
-                        await db.execute(select(DeviceMetricHourly))
-                    ).scalar_one_or_none() is None
-                    assert (
-                        await conn.execute(text("SELECT count(*) FROM device_metrics"))
-                    ).scalar() == 2
+                    assert await db.scalar(text("SELECT status FROM storage_cleanup")) == "guarded"
+                    assert await db.scalar(select(DeviceMetric.metric_id).where(DeviceMetric.created_at == old))
+                    from app.workers.metric_rollups import rollup_window
+                    start = old.replace(minute=0, second=0, microsecond=0)
+                    await rollup_window(db, start, start + timedelta(hours=1), now)
+                    await db.execute(text("UPDATE device_metrics_minute SET metric_stats=jsonb_set(metric_stats,'{cpu_usage,max}','99') WHERE device_id=:id AND minute_bucket=date_trunc('minute',cast(:old as timestamp))"), {"id": device.device_id,"old":old})
+                    with patch("app.workers.runner.SessionLocal", bound_session):
+                        await cleanup_metrics()
+                    assert await db.scalar(select(DeviceMetric.metric_id).where(DeviceMetric.created_at == old))
+                    await rollup_window(db, start, start + timedelta(hours=1), now)
+                    await db.execute(text("UPDATE device_metrics_hourly SET sample_count=sample_count+1 WHERE device_id=:id AND hour_bucket=:start"), {"id":device.device_id,"start":start})
+                    with patch("app.workers.runner.SessionLocal", bound_session):
+                        await cleanup_metrics()
+                    assert await db.scalar(select(DeviceMetric.metric_id).where(DeviceMetric.created_at == old)) is None
+                    minute_count = text("SELECT count(*) FROM device_metrics_minute WHERE device_id=:id AND minute_bucket>=:start AND minute_bucket<:stop")
+                    params = {"id":device.device_id,"start":start,"stop":start+timedelta(hours=1)}
+                    assert await db.scalar(minute_count, params) == 1
+                    assert await db.scalar(text("SELECT status FROM storage_cleanup")) == "guarded"
+                    await db.execute(text("UPDATE device_metrics_hourly SET sample_count=sample_count-1 WHERE device_id=:id AND hour_bucket=:start"), {"id":device.device_id,"start":start})
+                    with patch("app.workers.runner.SessionLocal", bound_session):
+                        await cleanup_metrics()
+                    assert await db.scalar(select(DeviceMetric.metric_id).where(DeviceMetric.created_at == old)) is None
+                    assert await db.scalar(minute_count, params) == 0
+                    assert await db.scalar(text("SELECT count(*) FROM device_metrics")) == 2
 
                     device.archived_at = now
                     device.status = "Archived"

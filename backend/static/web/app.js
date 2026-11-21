@@ -1,15 +1,15 @@
-import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.35';
-import {groupEditorState} from './group-access.js?v=1.0.35';
-import {canControlDevice} from './permissions.js?v=1.0.35';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.35';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.35';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.36';
+import {groupEditorState} from './group-access.js?v=1.0.36';
+import {canControlDevice} from './permissions.js?v=1.0.36';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.36';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.36';
 const WEB_VERSION='1.0.32';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.35';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.35';
-import {demoData} from './demo.js?v=1.0.35';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.36';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.36';
+import {demoData} from './demo.js?v=1.0.36';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.35';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.35';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.36';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.36';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -435,7 +435,7 @@ async function action(name, element){
     if(state.orgId!==workspace||route()!=='/settings')return;
     const names={raw:'Mẫu hiệu năng gốc',minute:'Tổng hợp theo phút',hour:'Tổng hợp theo giờ',events:'Nhật ký thiết bị',checks:'Kết quả kiểm tra dịch vụ',alerts:'Lịch sử cảnh báo',other:'Các bảng khác'};
     const size=n=>n==null?'Chưa đo được':n>=1073741824?(n/1073741824).toFixed(1)+' GiB':(n/1048576).toFixed(2)+' MiB';
-    const status={started:'Đã bắt đầu',success:'Thành công',failed:'Thất bại'};
+    const status={guarded:'Đã giữ lại dữ liệu do chưa xác nhận đủ bản tổng hợp',started:'Đã bắt đầu',success:'Thành công',failed:'Thất bại'};
     const cleaned=data.cleanup?status[data.cleanup.status]+' · '+date(data.cleanup.updated_at):'Chưa ghi nhận';
     openModal('Dung lượng & lưu trữ',`<p>Toàn máy chủ DMS · ${esc(date(data.measured_at))}</p>
       ${kv('Database đang dùng',size(data.database_bytes))}${kv('Ổ chứa database còn trống',size(data.free_bytes))}

@@ -1,5 +1,5 @@
-import {SERVER} from './api.js?v=1.0.35';
-import {esc, number, date, ago, button, empty, field, select, kv} from './ui.js?v=1.0.35';
+import {SERVER} from './api.js?v=1.0.36';
+import {esc, number, date, ago, button, empty, field, select, kv} from './ui.js?v=1.0.36';
 
 export function healthPanel(d,panel){
   const info=d.static_info||{},rows=info.disks_health;
