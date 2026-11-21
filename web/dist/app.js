@@ -67,10 +67,57 @@ function preview() {
   return `<div class="product-preview"><div class="preview-browser"><i class="traffic"></i><i class="traffic"></i><i class="traffic"></i><span class="preview-url">dms monitor / workspace</span><span class="text-xs muted">${icon('shield')}</span></div><div class="preview-body"><aside class="preview-side">${brand(true)}<div class="preview-menu"><span class="active">${icon('grid')}Tổng quan</span><span>${icon('monitor')}Thiết bị</span><span>${icon('bell')}Cảnh báo</span><span>${icon('workspace')}Không gian làm việc</span><span>${icon('activity')}Lịch sử lệnh</span><span>${icon('settings')}Cài đặt</span></div></aside><div class="preview-content"><div class="preview-title"><div><h3>Tổng quan hệ thống</h3><small class="muted">Mọi thiết bị, trong một không gian làm việc.</small></div><span class="pill online"><i class="dot"></i>Live view</span></div><div class="preview-kpis">${[['Tổng thiết bị','12'],['Trực tuyến','08'],['Cảnh báo','01'],['Ngoại tuyến','02']].map(([label,value])=>`<div class="preview-kpi">${label}<strong>${value}</strong></div>`).join('')}</div><div class="preview-panels"><div class="preview-panel"><strong>Hiệu năng thiết bị</strong><span class="muted" style="float:right;font-size:9px">60 phút gần nhất</span><svg class="preview-chart" viewBox="0 0 330 125" role="img" aria-label="Biểu đồ minh họa CPU và RAM"><path d="M0 20H330 M0 50H330 M0 80H330 M0 110H330" stroke="#edf1e9" stroke-dasharray="3 5"/><path d="${line(line1)}" fill="none" stroke="#6a9857" stroke-width="2"/><path d="${line(line2)}" fill="none" stroke="#8aabc9" stroke-width="2"/></svg><div class="chart-legend"><span><i class="legend-line"></i>CPU</span><span><i class="legend-line blue"></i>RAM</span></div></div><div class="preview-panel"><strong>Thiết bị đang hoạt động</strong><div class="preview-small-list">${demo.devices.slice(0,4).map(d=>`<div><span>${esc(d.device_name)}</span><span style="color:#6b9659">${d.cpu_usage}%</span></div>`).join('')}</div></div></div></div></div><div class="preview-caption">Dữ liệu minh họa giao diện · Dữ liệu thật hiển thị sau khi đăng nhập</div></div>`;
 }
 function landing(){
-  return `<div class="landing"><div class="page-wrap"><header class="landing-nav">${brand(true)}<nav aria-label="Điều hướng trang chủ"><a href="#features" data-section="features">Tính năng</a><a href="#workflow" data-section="workflow">Cách hoạt động</a><a href="#/overview" data-action="demo">Khám phá giao diện</a></nav><div class="nav-actions"><a class="btn ghost" href="#/login">Đăng nhập</a><a class="btn dark" href="#/register">Bắt đầu sử dụng ${icon('arrow')}</a></div></header><main id="main"><section class="landing-hero"><span class="hero-label"><i class="dot"></i>DEVICE MONITORING, MADE CLEAR</span><h1>Toàn bộ hệ thống.<br>Trong <em>một tầm nhìn.</em></h1><p>Nắm bắt tình trạng máy tính, phát hiện vấn đề và phối hợp cùng đội ngũ. DMS đưa mọi thiết bị về một không gian quản trị rõ ràng.</p><div class="hero-actions"><a class="btn dark" href="#/login">Mở bảng điều khiển ${icon('arrow')}</a>${button('Khám phá giao diện','demo','','play')}</div><div class="hero-note"><span>${icon('check')}Dùng chung tài khoản Android</span><span>${icon('check')}Kết nối HTTPS</span><span>${icon('check')}Quyền truy cập theo không gian làm việc</span></div></section>${preview()}<div class="trusted-line"><span>${icon('monitor')}Windows Agent</span><span>${icon('globe')}Web Dashboard</span><span>${icon('wifi')}Android App</span><span>${icon('shield')}Một nguồn dữ liệu</span></div><section id="features" class="landing-section"><div class="section-intro"><div class="eyebrow muted">01 / MỌI THỨ BẠN CẦN</div><h2>Ít thao tác hơn.<br>Hiểu hệ thống nhiều hơn.</h2><p>Từ một máy trạm đến nhiều nhóm thiết bị, luôn biết điều gì đang diễn ra và điều gì cần được ưu tiên.</p></div><div class="feature-grid">${[['activity','Giám sát có ngữ cảnh','Theo dõi CPU, RAM, ổ đĩa, mạng, GPU và các tiến trình trong từng thiết bị. Xem lịch sử hiệu năng ngay khi cần.'],['bell','Đúng vấn đề, đúng thời điểm','Tập trung các cảnh báo vào một nơi. Thiết lập ngưỡng theo thiết bị hoặc nhóm, xác nhận và xử lý sự cố có theo dõi.'],['users','Cộng tác cùng đội ngũ','Chia thiết bị theo không gian và nhóm. Cấp quyền Owner, Admin, Manager hoặc Viewer phù hợp với từng thành viên.']].map(([ico,title,desc],i)=>`<article class="feature-card"><div class="feature-number">0${i+1}</div>${icon(ico)}<h3>${title}</h3><p>${desc}</p></article>`).join('')}</div></section><section id="workflow" class="landing-section workflow"><div class="section-intro"><div class="eyebrow muted">02 / TỪ KẾT NỐI ĐẾN KIỂM SOÁT</div><h2>Sẵn sàng làm việc.<br>Không thêm phức tạp.</h2><p>Web và Android sử dụng cùng API, cùng tài khoản và cùng dữ liệu thiết bị. Những thay đổi được ghi nhận trên server DMS hiện tại.</p><a href="#/register" class="text-link" style="display:inline-flex;gap:8px;margin-top:24px;font-size:12px">Tạo không gian ${icon('arrow')}</a></div><div class="steps">${[['Tạo tài khoản hoặc đăng nhập','Sử dụng tài khoản DMS đã có trên điện thoại, hoặc đăng ký và bắt đầu một không gian làm việc mới.'],['Kết nối thiết bị','Tạo thiết bị, sao chép câu lệnh cài agent và chạy trên máy tính thuộc quyền quản lý của bạn.'],['Theo dõi và cộng tác','Kiểm tra hiệu năng, thiết lập cảnh báo và mời đội ngũ cùng quản lý trong một bảng điều khiển.']].map(([title,desc],i)=>`<div class="step"><div class="step-no">0${i+1}</div><div><h3>${title}</h3><p>${desc}</p></div></div>`).join('')}</div></section><section class="landing-section"><div class="landing-cta"><div><h2>Một góc nhìn rõ ràng.<br>Một hệ thống chủ động hơn.</h2><p>Bắt đầu từ những thiết bị bạn đang quản lý.</p></div><a class="btn primary" href="#/login">Đi đến bảng điều khiển ${icon('arrow')}</a></div></section></main><footer class="footer">${brand(true)}<span>© ${new Date().getFullYear()} DMS Monitor. Device Monitoring System.</span><div class="footer-links"><a href="#/login">Đăng nhập</a><a href="${SERVER}/static/dms-app.apk">Android APK</a><a href="https://github.com/phan-cao-huy/dms-monitor" target="_blank" rel="noopener noreferrer">Mã nguồn ${icon('arrow')}</a></div></footer></div></div>`;
+  return `<div class="landing"><div class="page-wrap"><header class="landing-nav">${brand(true)}<nav aria-label="Điều hướng trang chủ"><a href="#features" data-section="features">Tính năng</a><a href="#workflow" data-section="workflow">Cách hoạt động</a><a href="#/overview" data-action="demo">Khám phá giao diện</a></nav><div class="nav-actions"><a class="btn ghost" href="#/login">Đăng nhập</a><a class="btn dark" href="#/register">Bắt đầu sử dụng ${icon('arrow')}</a></div></header><main id="main"><section class="landing-hero"><span class="hero-label"><i class="dot"></i>DEVICE MONITORING, MADE CLEAR</span><h1>Toàn bộ hệ thống.<br>Trong <em>một tầm nhìn.</em></h1><p>Nắm bắt tình trạng máy tính, phát hiện vấn đề và phối hợp cùng đội ngũ. DMS đưa mọi thiết bị về một không gian quản trị rõ ràng.</p><div class="hero-actions"><a class="btn dark" href="#/login">Mở bảng điều khiển ${icon('arrow')}</a>${button('Khám phá giao diện','demo','','play')}</div><div class="hero-note"><span>${icon('check')}Dùng chung tài khoản Android</span><span>${icon('check')}Kết nối HTTPS</span><span>${icon('check')}Quyền truy cập theo không gian làm việc</span></div></section>${preview()}<div class="trusted-line"><span>${icon('monitor')}Windows Agent</span><span>${icon('globe')}Web Dashboard</span><span>${icon('wifi')}Android App</span><span>${icon('shield')}Một nguồn dữ liệu</span></div><section id="features" class="landing-section"><div class="section-intro"><div class="eyebrow muted">01 / MỌI THỨ BẠN CẦN</div><h2>Ít thao tác hơn.<br>Hiểu hệ thống nhiều hơn.</h2><p>Từ một máy trạm đến nhiều nhóm thiết bị, luôn biết điều gì đang diễn ra và điều gì cần được ưu tiên.</p></div><div class="feature-grid">${[['activity','Giám sát có ngữ cảnh','Theo dõi CPU, RAM, ổ đĩa, mạng, GPU và các tiến trình trong từng thiết bị. Xem lịch sử hiệu năng ngay khi cần.'],['bell','Đúng vấn đề, đúng thời điểm','Tập trung các cảnh báo vào một nơi. Thiết lập ngưỡng theo thiết bị hoặc nhóm, xác nhận và xử lý sự cố có theo dõi.'],['users','Cộng tác cùng đội ngũ','Chia thiết bị theo không gian và nhóm. Cấp quyền Owner, Admin, Manager hoặc Viewer phù hợp với từng thành viên.']].map(([ico,title,desc],i)=>`<article class="feature-card"><div class="feature-number">0${i+1}</div>${icon(ico)}<h3>${title}</h3><p>${desc}</p></article>`).join('')}</div></section><section id="workflow" class="landing-section workflow"><div class="section-intro"><div class="eyebrow muted">02 / TỪ KẾT NỐI ĐẾN KIỂM SOÁT</div><h2>Sẵn sàng làm việc.<br>Không thêm phức tạp.</h2><p>Web và Android sử dụng cùng API, cùng tài khoản và cùng dữ liệu thiết bị. Những thay đổi được ghi nhận trên server DMS hiện tại.</p><a href="#/register" class="text-link" style="display:inline-flex;gap:8px;margin-top:24px;font-size:12px">Tạo không gian ${icon('arrow')}</a></div><div class="steps">${[['Tạo tài khoản hoặc đăng nhập','Sử dụng tài khoản DMS đã có trên điện thoại, hoặc đăng ký và bắt đầu một không gian làm việc mới.'],['Kết nối thiết bị','Tạo thiết bị, sao chép câu lệnh cài agent và chạy trên máy tính thuộc quyền quản lý của bạn.'],['Theo dõi và cộng tác','Kiểm tra hiệu năng, thiết lập cảnh báo và mời đội ngũ cùng quản lý trong một bảng điều khiển.']].map(([title,desc],i)=>`<div class="step"><div class="step-no">0${i+1}</div><div><h3>${title}</h3><p>${desc}</p></div></div>`).join('')}</div></section><section class="landing-section"><div class="landing-cta"><div><h2>Một góc nhìn rõ ràng.<br>Một hệ thống chủ động hơn.</h2><p>Bắt đầu từ những thiết bị bạn đang quản lý.</p></div><a class="btn primary" href="#/login">Đi đến bảng điều khiển ${icon('arrow')}</a></div></section></main><footer class="footer">${brand(true)}<span>© ${new Date().getFullYear()} DMS Monitor. Device Monitoring System.</span><div class="footer-links"><a href="#/login">Đăng nhập</a><a href="./terms.html" target="_blank" rel="noopener noreferrer">Điều khoản dịch vụ</a><a href="${SERVER}/static/dms-app.apk">Android APK</a><a href="https://github.com/phan-cao-huy/dms-monitor" target="_blank" rel="noopener noreferrer">Mã nguồn ${icon('arrow')}</a></div></footer></div></div>`;
 }
+const GOOGLE_CLIENT_ID = "455891485973-rfehjhelt6q9e0nfqhcv5qpgci3q3at2.apps.googleusercontent.com";
+
+function initGoogleSignIn(){
+  const wrap = document.getElementById('google-btn-wrap');
+  if(!wrap) return;
+  if(window.google?.accounts?.id){
+    try {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleLogin,
+        auto_select: false
+      });
+      window.google.accounts.id.renderButton(wrap, {
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        width: 375,
+        locale: 'vi'
+      });
+    } catch(err) {
+      console.warn('Google Sign-In init error:', err);
+    }
+  } else {
+    setTimeout(initGoogleSignIn, 300);
+  }
+}
+
+async function handleGoogleLogin(response){
+  const error = document.getElementById('auth-error');
+  if(error) error.innerHTML = '';
+  try {
+    const tokens = await api.request('auth/google', {
+      method: 'POST',
+      auth: false,
+      body: { credential: response.credential }
+    });
+    api.setSession(tokens);
+    resetWorkspace();
+    state.user = await api.request('auth/me');
+    navigate('/overview');
+    await loadWorkspace();
+  } catch(e) {
+    if(error) error.innerHTML = `<div class="form-error">Đăng nhập Google thất bại: ${esc(e.message)}</div>`;
+  }
+}
+
 function authView(register=false){
-  return `<div class="auth-layout"><aside class="auth-art">${brand(true)}<div class="auth-copy"><div class="eyebrow" style="color:#839e8a;margin-bottom:25px">YOUR DEVICES. ONE CLEAR VIEW.</div><h1>Hiểu hệ thống.<br><span>Làm chủ mỗi ngày.</span></h1><p>Một không gian cho thiết bị, đội ngũ và những quyết định kịp thời. Kết nối với dữ liệu DMS bạn đang sử dụng.</p><div class="row" style="margin-top:30px;color:#a8c28f;font-size:12px">${icon('shield')} Kết nối được bảo vệ bằng HTTPS</div></div><div class="auth-footer">DMS Monitor / Web workspace<br>Thiết bị của bạn. Dữ liệu của bạn.</div></aside><main id="main" class="auth-form-wrap"><div class="auth-form"><h2>${register?'Tạo tài khoản DMS':'Chào mừng trở lại.'}</h2><p>${register?'Bắt đầu với không gian làm việc dành cho bạn.':'Đăng nhập để tiếp tục quản lý hệ thống của bạn.'}</p><form id="auth-form" data-register="${register}" autocomplete="on"><div id="auth-error" role="alert"></div>${register?field('Tên đầy đủ','full_name','text','','autocomplete="name" maxlength="150"')+field('Tên đăng nhập','username','text','','required minlength="3" maxlength="50" pattern="[A-Za-z0-9_.\\-]+" autocomplete="username"')+field('Địa chỉ email','email','email','','required autocomplete="email"'):field('Email hoặc tên đăng nhập','identifier','text','','required autocomplete="username" maxlength="100"')}<label class="form-field">Mật khẩu<div class="password-wrap"><input name="password" type="password" required minlength="${register?8:1}" maxlength="72" autocomplete="${register?'new-password':'current-password'}"><button type="button" data-action="show-password" aria-label="Hiện hoặc ẩn mật khẩu">${icon('eye')}</button></div>${register?'<small>Tối thiểu 8 ký tự, tối đa 72 byte UTF-8.</small>':''}</label><button class="btn primary" type="submit">${register?'Tạo tài khoản':'Đăng nhập'} ${icon('arrow')}</button></form><div class="auth-switch">${register?'Đã có tài khoản? <a class="text-link" href="#/login">Đăng nhập</a>':'Chưa có tài khoản? <a class="text-link" href="#/register">Tạo tài khoản</a>'}</div><div class="auth-bottom"><a href="#/">${icon('home')} Về trang chủ</a><span style="margin:0 12px">·</span><button class="btn ghost sm" data-action="demo">Xem giao diện minh họa</button></div></div></main></div>`;
+  return `<div class="auth-layout"><aside class="auth-art">${brand(true)}<div class="auth-copy"><div class="eyebrow" style="color:#839e8a;margin-bottom:25px">YOUR DEVICES. ONE CLEAR VIEW.</div><h1>Hiểu hệ thống.<br><span>Làm chủ mỗi ngày.</span></h1><p>Một không gian cho thiết bị, đội ngũ và những quyết định kịp thời. Kết nối với dữ liệu DMS bạn đang sử dụng.</p><div class="row" style="margin-top:30px;color:#a8c28f;font-size:12px">${icon('shield')} Kết nối được bảo vệ bằng HTTPS</div></div><div class="auth-footer">DMS Monitor / Web workspace<br>Thiết bị của bạn. Dữ liệu của bạn.</div></aside><main id="main" class="auth-form-wrap"><div class="auth-form"><h2>${register?'Tạo tài khoản DMS':'Chào mừng trở lại.'}</h2><p>${register?'Bắt đầu với không gian làm việc dành cho bạn.':'Đăng nhập để tiếp tục quản lý hệ thống của bạn.'}</p><form id="auth-form" data-register="${register}" autocomplete="on"><div id="auth-error" role="alert"></div>${register?field('Tên đầy đủ','full_name','text','','autocomplete="name" maxlength="150"')+field('Tên đăng nhập','username','text','','required minlength="3" maxlength="50" pattern="[A-Za-z0-9_.\\-]+" autocomplete="username"')+field('Địa chỉ email','email','email','','required autocomplete="email"'):field('Email hoặc tên đăng nhập','identifier','text','','required autocomplete="username" maxlength="100"')}<label class="form-field">Mật khẩu<div class="password-wrap"><input name="password" type="password" required minlength="${register?8:1}" maxlength="72" autocomplete="${register?'new-password':'current-password'}"><button type="button" data-action="show-password" aria-label="Hiện hoặc ẩn mật khẩu">${icon('eye')}</button></div>${register?'<small>Tối thiểu 8 ký tự, tối đa 72 byte UTF-8.</small>':''}</label>${!register?`<div style="text-align:right;margin:-8px 0 16px"><button type="button" class="text-link" data-action="forgot-password" style="background:none;border:0;cursor:pointer;font-size:12px;padding:0">Quên mật khẩu?</button></div>`:''}${register?`<div style="margin:14px 0 16px;display:flex;align-items:flex-start;gap:9px;font-size:12px;color:var(--ink)"><input type="checkbox" id="agree_terms" name="agree_terms" required style="width:16px;height:16px;margin-top:2px;accent-color:var(--green);flex:none;cursor:pointer"><label for="agree_terms" style="cursor:pointer;line-height:1.5">Tôi đã đọc và đồng ý với <a href="./terms.html" target="_blank" class="text-link" rel="noopener noreferrer">Điều khoản sử dụng</a> DMS Monitor</label></div>`:''}<button class="btn primary" type="submit">${register?'Tạo tài khoản':'Đăng nhập'} ${icon('arrow')}</button></form><div class="row" style="margin:20px 0 16px;align-items:center;color:var(--muted);font-size:11px"><hr style="flex:1;border:0;border-top:1px solid var(--border)"><span>HOẶC</span><hr style="flex:1;border:0;border-top:1px solid var(--border)"></div><div id="google-btn-wrap" style="display:flex;justify-content:center;min-height:44px"></div><div class="auth-switch">${register?'Đã có tài khoản? <a class="text-link" href="#/login">Đăng nhập</a>':'Chưa có tài khoản? <a class="text-link" href="#/register">Tạo tài khoản</a>'}</div><div class="auth-bottom"><a href="#/">${icon('home')} Về trang chủ</a><span style="margin:0 12px">·</span><a href="./terms.html" target="_blank" rel="noopener noreferrer" style="color:inherit">Điều khoản dịch vụ</a><span style="margin:0 12px">·</span><button class="btn ghost sm" data-action="demo">Xem giao diện minh họa</button></div></div></main></div>`;
 }
 const navItems=[['/overview','grid','Tổng quan'],['/devices','monitor','Thiết bị'],['/analytics','activity','Phân tích tài nguyên'],['/alerts','bell','Cảnh báo'],['/checks','activity','Kiểm tra dịch vụ'],['/organizations','workspace','Không gian & thành viên'],['/activity','activity','Lịch sử lệnh'],['/settings','settings','Cài đặt']];
 function shell(body){
@@ -198,13 +245,13 @@ function organizationsView(){
 }
 function settingsView(){
   const u=state.user||{};
-  return heading('Cài đặt & tài khoản','Thông tin tài khoản, giao diện và kết nối của bạn.')+`<div class="account-grid">${panel('Tài khoản DMS','Dùng chung với ứng dụng Android.',`<div class="panel-body">${kv('Họ tên',u.full_name)}${kv('Tên đăng nhập',u.username)}${kv('Email',u.email)}${kv('Vai trò hiện tại',org()?.role)}${kv('Mã người dùng',u.user_id)}<p class="muted text-xs gap-top">Backend hiện chưa cung cấp API đổi hồ sơ hoặc mật khẩu. Web chỉ hiển thị thông tin đã lưu trên server.</p><div class="gap-top">${button('Đăng xuất','logout','danger','logout')}</div></div>`)}${panel('Tùy chọn & kết nối','Các thay đổi giao diện được lưu trên trình duyệt này.',`<div class="panel-body"><div class="setting-row"><div><strong>Giao diện tối</strong><p>Điều chỉnh độ sáng của không gian làm việc.</p></div><button class="toggle ${state.theme==='dark'?'on':''}" role="switch" aria-checked="${state.theme==='dark'}" aria-label="Giao diện tối" data-action="theme"></button></div><div class="setting-row"><div><strong>Đồng bộ tự động</strong><p>Mỗi 15 giây khi tab đang hiển thị.</p></div><span class="pill online">Đang bật</span></div><div class="setting-row"><div><strong>Kết nối API</strong><p class="break">${API_BASE}</p></div>${icon('shield')}</div><div class="setting-row"><div><strong>Ứng dụng Android</strong><p>${state.version?'Phiên bản '+esc(state.version.version_name):'Kiểm tra bản phát hành mới nhất.'}</p></div><a href="${SERVER}/static/dms-app.apk" class="btn sm">${icon('download')}Tải APK</a></div><div class="setting-row"><div><strong>Trạng thái server</strong><p>${state.connection?'Đã nhận dữ liệu từ API.':'Chưa xác minh kết nối.'}</p></div>${button('Kiểm tra','check-health','sm','refresh')}</div></div>`)}</div>`;
+  return heading('Cài đặt & tài khoản','Thông tin tài khoản, giao diện và kết nối của bạn.')+`<div class="account-grid">${panel('Tài khoản DMS','Dùng chung với ứng dụng Android.',`<div class="panel-body">${kv('Họ tên',u.full_name)}${kv('Tên đăng nhập',u.username)}${kv('Email',u.email)}${kv('Vai trò hiện tại',org()?.role)}${kv('Mã người dùng',u.user_id)}<div class="row gap-top">${button('Đổi mật khẩu','change-password','primary sm','key')}${button('Đăng xuất','logout','danger sm','logout')}</div></div>`)}${panel('Tùy chọn & kết nối','Các thay đổi giao diện được lưu trên trình duyệt này.',`<div class="panel-body"><div class="setting-row"><div><strong>Giao diện tối</strong><p>Điều chỉnh độ sáng của không gian làm việc.</p></div><button class="toggle ${state.theme==='dark'?'on':''}" role="switch" aria-checked="${state.theme==='dark'}" aria-label="Giao diện tối" data-action="theme"></button></div><div class="setting-row"><div><strong>Đồng bộ tự động</strong><p>Mỗi 15 giây khi tab đang hiển thị.</p></div><span class="pill online">Đang bật</span></div><div class="setting-row"><div><strong>Kết nối API</strong><p class="break">${API_BASE}</p></div>${icon('shield')}</div><div class="setting-row"><div><strong>Ứng dụng Android</strong><p>${state.version?'Phiên bản '+esc(state.version.version_name):'Kiểm tra bản phát hành mới nhất.'}</p></div><a href="${SERVER}/static/dms-app.apk" class="btn sm">${icon('download')}Tải APK</a></div><div class="setting-row"><div><strong>Trạng thái server</strong><p>${state.connection?'Đã nhận dữ liệu từ API.':'Chưa xác minh kết nối.'}</p></div>${button('Kiểm tra','check-health','sm','refresh')}</div></div>`)}</div>`;
 }
 
 function render(){
   applyTheme();const path=route();
   if(path==='/'){document.title='DMS Monitor — Một tầm nhìn cho toàn bộ hệ thống';preserveRender(landing());return;}
-  if(path==='/login'||path==='/register'){document.title=(path==='/login'?'Đăng nhập':'Đăng ký')+' · DMS Monitor';preserveRender(authView(path==='/register'));return;}
+  if(path==='/login'||path==='/register'){document.title=(path==='/login'?'Đăng nhập':'Đăng ký')+' · DMS Monitor';preserveRender(authView(path==='/register'));initGoogleSignIn();return;}
   if(!state.user){if(api.session){preserveRender(`<main class="boot"><span class="brand-mark">d</span><div><p>${state.error?esc(state.error):'Đang mở không gian làm việc…'}</p>${state.error?button('Thử lại','refresh','sm','refresh')+button('Đăng xuất','logout','sm'):''}</div></main>`);return;}navigate('/login');return;}
   document.title=(navItems.find(([r])=>r===path)?.[2]||'Chi tiết thiết bị')+' · DMS Monitor';
   let content=path==='/overview'?overview():path==='/devices'?devicesView():path==='/analytics'?analyticsView(state,panel,heading):path.startsWith('/devices/')?deviceView():path==='/alerts'?alertsView():path==='/checks'?(admin()?checksView(state,panel,heading):empty('Không có quyền','Chỉ Owner/Admin được xem và quản lý kiểm tra dịch vụ.','shield')):path==='/organizations'?organizationsView():path==='/activity'?activityView():path==='/settings'?settingsView():empty('Không tìm thấy trang','Về trang tổng quan để tiếp tục.','home','<a href="#/overview" class="btn primary">Về tổng quan</a>');
@@ -416,6 +463,73 @@ async function action(name, element){
   if(name==='edit-device'){
     const d=currentDevice();openModal('Chỉnh sửa thiết bị',field('Tên thiết bị','device_name','text',d.device_name,'required maxlength="100"')+select('Nhóm thiết bị','group_id',[[0,'Chưa phân nhóm'],...state.groups.map(g=>[g.group_id,g.group_name])],d.group_id||0)+field('Ngưỡng ngoại tuyến (phút)','offline_threshold_minutes','number',d.offline_threshold_minutes||5,'required min="1" max="1440"')+area('Mô tả','description',d.description||'')+`<details><summary class="text-xs muted">Cấu hình theo dõi dịch vụ / tiến trình (JSON)</summary><div class="gap-top">${area('Watch config','watch_config',JSON.stringify(d.watch_config||{services:[],processes:[]},null,2),'class="mono"')}</div></details>`,{onSubmit:async f=>{let watch;try{watch=JSON.parse(f.get('watch_config'));}catch{throw new Error('Watch config phải là JSON hợp lệ.');}if(!watch||Array.isArray(watch)||typeof watch!=='object')throw new Error('Watch config phải là một object.');await api.request(`devices/${d.device_id}`,{method:'PATCH',body:{device_name:f.get('device_name').trim(),group_id:Number(f.get('group_id')),description:f.get('description'),offline_threshold_minutes:Number(f.get('offline_threshold_minutes')),watch_config:watch}});toast('Đã cập nhật thiết bị.');await loadWorkspace();}});return;
   }
+  if(name==='forgot-password'){
+    openModal('Quên mật khẩu',
+      `<p class="intro">Nhập địa chỉ email tài khoản của bạn để nhận mã xác thực đặt lại mật khẩu.</p>`+
+      field('Địa chỉ email','email','email','','required autocomplete="email"'),
+      {
+        submit: 'Nhận mã xác thực',
+        onSubmit: async f => {
+          const email = f.get('email').trim();
+          const res = await api.request('auth/forgot-password', {
+            method: 'POST',
+            auth: false,
+            body: { email }
+          });
+          const code = res.reset_code || '';
+          openModal('Đặt lại mật khẩu',
+            `<p class="intro">Nhập mã xác thực 6 số và mật khẩu mới cho tài khoản <strong>${esc(email)}</strong>.</p>`+
+            (code?`<div class="notice">Mã xác thực của bạn: <strong class="mono" style="font-size:16px;letter-spacing:2px">${esc(code)}</strong></div>`:'')+
+            field('Mã xác thực (6 số)','reset_code','text',code,'required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code"')+
+            field('Mật khẩu mới (tối thiểu 8 ký tự)','new_password','password','','required minlength="8" maxlength="72" autocomplete="new-password"')+
+            field('Xác nhận mật khẩu mới','confirm_password','password','','required minlength="8" maxlength="72" autocomplete="new-password"'),
+            {
+              submit: 'Lưu mật khẩu mới',
+              onSubmit: async f2 => {
+                const resetCode = f2.get('reset_code').trim();
+                const newPass = f2.get('new_password');
+                const confirmPass = f2.get('confirm_password');
+                if(newPass !== confirmPass) throw new Error('Mật khẩu mới và xác nhận mật khẩu không khớp.');
+                if(new TextEncoder().encode(newPass).length > 72) throw new Error('Mật khẩu không được vượt quá 72 byte UTF-8.');
+                await api.request('auth/reset-password', {
+                  method: 'POST',
+                  auth: false,
+                  body: { email, reset_code: resetCode, new_password: newPass }
+                });
+                toast('Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay.');
+              }
+            }
+          );
+          return false;
+        }
+      }
+    );
+    return;
+  }
+  if(name==='change-password'){
+    openModal('Đổi mật khẩu tài khoản',
+      field('Mật khẩu hiện tại','old_password','password','','required autocomplete="current-password"')+
+      field('Mật khẩu mới (tối thiểu 8 ký tự)','new_password','password','','required minlength="8" maxlength="72" autocomplete="new-password"')+
+      field('Xác nhận mật khẩu mới','confirm_password','password','','required minlength="8" maxlength="72" autocomplete="new-password"'),
+      {
+        submit: 'Cập nhật mật khẩu',
+        onSubmit: async f => {
+          const oldPass = f.get('old_password');
+          const newPass = f.get('new_password');
+          const confirmPass = f.get('confirm_password');
+          if(newPass !== confirmPass) throw new Error('Mật khẩu mới và xác nhận mật khẩu không khớp.');
+          if(newPass === oldPass) throw new Error('Mật khẩu mới phải khác mật khẩu hiện tại.');
+          if(new TextEncoder().encode(newPass).length > 72) throw new Error('Mật khẩu không được vượt quá 72 byte UTF-8.');
+          await api.request('auth/change-password', {
+            method: 'POST',
+            body: { old_password: oldPass, new_password: newPass }
+          });
+          toast('Đổi mật khẩu thành công!');
+        }
+      }
+    );
+    return;
+  }
   if(name==='toggle-monitoring'){
     const d=currentDevice();confirmAction(d.is_monitoring?'Tạm dừng theo dõi':'Bật theo dõi',d.is_monitoring?'Agent sẽ ngừng thu thập tài nguyên và tiến trình, nhưng vẫn giữ kết nối để nhận lệnh.':'Agent sẽ tiếp tục thu thập tài nguyên và tiến trình.',async()=>{await api.request(`devices/${d.device_id}/toggle-monitoring`,{method:'POST',body:{is_monitoring:!d.is_monitoring}});});return;
   }
@@ -575,6 +689,7 @@ document.addEventListener('submit',async event=>{
     try{
       state.demo=false;const register=form.dataset.register==='true';const password=data.get('password');
       if(register&&new TextEncoder().encode(password).length>72)throw new Error('Mật khẩu không được vượt quá 72 byte UTF-8.');
+      if(register&&!form.agree_terms?.checked)throw new Error('Bạn cần đọc và đồng ý với Điều khoản sử dụng DMS Monitor để tiếp tục.');
       if(register)await api.request('auth/register',{method:'POST',auth:false,body:{username:data.get('username').trim(),email:data.get('email').trim(),password,full_name:data.get('full_name').trim()}});
       const tokens=await api.request('auth/login',{method:'POST',auth:false,body:{identifier:register?data.get('username').trim():data.get('identifier').trim(),password}});
       api.setSession(tokens);resetWorkspace();state.user=await api.request('auth/me');navigate('/overview');await loadWorkspace();

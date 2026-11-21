@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     SYNTHETIC_ALLOWED_CIDRS: str = ""
     FCM_ENABLED: bool = False
     FCM_CREDENTIALS_FILE: str | None = None
+    GOOGLE_CLIENT_ID: str = "455891485973-rfehjhelt6q9e0nfqhcv5qpgci3q3at2.apps.googleusercontent.com"
 
 
 settings = Settings()

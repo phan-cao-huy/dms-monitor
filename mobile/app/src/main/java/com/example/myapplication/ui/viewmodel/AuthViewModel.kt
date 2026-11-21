@@ -95,6 +95,44 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loginWithGoogle(credential: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val response = RetrofitClient.apiService.googleLogin(
+                    com.example.myapplication.data.model.GoogleLoginRequest(credential = credential)
+                )
+                if (response.isSuccessful && response.body() != null) {
+                    val body = response.body()!!
+                    tokenManager.saveTokens(body.accessToken, body.refreshToken)
+                    val user = try {
+                        val meResponse = RetrofitClient.apiService.getMe()
+                        if (meResponse.isSuccessful) meResponse.body() else null
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        null
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoggedIn = true,
+                        user = user
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Đăng nhập Google thất bại (${response.code()})"
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Không thể kết nối server: ${e.message}"
+                )
+            }
+        }
+    }
+
     fun register(username: String, email: String, password: String, fullName: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)

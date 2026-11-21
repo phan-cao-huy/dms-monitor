@@ -13,11 +13,23 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<TokenResponse>
 
+    @POST("auth/google")
+    suspend fun googleLogin(@Body request: GoogleLoginRequest): Response<TokenResponse>
+
     @POST("auth/refresh")
     suspend fun refreshToken(@Body request: RefreshRequest): Response<TokenResponse>
 
     @POST("auth/logout")
     suspend fun logout(@Body request: RefreshRequest): Response<Unit>
+
+    @POST("auth/change-password")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<Map<String, String>>
+
+    @POST("auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<ForgotPasswordResponse>
+
+    @POST("auth/reset-password")
+    suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<Map<String, String>>
 
     @GET("auth/me")
     suspend fun getMe(): Response<UserInfo>

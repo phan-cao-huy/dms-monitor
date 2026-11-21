@@ -8,6 +8,10 @@ data class LoginRequest(
     val password: String
 )
 
+data class GoogleLoginRequest(
+    val credential: String
+)
+
 data class RegisterRequest(
     val username: String,
     val email: String,
@@ -23,6 +27,26 @@ data class TokenResponse(
 
 data class RefreshRequest(
     @SerializedName("refresh_token") val refreshToken: String
+)
+
+data class ChangePasswordRequest(
+    @SerializedName("old_password") val oldPassword: String,
+    @SerializedName("new_password") val newPassword: String
+)
+
+data class ForgotPasswordRequest(
+    val email: String
+)
+
+data class ForgotPasswordResponse(
+    val message: String,
+    @SerializedName("reset_code") val resetCode: String? = null
+)
+
+data class ResetPasswordRequest(
+    val email: String,
+    @SerializedName("reset_code") val resetCode: String,
+    @SerializedName("new_password") val newPassword: String
 )
 
 data class UserInfo(

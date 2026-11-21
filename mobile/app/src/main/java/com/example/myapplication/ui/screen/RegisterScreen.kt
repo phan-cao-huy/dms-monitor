@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.data.api.RetrofitClient
 import com.example.myapplication.ui.viewmodel.AuthUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +41,8 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var agreedToTerms by remember { mutableStateOf(false) }
+    var showTermsDialog by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
@@ -156,7 +161,39 @@ fun RegisterScreen(
                     onDone = { focusManager.clearFocus() }
                 )
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Terms of Service Checkbox & Link
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
+            ) {
+                Checkbox(
+                    checked = agreedToTerms,
+                    onCheckedChange = { agreedToTerms = it }
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Tôi đồng ý với ",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "Điều khoản sử dụng",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.clickable { showTermsDialog = true }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Error
             if (uiState.error != null) {
@@ -173,7 +210,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             val isValid = username.length >= 3 && email.contains("@") &&
-                    password.length >= 8 && password == confirmPassword && fullName.isNotBlank()
+                    password.length >= 8 && password == confirmPassword && fullName.isNotBlank() && agreedToTerms
 
             Button(
                 onClick = { onRegister(username, email, password, fullName) },
@@ -199,5 +236,63 @@ fun RegisterScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showTermsDialog) {
+        val uriHandler = LocalUriHandler.current
+        val termsWebUrl = RetrofitClient.getBaseUrl().replace("/api/v1/", "").trimEnd('/') + "/terms.html"
+        AlertDialog(
+            onDismissRequest = { showTermsDialog = false },
+            title = { Text("📜 Điều khoản sử dụng DMS Monitor") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "1. Chấp thuận điều khoản\n" +
+                                "Bằng việc đăng ký tài khoản DMS Monitor, bạn đồng ý tuân thủ toàn bộ các quy định tại đây.\n\n" +
+                                "2. Phạm vi dịch vụ\n" +
+                                "DMS Monitor cung cấp giải pháp giám sát tình trạng máy tính (CPU, RAM, Ổ đĩa, Mạng, GPU, tiến trình) và thực thi lệnh quản trị từ xa hợp lệ.\n\n" +
+                                "3. Trách nhiệm thiết bị\n" +
+                                "Bạn cam kết chỉ cài đặt DMS Agent trên các máy tính thuộc quyền sở hữu hoặc được ủy quyền quản trị hợp pháp. Nghiêm cấm mọi hành vi can thiệp trái phép thiết bị của người khác.\n\n" +
+                                "4. Bảo mật tài khoản & Agent Token\n" +
+                                "Người dùng tự bảo quản mật khẩu đăng nhập và Secret Token của máy tính. Mọi thao tác thực thi từ tài khoản thuộc về trách nhiệm của bạn.\n\n" +
+                                "5. Quyền riêng tư\n" +
+                                "Hệ thống chỉ đo lường số liệu kỹ thuật, không thu thập tệp tin cá nhân, hình ảnh màn hình hay phím bấm. Toàn bộ đường truyền được bảo vệ bằng giao thức bảo mật HTTPS/TLS.\n\n" +
+                                "6. Giới hạn trách nhiệm\n" +
+                                "DMS Monitor không chịu trách nhiệm với sự cố phát sinh do người dùng chủ động thực thi lệnh dừng tiến trình hoặc khởi động lại máy tính từ xa.",
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(
+                        onClick = {
+                            try {
+                                uriHandler.openUri(termsWebUrl)
+                            } catch (_: Exception) {}
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Mở bản web đầy đủ ↗", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    agreedToTerms = true
+                    showTermsDialog = false
+                }) {
+                    Text("Tôi đồng ý")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTermsDialog = false }) {
+                    Text("Đóng")
+                }
+            }
+        )
     }
 }
