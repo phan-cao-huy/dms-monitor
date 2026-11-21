@@ -1,15 +1,15 @@
-import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.37';
-import {groupEditorState} from './group-access.js?v=1.0.37';
-import {canControlDevice} from './permissions.js?v=1.0.37';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.37';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.37';
-const WEB_VERSION='1.0.32';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.37';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.37';
-import {demoData} from './demo.js?v=1.0.37';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.38';
+import {groupEditorState} from './group-access.js?v=1.0.38';
+import {canControlDevice} from './permissions.js?v=1.0.38';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.38';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.38';
+const WEB_VERSION='1.0.38';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.38';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.38';
+import {demoData} from './demo.js?v=1.0.38';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.37';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.37';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.38';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.38';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -437,8 +437,13 @@ async function action(name, element){
     const size=n=>n==null?'Chưa đo được':n>=1073741824?(n/1073741824).toFixed(1)+' GiB':(n/1048576).toFixed(2)+' MiB';
     const status={guarded:'Đã giữ lại dữ liệu do chưa xác nhận đủ bản tổng hợp',started:'Đã bắt đầu',success:'Thành công',failed:'Thất bại'};
     const cleaned=data.cleanup?status[data.cleanup.status]+' · '+date(data.cleanup.updated_at):'Chưa ghi nhận';
+    const pressure={normal:'Bình thường',warning:'Cảnh báo',critical:'Nghiêm trọng',unknown:'Chưa đo được'};
+    const backups={ready:'Đã có bản sao',failed:'Sao lưu thất bại',stale:'Trạng thái đã cũ',unknown:'Chưa ghi nhận'};
+    const backup=data.backup||{};
     openModal('Dung lượng & lưu trữ',`<p>Toàn máy chủ DMS · ${esc(date(data.measured_at))}</p>
       ${kv('Database đang dùng',size(data.database_bytes))}${kv('Ổ chứa database còn trống',size(data.free_bytes))}
+      ${kv('Ổ database · cảnh báo từ 80%, nghiêm trọng từ 90%',(pressure[data.disk_level]||'Chưa đo được')+(data.disk_percent!=null?' · '+data.disk_percent+'%':''))}
+      ${kv('Sao lưu database hằng ngày',backups[backup.status]||'Chưa ghi nhận')}${backup.date?kv('Bản sao (UTC)',backup.date+' · '+size(backup.bytes)):''}
       ${kv('Lần dọn gần nhất',cleaned)}
       <table><thead><tr><th>Loại dữ liệu</th><th>Dung lượng</th><th>Thời hạn giữ</th></tr></thead>
       <tbody>${data.groups.map(g=>`<tr><td>${esc(names[g.kind])}</td><td>${size(g.bytes)}</td><td>${g.days?g.days+' ngày':'—'}</td></tr>`).join('')}</tbody></table>

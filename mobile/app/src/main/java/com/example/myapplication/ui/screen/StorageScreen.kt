@@ -26,6 +26,23 @@ import com.example.myapplication.data.model.StorageSummary
             Text(featureText("Database đang dùng", "Database size") + " · " + Formatter.formatFileSize(context, snapshot.database_bytes))
             Text(featureText("Ổ chứa database còn trống", "Database disk free") + " · " +
                 (snapshot.free_bytes?.let { Formatter.formatFileSize(context, it) } ?: featureText("Chưa đo được","Unavailable")))
+            val diskStatus = when(snapshot.disk_level) {
+                "normal" -> featureText("Bình thường","Normal")
+                "warning" -> featureText("Cảnh báo","Warning")
+                "critical" -> featureText("Nghiêm trọng","Critical")
+                else -> featureText("Chưa đo được","Unavailable")
+            }
+            Text(featureText("Ổ database","Database disk") + " · " + diskStatus + (snapshot.disk_percent?.let { " · $it%" } ?: ""))
+            Text(featureText("Cảnh báo từ 80%, nghiêm trọng từ 90%.","Warning at 80%, critical at 90%."))
+            val backup = snapshot.backup
+            val backupStatus = when(backup?.status) {
+                "ready" -> featureText("Đã có bản sao","Backup available")
+                "failed" -> featureText("Sao lưu thất bại","Backup failed")
+                "stale" -> featureText("Trạng thái đã cũ","Status out of date")
+                else -> featureText("Chưa ghi nhận","No status yet")
+            }
+            Text(featureText("Sao lưu hằng ngày","Daily backup") + " · " + backupStatus)
+            backup?.date?.let { Text(it + " UTC · " + Formatter.formatFileSize(context,backup.bytes ?: 0)) }
             val result = when(snapshot.cleanup?.status) {
                 "guarded" -> featureText("Đã giữ lại dữ liệu do chưa xác nhận đủ bản tổng hợp","Data retained because summaries could not be verified")
                 "success" -> featureText("Thành công","Succeeded")

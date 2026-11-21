@@ -1,3 +1,5 @@
+> **1.0.38:** Daily database backups, disk pressure alerts and acceptance cases for all five storage features: [storage acceptance](docs/STORAGE_ACCEPTANCE_VI.md).
+
 > **Web/Android 1.0.32 (Android build 30):** group editor preloads stored roles, separates effective access, disables unchanged saves; End task defaults to exact executable scope. Disposable Windows parent/child kill verified; Viewer restrictions preserved. See [docs/GROUP_EDITOR_END_TASK.md](docs/GROUP_EDITOR_END_TASK.md).
 
 > **Web/Android 1.0.31 (Android build 29):** workspace Viewer cannot control/modify devices even with group Manager; server 403 and matching web/Android control gates. See [docs/VIEWER_CONTROL_FIX.md](docs/VIEWER_CONTROL_FIX.md).

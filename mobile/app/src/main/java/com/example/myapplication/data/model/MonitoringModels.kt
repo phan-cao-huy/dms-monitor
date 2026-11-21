@@ -84,7 +84,8 @@ data class MetricsQuery(
 
 data class DeviceSettingsWrite(@SerializedName("offline_threshold_minutes") val offlineThresholdMinutes: Int)
 
-data class StorageSummary(val alert_days: Int, val database_bytes: Long, val free_bytes: Long?, val cleanup: CleanupStatus?, val groups: List<StorageGroup>)
+data class DatabaseBackup(val status:String, val date:String?, val bytes:Long?)
+data class StorageSummary(val disk_percent:Double?, val disk_level:String?, val backup:DatabaseBackup?, val alert_days: Int, val database_bytes: Long, val free_bytes: Long?, val cleanup: CleanupStatus?, val groups: List<StorageGroup>)
 data class CleanupStatus(val status: String, val updated_at: String)
 data class StorageGroup(val kind: String, val bytes: Long, val days: Int?)
 

@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, UTC
 from typing import Literal
-import os
-import shutil
+from app.services.storage_health import disk_snapshot, backup_snapshot
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import text
@@ -45,12 +44,10 @@ async def storage(org_id: int, db: DB, user: CurrentUser):
     groups = (await db.execute(text(SIZES))).mappings().all()
     days = dict(raw=settings.METRICS_RETENTION_DAYS, minute=settings.MINUTE_RETENTION_DAYS,
                 hour=settings.HOURLY_RETENTION_DAYS, events=settings.EVENTS_RETENTION_DAYS, checks=7)
-    mount = "/run/dms-db-volume"
-    free = shutil.disk_usage(mount).free if os.path.ismount(mount) else None
     cleanup = (await db.execute(text("SELECT status, updated_at FROM storage_cleanup WHERE id=1"))).mappings().first()
     alert_days = await db.scalar(text("SELECT days FROM workspace_alert_retention WHERE org_id=:id"), {"id":org_id})
     return dict(alert_days=alert_days or 0, database_bytes=await db.scalar(text("SELECT pg_database_size(current_database())")),
-                free_bytes=free, measured_at=datetime.now(UTC), cleanup=cleanup,
+                backup=backup_snapshot(), **disk_snapshot(), measured_at=datetime.now(UTC), cleanup=cleanup,
                 groups=[dict(**row, days=days.get(row["kind"])) for row in groups])
 
 # Only server-defined identifiers are interpolated into this query.

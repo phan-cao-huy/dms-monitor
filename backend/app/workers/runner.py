@@ -321,6 +321,8 @@ def build_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(backfill_metrics, "cron", hour=0, minute=15)
     scheduler.add_job(manage_partitions, "cron", hour=0, minute=0)
     from app.workers.alert_retention import prune_resolved_alerts
+    from app.workers.storage_pressure import notify_disk_pressure
+    scheduler.add_job(notify_disk_pressure, "interval", minutes=5)
     scheduler.add_job(prune_resolved_alerts, "cron", hour=1, minute=15)
     scheduler.add_job(cleanup_metrics, "cron", hour=1, minute=0)
     return scheduler
