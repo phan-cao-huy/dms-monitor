@@ -13,6 +13,7 @@ CREATE TABLE users (
     user_id             SERIAL PRIMARY KEY,
     username            VARCHAR(50)  UNIQUE NOT NULL,
     email               VARCHAR(100) UNIQUE NOT NULL,
+    password_version    INTEGER NOT NULL DEFAULT 0,
     password_hash       VARCHAR(255) NOT NULL,          -- bcrypt, cost >= 12
     full_name           VARCHAR(150),
     avatar_url          TEXT,
@@ -527,3 +528,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_rule_group_component_active ON alert_rules 
  (CASE WHEN metric_type='SERVICE' THEN COALESCE(service_name,'')
        WHEN metric_type='PROCESS_MISSING' THEN COALESCE(process_name,'') ELSE '' END)
 ) WHERE group_id IS NOT NULL AND is_active;
+
+CREATE TABLE IF NOT EXISTS password_recovery (
+    user_id integer PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    digest text NOT NULL,
+    nonce text NOT NULL,
+    sent_at timestamp NOT NULL,
+    window_start timestamp NOT NULL,
+    deliveries integer NOT NULL,
+    attempts integer NOT NULL DEFAULT 0
+);

@@ -1,6 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from app.services.password_recovery import deliver_code, mail_config, redeem_code
+from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -109,7 +110,7 @@ async def login(
             detail="Invalid username/email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token, refresh_token = await issue_tokens(db, user.user_id)
+    access_token, refresh_token = await issue_tokens(db, user)
     return TokenOut(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -130,7 +131,7 @@ async def google_login(
             detail="Xác thực tài khoản Google không thành công hoặc token không hợp lệ",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token, refresh_token = await issue_tokens(db, user.user_id)
+    access_token, refresh_token = await issue_tokens(db, user)
     return TokenOut(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -204,6 +205,8 @@ async def change_password(
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, str]:
     """Đổi mật khẩu tài khoản khi đã đăng nhập."""
+    if payload.old_password == payload.new_password:
+        raise HTTPException(422, "Mật khẩu mới phải khác mật khẩu hiện tại.")
     success = await change_user_password(
         db, user, payload.old_password, payload.new_password
     )
@@ -221,10 +224,13 @@ async def change_password(
 )
 async def forgot_password(
     payload: ForgotPasswordIn,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> dict[str, str | None]:
-    """Gửi yêu cầu quên mật khẩu, sinh mã xác thực OTP 6 số (hạn 15 phút)."""
-    raise HTTPException(status_code=503, detail="Chức năng khôi phục mật khẩu đang chờ cấu hình gửi email.")
+    background: BackgroundTasks,
+) -> dict[str, str]:
+    config = mail_config()
+    if config is None:
+        raise HTTPException(503, "Server chưa cấu hình hộp thư gửi mã khôi phục.")
+    background.add_task(deliver_code,str(payload.email),config)
+    return {"message": "Nếu email thuộc tài khoản DMS, bạn sẽ nhận mã có hiệu lực 15 phút."}
 
 
 @router.post(
@@ -235,5 +241,6 @@ async def reset_password(
     payload: ResetPasswordIn,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, str]:
-    """Đặt lại mật khẩu mới bằng mã xác thực 6 số."""
-    raise HTTPException(status_code=503, detail="Chức năng khôi phục mật khẩu đang chờ cấu hình gửi email.")
+    if not await redeem_code(db,str(payload.email),payload.reset_code,payload.new_password):
+        raise HTTPException(400,"Mã không đúng, đã hết hạn hoặc đã dùng hết số lần thử.")
+    return {"message": "Đã đặt lại mật khẩu."}

@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import decode_access_token
+from app.core.security import access_identity
 from app.db.session import get_db
 from app.models.auth import User
 from app.models.device import Device
@@ -27,12 +27,12 @@ async def get_current_user(
     if credentials is None:
         raise unauthorized
     try:
-        user_id = decode_access_token(credentials.credentials)
+        user_id, version = access_identity(credentials.credentials)
     except ValueError:
         raise unauthorized from None
 
     user = await db.get(User, user_id)
-    if user is None:
+    if user is None or user.password_version != version:
         raise unauthorized
     return user
 

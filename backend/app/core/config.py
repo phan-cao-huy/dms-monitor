@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from pydantic import Field
+from typing import Annotated, Literal
+from pydantic import Field, SecretStr, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -26,6 +27,11 @@ class Settings(BaseSettings):
     SYNTHETIC_ALLOWED_CIDRS: str = ""
     FCM_ENABLED: bool = False
     FCM_CREDENTIALS_FILE: str | None = None
+    RESET_SMTP_HOST: str = "smtp.gmail.com"
+    RESET_SMTP_PORT: Annotated[Literal[465, 587], BeforeValidator(int)] = 587
+    RESET_SMTP_USERNAME: str = ""
+    RESET_SMTP_PASSWORD: SecretStr | None = None
+    RESET_SMTP_FROM: str = ""
     GOOGLE_CLIENT_ID: str = "455891485973-rfehjhelt6q9e0nfqhcv5qpgci3q3at2.apps.googleusercontent.com"
 
 

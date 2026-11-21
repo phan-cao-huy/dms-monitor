@@ -25,18 +25,22 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, password_version: int = 0) -> str:
     expires_at = datetime.now(UTC) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
     return jwt.encode(
-        {"sub": str(user_id), "type": "access", "exp": expires_at},
+        {"ver": password_version, "sub": str(user_id), "type": "access", "exp": expires_at},
         settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
     )
 
 
 def decode_access_token(token: str) -> int:
+    return access_identity(token)[0]
+
+
+def access_identity(token: str) -> tuple[int, int]:
     try:
         payload = jwt.decode(
             token,
@@ -45,7 +49,7 @@ def decode_access_token(token: str) -> int:
         )
         if payload.get("type") != "access":
             raise ValueError("Invalid access token")
-        return int(payload["sub"])
+        return int(payload["sub"]), int(payload.get("ver",0))
     except (JWTError, KeyError, TypeError) as exc:
         raise ValueError("Invalid access token") from exc
 

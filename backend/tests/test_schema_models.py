@@ -17,6 +17,7 @@ def test_auth_and_organization_models_match_dms01_tables():
             "username",
             "email",
             "password_hash",
+            "password_version",
             "full_name",
             "avatar_url",
             "is_email_verified",

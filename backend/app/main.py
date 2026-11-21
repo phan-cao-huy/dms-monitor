@@ -33,7 +33,7 @@ async def _ensure_db_schema() -> None:
     async with engine.begin() as conn:
         for stmt in migration_statements:
             await conn.execute(text(stmt))
-        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql", "storage.sql", "alert_retention.sql", "storage_push.sql"):
+        for name in ("t1_email.sql", "t2_monitoring.sql", "t3_metrics.sql", "unique_rules.sql", "storage.sql", "alert_retention.sql", "storage_push.sql", "password_recovery.sql"):
             migration = Path(__file__).resolve().parent / "db" / name
             for stmt in migration.read_text(encoding="utf-8").split(";"):
                 if stmt.strip():
@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.38",
+        "web_version": "1.0.39",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 36,
-        "version_name": "1.0.38",
+        "version_code": 37,
+        "version_name": "1.0.39",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "Sao lưu database hằng ngày và cảnh báo dung lượng ổ lưu trữ.",
-        "release_notes_en": "Daily database backups and disk usage alerts.",
+        "release_notes": "Đổi mật khẩu và khôi phục tài khoản bằng mã gửi qua email.",
+        "release_notes_en": "Change your password or recover your account with an emailed code.",
         "force_update": False
     }
 

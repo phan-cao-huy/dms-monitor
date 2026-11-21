@@ -44,7 +44,7 @@ class ForgotPasswordIn(BaseModel):
 
 class ResetPasswordIn(BaseModel):
     email: EmailStr
-    reset_code: str = Field(min_length=6, max_length=6)
+    reset_code: str = Field(pattern=r"^[0-9]{6}$")
     new_password: str = Field(min_length=8, max_length=72)
 
     @field_validator("new_password")

@@ -1,15 +1,15 @@
-import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.38';
-import {groupEditorState} from './group-access.js?v=1.0.38';
-import {canControlDevice} from './permissions.js?v=1.0.38';
-import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.38';
-import {effectiveRules,duplicateRule} from './rules.js?v=1.0.38';
-const WEB_VERSION='1.0.38';
-import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.38';
-import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.38';
-import {demoData} from './demo.js?v=1.0.38';
+import {endTaskScopeOptions,killParameters} from './process-actions.js?v=1.0.39';
+import {groupEditorState} from './group-access.js?v=1.0.39';
+import {canControlDevice} from './permissions.js?v=1.0.39';
+import {isDeviceOnline,matchesDeviceStatus,connectedCount} from './device-status.js?v=1.0.39';
+import {effectiveRules,duplicateRule} from './rules.js?v=1.0.39';
+const WEB_VERSION='1.0.39';
+import {API_BASE, SERVER, createClient, ApiError} from './api.js?v=1.0.39';
+import {icon, esc, number, percent, date, ago, status, button, empty, meter, field, select, area, kv, brand, spark, chart, csvDownload, alertCopy, processHeat, commandFeedback} from './ui.js?v=1.0.39';
+import {demoData} from './demo.js?v=1.0.39';
 
-import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.38';
-import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.38';
+import {analyticsView,labelsPanel,labelForm,normalizeLabelKey,labelInputError,labelOptions,labelChips,matchesLabel,rangeHours,rangeOptions,resolutionText,fillTimeline} from './metrics.js?v=1.0.39';
+import {healthPanel,connectionsView,eventsView,checksView,checkForm,checkPayload,checkHistory,checkDetail} from './monitoring.js?v=1.0.39';
 
 const $ = (selector, root=document) => root.querySelector(selector);
 const root = $('#app');
@@ -528,16 +528,14 @@ async function action(name, element){
         submit: 'Nhận mã xác thực',
         onSubmit: async f => {
           const email = f.get('email').trim();
-          const res = await api.request('auth/forgot-password', {
+          await api.request('auth/forgot-password', {
             method: 'POST',
             auth: false,
             body: { email }
           });
-          const code = res.reset_code || '';
           openModal('Đặt lại mật khẩu',
-            `<p class="intro">Nhập mã xác thực 6 số và mật khẩu mới cho tài khoản <strong>${esc(email)}</strong>.</p>`+
-            (code?`<div class="notice">Mã xác thực của bạn: <strong class="mono" style="font-size:16px;letter-spacing:2px">${esc(code)}</strong></div>`:'')+
-            field('Mã xác thực (6 số)','reset_code','text',code,'required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code"')+
+            `<p class="intro">Nếu tài khoản tồn tại, kiểm tra hộp thư và thư rác. Nhập mã 6 số trong 15 phút và mật khẩu mới cho <strong>${esc(email)}</strong>.</p>`+
+            field('Mã xác thực (6 số)','reset_code','text','','required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code"')+
             field('Mật khẩu mới (tối thiểu 8 ký tự)','new_password','password','','required minlength="8" maxlength="72" autocomplete="new-password"')+
             field('Xác nhận mật khẩu mới','confirm_password','password','','required minlength="8" maxlength="72" autocomplete="new-password"'),
             {
@@ -581,7 +579,8 @@ async function action(name, element){
             method: 'POST',
             body: { old_password: oldPass, new_password: newPass }
           });
-          toast('Đổi mật khẩu thành công!');
+          await logout();
+          toast('Đã đổi mật khẩu. Hãy đăng nhập lại.');
         }
       }
     );

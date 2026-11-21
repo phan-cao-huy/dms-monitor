@@ -39,8 +39,7 @@ data class ForgotPasswordRequest(
 )
 
 data class ForgotPasswordResponse(
-    val message: String,
-    @SerializedName("reset_code") val resetCode: String? = null
+    val message: String
 )
 
 data class ResetPasswordRequest(

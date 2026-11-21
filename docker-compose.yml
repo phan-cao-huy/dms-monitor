@@ -31,7 +31,10 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+      - path: .password-reset.env.local
+        required: false
     ports: ["8000:8000"]
     depends_on:
       db: { condition: service_healthy }

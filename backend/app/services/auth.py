@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -85,7 +84,7 @@ async def authenticate_user(
     result = await db.execute(
         select(User).where(
             or_(func.lower(User.username) == normalized, func.lower(User.email) == normalized)
-        )
+        ).with_for_update()
     )
     user = result.scalar_one_or_none()
     if (
@@ -95,21 +94,24 @@ async def authenticate_user(
     ):
         return None
     user.last_login_at = _utc_naive()
-    await db.commit()
     return user
 
 
 async def issue_tokens(
-    db: AsyncSession, user_id: int
+    db: AsyncSession, user: User
 ) -> tuple[str, str]:
     refresh_token = create_refresh_token()
-    db.add(_new_refresh_token(user_id, refresh_token))
+    db.add(_new_refresh_token(user.user_id, refresh_token))
     await db.commit()
-    return create_access_token(user_id), refresh_token
+    return create_access_token(user.user_id,user.password_version), refresh_token
 
 
 async def rotate_refresh_token(db: AsyncSession, token: str) -> tuple[int, str, str] | None:
     token_hash = hash_refresh_token(token)
+    uid = select(AuthToken.user_id).where(AuthToken.token_hash==token_hash, AuthToken.token_type=="REFRESH").scalar_subquery()
+    user = await db.scalar(select(User).where(User.user_id==uid).with_for_update())
+    if user is None:
+        return None
     result = await db.execute(
         select(AuthToken)
         .where(
@@ -127,9 +129,6 @@ async def rotate_refresh_token(db: AsyncSession, token: str) -> tuple[int, str, 
     ):
         return None
 
-    user = await db.get(User, stored_token.user_id)
-    if user is None:
-        return None
 
     new_token = create_refresh_token()
     stored_token.used_at = now
@@ -142,7 +141,7 @@ async def rotate_refresh_token(db: AsyncSession, token: str) -> tuple[int, str, 
         )
     )
     await db.commit()
-    return user.user_id, create_access_token(user.user_id), new_token
+    return user.user_id, create_access_token(user.user_id,user.password_version), new_token
 
 
 async def revoke_refresh_token(db: AsyncSession, token: str) -> None:
@@ -161,11 +160,11 @@ async def revoke_refresh_token(db: AsyncSession, token: str) -> None:
 async def change_user_password(
     db: AsyncSession, user: User, old_password: str, new_password: str
 ) -> bool:
-    if not verify_password(old_password, user.password_hash):
+    from app.services.password_recovery import locked_user, replace_password
+    user = await locked_user(db,user.email)
+    if user is None or not verify_password(old_password, user.password_hash):
         return False
-    user.password_hash = hash_password(new_password)
-    user.updated_at = _utc_naive()
-    await db.commit()
+    await replace_password(db,user,new_password)
     return True
 
 
@@ -193,76 +192,6 @@ async def save_fcm_token(
         return False
     stored_token.fcm_token = fcm_token
     stored_token.device_info = device_info
-    await db.commit()
-    return True
-
-
-async def create_password_reset_code(db: AsyncSession, email: str) -> tuple[bool, str | None]:
-    normalized_email = email.strip().lower()
-    result = await db.execute(
-        select(User).where(func.lower(User.email) == normalized_email)
-    )
-    user = result.scalar_one_or_none()
-    if user is None:
-        return False, None
-
-    code = f"{secrets.randbelow(900000) + 100000}"
-    code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
-    expires_at = _utc_naive() + timedelta(minutes=15)
-
-    await db.execute(
-        update(AuthToken)
-        .where(
-            AuthToken.user_id == user.user_id,
-            AuthToken.token_type == "PASSWORD_RESET",
-            AuthToken.used_at.is_(None),
-        )
-        .values(used_at=_utc_naive())
-    )
-
-    reset_token = AuthToken(
-        user_id=user.user_id,
-        token_type="PASSWORD_RESET",
-        token_hash=code_hash,
-        expires_at=expires_at,
-    )
-    db.add(reset_token)
-    await db.commit()
-    return True, code
-
-
-async def reset_password_with_code(
-    db: AsyncSession, email: str, code: str, new_password: str
-) -> bool:
-    normalized_email = email.strip().lower()
-    result = await db.execute(
-        select(User).where(func.lower(User.email) == normalized_email)
-    )
-    user = result.scalar_one_or_none()
-    if user is None:
-        return False
-
-    code_hash = hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
-    token_res = await db.execute(
-        select(AuthToken)
-        .where(
-            AuthToken.user_id == user.user_id,
-            AuthToken.token_type == "PASSWORD_RESET",
-            AuthToken.token_hash == code_hash,
-            AuthToken.used_at.is_(None),
-            AuthToken.expires_at > _utc_naive(),
-        )
-        .with_for_update()
-    )
-    token = token_res.scalar_one_or_none()
-    if token is None:
-        return False
-
-    token.used_at = _utc_naive()
-    user.password_hash = hash_password(new_password)
-    user.updated_at = _utc_naive()
-    user.failed_login_count = 0
-    user.locked_until = None
     await db.commit()
     return True
 

@@ -279,7 +279,7 @@ fun LoginScreen(
                         )
                     } else {
                         Text(
-                            text = "Nhập mã xác thực 6 số và mật khẩu mới cho email: $forgotEmail",
+                            text = "Nếu tài khoản tồn tại, kiểm tra hộp thư và thư rác. Nhập mã 6 số trong 15 phút và mật khẩu mới cho: $forgotEmail",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -342,14 +342,10 @@ fun LoginScreen(
                                         ForgotPasswordRequest(forgotEmail.trim())
                                     )
                                     if (res.isSuccessful) {
-                                        val code = res.body()?.resetCode ?: ""
-                                        if (code.isNotBlank()) {
-                                            forgotCode = code
-                                            Toast.makeText(context, "Mã xác thực của bạn: $code", Toast.LENGTH_LONG).show()
-                                        }
+                                        forgotCode = ""
                                         forgotStep = 2
                                     } else {
-                                        forgotError = if (res.code() == 404) "Không tìm thấy tài khoản với email này" else "Yêu cầu thất bại (${res.code()})"
+                                        forgotError = if (res.code() == 503) "Server chưa cấu hình hộp thư gửi mã khôi phục." else "Yêu cầu thất bại (${res.code()})"
                                     }
                                 } catch (e: Exception) {
                                     forgotError = e.localizedMessage ?: "Lỗi kết nối máy chủ"
@@ -367,7 +363,7 @@ fun LoginScreen(
                         }
                     }
                 } else {
-                    val canSubmit = forgotCode.length == 6 && forgotNewPassword.length >= 8 && forgotNewPassword == forgotConfirmPassword
+                    val canSubmit = forgotCode.matches(Regex("[0-9]{6}")) && forgotNewPassword.toByteArray().size <= 72 && forgotNewPassword.length >= 8 && forgotNewPassword == forgotConfirmPassword
                     Button(
                         onClick = {
                             coroutineScope.launch {

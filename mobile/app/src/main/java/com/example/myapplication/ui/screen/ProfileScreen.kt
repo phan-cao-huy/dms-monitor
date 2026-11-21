@@ -221,7 +221,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 val isFormValid = oldPassword.isNotBlank() && newPassword.length >= 8 &&
-                        newPassword == confirmPassword && oldPassword != newPassword
+                        newPassword.toByteArray().size <= 72 && newPassword == confirmPassword && oldPassword != newPassword
                 Button(
                     onClick = {
                         coroutineScope.launch {
@@ -238,6 +238,7 @@ fun ProfileScreen(
                                         Toast.LENGTH_SHORT
                                     ).show()
                                     showPasswordDialog = false
+                                    onLogout()
                                 } else {
                                     val code = response.code()
                                     errorMessage = if (code == 400) {
