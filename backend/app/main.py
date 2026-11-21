@@ -96,15 +96,15 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.32",
+        "web_version": "1.0.33",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
-        "version_code": 30,
-        "version_name": "1.0.32",
+        "version_code": 31,
+        "version_name": "1.0.33",
         "apk_url": "/static/dms-app.apk",
         "apk_size_bytes": apk_size,
-        "release_notes": "• Biểu mẫu quyền nhóm nạp đúng vai trò đang lưu của thành viên\n• Hiển thị rõ quyền trong nhóm và quyền thực tế theo không gian\n• End task mặc định buộc tắt toàn bộ ứng dụng cùng tên\n• Giữ tùy chọn buộc tắt riêng PID và giới hạn quyền Viewer",
-        "release_notes_en": "• Load the member's stored role in the group editor\n• Explain stored group roles versus effective workspace permissions\n• Default End task to force-closing the whole matching application\n• Keep explicit PID mode and Viewer restrictions",
+        "release_notes": "Gỡ thông báo qua email khỏi web và Android.",
+        "release_notes_en": "Removed email alerts from web and Android.",
         "force_update": False
     }
 

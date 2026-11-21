@@ -1,5 +1,5 @@
-import {SERVER} from './api.js?v=1.0.32';
-import {esc, number, date, ago, button, empty, field, select, kv} from './ui.js?v=1.0.32';
+import {SERVER} from './api.js?v=1.0.33';
+import {esc, number, date, ago, button, empty, field, select, kv} from './ui.js?v=1.0.33';
 
 export function healthPanel(d,panel){
   const info=d.static_info||{},rows=info.disks_health;
@@ -43,7 +43,7 @@ export function checkForm(r={}){
     field('Chu kỳ (giây, tối thiểu 30)','interval_seconds','number',r.interval_seconds||60,'required min="30" max="86400"')+
     field('Thời gian chờ (giây, tối đa 5)','timeout_seconds','number',r.timeout_seconds||5,'required min="1" max="5"')+
     field('Mở sự cố sau số lần lỗi liên tiếp','failure_threshold','number',r.failure_threshold||3,'required min="1" max="20"')+
-    select('Trạng thái','enabled',[['true','Đang bật'],['false','Tạm tắt']],String(r.enabled??true))+'</div><p class="muted text-sm">Gửi email sự cố qua các kênh đã bật trong Cảnh báo → Email. Không lưu nội dung phản hồi của địa chỉ được kiểm tra.</p>';
+    select('Trạng thái','enabled',[['true','Đang bật'],['false','Tạm tắt']],String(r.enabled??true))+'</div><p class="muted text-sm">Không lưu nội dung phản hồi của địa chỉ được kiểm tra.</p>';
 }
 
 export function checkPayload(f){

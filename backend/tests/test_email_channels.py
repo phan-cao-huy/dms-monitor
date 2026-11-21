@@ -77,29 +77,12 @@ def test_delivery_errors_do_not_expose_smtp_response(error):
     assert "secret" not in safe_delivery_error(error)
 
 
-@pytest.mark.parametrize("role,found,expected", [("Viewer", True,403),("Admin",False,404)])
-def test_email_api_rejects_viewer_and_cross_workspace_channel(role, found, expected):
-    member_result = Mock()
-    member_result.scalar_one_or_none.return_value = SimpleNamespace(role=role)
-    channel_result = Mock()
-    channel_result.scalar_one_or_none.return_value = None
-    db = Mock(execute=AsyncMock(side_effect=[member_result, channel_result]))
-    async def user():
-        return SimpleNamespace(user_id=1)
-    async def database():
-        yield db
-    app.dependency_overrides[get_current_user] = user
-    app.dependency_overrides[get_db] = database
-    try:
-        response = TestClient(app).post("/api/v1/orgs/10/email-channels/999/test")
-        assert response.status_code == expected
-        if found:
-            assert db.execute.await_count == 1
-        else:
-            stmt = str(db.execute.call_args.args[0])
-            assert "email_channels.org_id" in stmt and "email_channels.channel_id" in stmt
-    finally:
-        app.dependency_overrides.clear()
+def test_email_alerts_removed_and_push_still_scheduled():
+    from app.workers.runner import build_scheduler
+    assert not any("email-channels" in path for path in app.openapi()["paths"])
+    jobs = {job.func.__name__ for job in build_scheduler().get_jobs()}
+    assert {"send_pending_notifications", "run_synthetic_checks"} <= jobs
+    assert not {"send_pending_emails", "send_check_emails"} & jobs
 
 
 @pytest.mark.parametrize("error,expected", [(None,"SENT"),(TimeoutError(),"FAILED"),(smtplib.SMTPAuthenticationError(535,b"secret"),"FAILED")])

@@ -109,6 +109,6 @@ import kotlinx.coroutines.launch
         OutlinedTextField(timeout,{timeout=it},label={Text(featureText("Thời gian chờ (1–5 giây)","Timeout (1–5 seconds)"))},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
         OutlinedTextField(failures,{failures=it},label={Text(featureText("Mở sự cố sau số lần lỗi (1–20)","Open incident after failures (1–20)"))},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number))
         Row{Checkbox(enabled,{enabled=it});Text(featureText("Bật kiểm tra","Enable check"))}
-        Text(featureText("HTTPS còn ≤14 ngày được cảnh báo ngay. Sự cố gửi qua kênh email đã bật. Lưu chỉnh sửa sẽ bắt đầu lại chu kỳ đánh giá.","HTTPS expiry within 14 days opens an incident immediately. Alerts use enabled email channels. Saving restarts the evaluation window."))
+        Text(featureText("HTTPS còn ≤14 ngày được cảnh báo ngay. Lưu chỉnh sửa sẽ bắt đầu lại chu kỳ đánh giá.","HTTPS expiry within 14 days opens an incident immediately. Saving restarts the evaluation window."))
     }
 }

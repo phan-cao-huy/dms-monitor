@@ -186,12 +186,6 @@ interface ApiService {
     @GET("app/version")
     suspend fun getAppVersion(): Response<AppVersionResponse>
 
-    @GET("orgs/{org}/email-channels") suspend fun emailChannels(@Path("org") org: String): Response<List<EmailChannel>>
-    @POST("orgs/{org}/email-channels") suspend fun createEmailChannel(@Path("org") org: String, @Body body: EmailChannelWrite): Response<EmailChannel>
-    @PUT("orgs/{org}/email-channels/{id}") suspend fun updateEmailChannel(@Path("org") org: String, @Path("id") id: Int, @Body body: EmailChannelWrite): Response<EmailChannel>
-    @DELETE("orgs/{org}/email-channels/{id}") suspend fun deleteEmailChannel(@Path("org") org: String, @Path("id") id: Int): Response<Unit>
-    @POST("orgs/{org}/email-channels/{id}/test") suspend fun testEmailChannel(@Path("org") org: String, @Path("id") id: Int): Response<Map<String,String>>
-    @GET("orgs/{org}/email-channels/{id}/deliveries") suspend fun emailDeliveries(@Path("org") org: String, @Path("id") id: Int): Response<List<EmailDelivery>>
 
     @GET("orgs/{org}/checks") suspend fun serviceChecks(@Path("org") org: String): Response<List<ServiceCheck>>
     @POST("orgs/{org}/checks") suspend fun createCheck(@Path("org") org: String, @Body body: CheckWrite): Response<ServiceCheck>

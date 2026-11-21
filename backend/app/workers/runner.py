@@ -263,19 +263,16 @@ async def cleanup_metrics() -> None:
 
 
 def build_scheduler() -> AsyncIOScheduler:
-    from app.workers.email_notifications import send_pending_emails
     from app.workers.metric_rollups import aggregate_recent_metrics, backfill_metrics
     from app.workers.notifications import send_pending_notifications
     from app.workers.rules import evaluate_alert_rules
-    from app.workers.synthetic_checks import run_synthetic_checks, send_check_emails
+    from app.workers.synthetic_checks import run_synthetic_checks
 
     scheduler = AsyncIOScheduler(timezone="UTC", job_defaults={"max_instances": 1, "coalesce": True})
     scheduler.add_job(run_synthetic_checks, "interval", seconds=10)
-    scheduler.add_job(send_check_emails, "interval", minutes=1)
     scheduler.add_job(check_offline_devices, "interval", minutes=1)
     scheduler.add_job(check_command_timeouts, "interval", minutes=1)
     scheduler.add_job(evaluate_alert_rules, "interval", minutes=1)
-    scheduler.add_job(send_pending_emails, "interval", minutes=1)
     scheduler.add_job(send_pending_notifications, "interval", minutes=1)
     scheduler.add_job(aggregate_recent_metrics, "interval", minutes=1)
     scheduler.add_job(backfill_metrics, "cron", hour=0, minute=15)

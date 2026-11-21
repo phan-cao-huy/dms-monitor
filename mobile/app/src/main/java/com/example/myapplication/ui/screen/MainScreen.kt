@@ -158,10 +158,8 @@ fun MainScreen(
                     Row(Modifier.horizontalScroll(rememberScrollState())) {
                         TextButton(onClick={alertPane="history"}){Text(featureText("Lịch sử","History"))}
                         TextButton(onClick={alertPane="rules"}){Text(featureText("Ngưỡng cảnh báo","Alert rules"))}
-                        if(dashboardState.selectedOrg?.role in listOf("Owner","Admin"))TextButton(onClick={alertPane="email"}){Text("Email")}
                     }
                     if(alertPane=="rules")key(currentUser?.id,dashboardState.selectedOrg?.id){AlertRulesScreen(dashboardState.selectedOrg,dashboardState.devices,dashboardState.groups)}
-                    else if(alertPane=="email")key(currentUser?.id,dashboardState.selectedOrg?.id){EmailChannelsScreen(dashboardState.selectedOrg)}
                     else AlertScreen(
                     alerts = dashboardState.alerts,
                     isLoading = dashboardState.isLoading,

@@ -18,10 +18,9 @@ import com.example.myapplication.data.model.*
                 FilterChip(selected=tab=="analytics",onClick={tab="analytics"},label={Text(featureText("Phân tích","Analytics"))})
                 if(org?.role in listOf("Owner","Admin")){
                     FilterChip(selected=tab=="checks",onClick={tab="checks"},label={Text(featureText("Dịch vụ","Service checks"))})
-                    FilterChip(selected=tab=="email",onClick={tab="email"},label={Text("Email")})
                 }
             }
         }
-        Box(Modifier.weight(1f)){key(org?.id,tab){when(tab){"checks"->ServiceChecksScreen(org);"email"->EmailChannelsScreen(org);else->MetricAnalysisScreen(org,devices)}}}
+        Box(Modifier.weight(1f)){key(org?.id,tab){when(tab){"checks"->ServiceChecksScreen(org);else->MetricAnalysisScreen(org,devices)}}}
     }
 }
