@@ -96,7 +96,7 @@ def get_app_version():
     apk_path = os.path.join(STATIC_DIR, "dms-app.apk")
     apk_size = os.path.getsize(apk_path) if os.path.isfile(apk_path) else 0
     return {
-        "web_version": "1.0.39",
+        "web_version": "1.0.40",
         "agent_version": "1.3.0",
         "agent_url": "/static/dms-agent.exe",
         "version_code": 37,

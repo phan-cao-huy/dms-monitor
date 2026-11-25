@@ -46,7 +46,7 @@ export const field = (label, name, type = 'text', value = '', attrs = '') => `<l
 export const select = (label, name, options, selected = '', attrs = '') => `<label class="form-field">${label}<select name="${name}" ${attrs}>${options.map(([value,text])=>`<option value="${esc(value)}" ${String(selected)===String(value)?'selected':''}>${esc(text)}</option>`).join('')}</select></label>`;
 export const area = (label, name, value = '', attrs = '') => `<label class="form-field">${label}<textarea name="${name}" ${attrs}>${esc(value)}</textarea></label>`;
 export const kv = (label, value) => `<div class="kv-row"><span>${esc(label)}</span><span>${esc(value ?? '—')}</span></div>`;
-export const brand = (small = false) => `<a class="brand" href="#/" aria-label="DMS Monitor — Trang chủ"><span class="brand-mark">d</span><span>DMS Monitor</span>${small?'':'<span class="brand-version">WEB</span>'}</a>`;
+export const brand = (small = false, workspace = false) => `<a class="brand" href="${workspace?'#/overview':'#/'}" aria-label="DMS Monitor — ${workspace?'Tổng quan':'Trang chủ'}"><span class="brand-mark">d</span><span>DMS Monitor</span>${small?'':'<span class="brand-version">WEB</span>'}</a>`;
 export function spark(points, color = '#79a46d') {
   if (!points.length) return '';
   const path = points.map((v,i)=>`${i?'L':'M'}${i*66/Math.max(1,points.length-1)},${23-Math.max(0,Math.min(100,v))*0.2}`).join(' ');

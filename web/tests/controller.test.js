@@ -25,6 +25,7 @@ test('workspace routes render and demo mode cannot write to the real API',async(
   for(const [path,title] of [['/overview','Tổng quan hệ thống'],['/devices','Danh sách thiết bị'],['/analytics','Phân tích tài nguyên'],['/devices/1','DESIGN-WS-01'],['/alerts','Lịch sử cảnh báo'],['/organizations','Nhóm thiết bị'],['/activity','Lịch sử lệnh'],['/settings','Cài đặt & tài khoản']]){
     location.hash='#'+path;await windowEvents.get('hashchange')();
     const html=nodes.get('#app').innerHTML;
+    assert.match(html, /class="brand" href="#\/overview"/);
     assert.ok(html.includes(title),`Missing ${title} on ${path}`);
     assert.doesNotMatch(html,/NaN|undefined/);
   }
